@@ -17,8 +17,9 @@ skill wins** and this doc should be corrected.
 
 | Layer | Lives at | Authoritative for | Edited by |
 |---|---|---|---|
-| **Skills** | `~/.cursor/skills/<name>/SKILL.md` | The exact commands, gates, and sequences the agent runs | Claude |
-| **This doc** | `~/dev/gnadd/GNADD.md` | The model, the rationale, and how to drive it | Claude |
+| **Skills** | `skills/<name>/SKILL.md` in this repo | The exact commands, gates, and sequences the agent runs | Claude |
+| **Skills (installed)** | `~/.cursor/skills/<name>/` via `npx skills add` | Runtime copy Cursor loads globally | Install script |
+| **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
 | **Instructions** | Claude Desktop settings (a pointer to this doc) | Telling Claude this doc exists | You (once) |
 
 The skills carry operational detail. This doc deliberately does **not** restate every
@@ -39,6 +40,14 @@ questions deliberately, and read diffs before merging.
 **Prerequisites:** Cursor with the five GNADD skills installed (`prime`,
 `new-issue`, `start-issue`, `commit`, `resolve-issue`), the GitHub CLI (`gh`)
 installed and authenticated, and a GitHub account.
+
+**Install skills:**
+
+```bash
+npx skills add AlexHagemeister/gnadd -g -a cursor --copy -y
+```
+
+Authors editing skills in this repo sync locally with `./scripts/sync.sh`. See [README.md](README.md).
 
 ---
 
@@ -259,13 +268,13 @@ All five are global Cursor skills (available in every repo). Each is invoked
 explicitly; none fire on their own except `commit`, which can also trigger on
 "commit this" or similar.
 
-| Skill | Invocation | Path | Does |
+| Skill | Invocation | Source | Does |
 |---|---|---|---|
-| `prime` | `/prime` | `~/.cursor/skills/prime/SKILL.md` | Orient a new session: fetches remote, reports project shape, branch state, whether main is behind or diverged, stashes, open issues, open + merged PRs |
-| `new-issue` | `/new-issue` | `~/.cursor/skills/new-issue/SKILL.md` | Draft a behavioral issue (with acceptance criteria) and create it after review |
-| `start-issue` | `/start-issue <N>` | `~/.cursor/skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the issue as the working spec |
-| `commit` | `/commit` or "commit this" | `~/.cursor/skills/commit/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main |
-| `resolve-issue` | `/resolve-issue` | `~/.cursor/skills/resolve-issue/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
+| `prime` | `/prime` | `skills/prime/SKILL.md` | Orient a new session: fetches remote, reports project shape, branch state, whether main is behind or diverged, stashes, open issues, open + merged PRs |
+| `new-issue` | `/new-issue` | `skills/new-issue/SKILL.md` | Draft a behavioral issue (with acceptance criteria) and create it after review |
+| `start-issue` | `/start-issue <N>` | `skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the issue as the working spec |
+| `commit` | `/commit` or "commit this" | `skills/commit/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main |
+| `resolve-issue` | `/resolve-issue` | `skills/resolve-issue/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
 
 ### The core principles
 
