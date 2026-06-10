@@ -12,6 +12,14 @@ disable-model-invocation: true
 
 Wrap up work on a GitHub issue using `git` and `gh`. Do not commit, create a PR, or merge without user approval at the required gates.
 
+## GNADD Invariants
+
+- Resolve verifies the issue contract against actual changes before anything ships.
+- The PR records what shipped, including descopes, divergences, and non-obvious decisions.
+- GitHub computes mergeability; do not locally rebase or resolve conflicts autonomously.
+- The human must review the diff before merge. CI and mergeability checks support that decision; they do not replace it.
+- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
 ## 1. Identify The Issue
 
 Infer the issue number from the current branch:

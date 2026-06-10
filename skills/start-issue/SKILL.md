@@ -11,6 +11,14 @@ disable-model-invocation: true
 
 Set up a working session for a GitHub issue using `gh` and `git`. Do not start coding.
 
+## GNADD Invariants
+
+- Work happens on issue branches; protect any in-progress work before switching branches.
+- A real commit is preferred over a stash because commits are visible and recoverable.
+- Never create local-main divergence while rescuing work; carry dirty `main` changes onto a fresh issue branch when the user confirms that path.
+- The issue is the contract for the work session; implementation is discussed after setup.
+- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
 ## Invocation
 
 The user invokes `/start-issue` with either:

@@ -10,6 +10,13 @@ Make an atomic git commit during active development. Work with the current branc
 
 Do not stage files, commit, amend, push, stash, or clean up without user approval where required below.
 
+## GNADD Invariants
+
+- Commits are visible save points during issue work; keep them atomic and recoverable.
+- `commit` can trigger from casual phrasing, so it must guard against accidental commits on `main`, `master`, or detached HEAD.
+- Do not cross-check issue completion here; drift and acceptance criteria verification belong to `resolve-issue`.
+- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
 ## 1. Review Changes
 
 Run:
