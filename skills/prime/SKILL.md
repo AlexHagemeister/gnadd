@@ -24,7 +24,7 @@ Build a lightweight working model of:
 
 Do not read individual source files, schemas, or entry points. This skill is for spatial awareness and momentum, not deep implementation context.
 
-Assume `AGENTS.md` and Cursor project rules are already loaded. Do not read or summarize them.
+Assume `AGENTS.md` and project rules are already loaded. Do not read or summarize them.
 
 ## Commands
 

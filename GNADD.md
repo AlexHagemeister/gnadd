@@ -3,7 +3,7 @@
 A lightweight project-management workflow where GitHub Issues, branches, PRs, and
 git history are the **sole** system of record. No external trackers, no markdown
 task files. Issues capture intent (behavioral specs), PRs capture outcome, and a
-Cursor agent handles the git mechanics through a set of skills.
+coding agent handles the git mechanics through a set of skills.
 
 This document is the canonical description of the workflow. Parts 1–3 are the
 user's guide — start there, and come back for refreshers. Part 4 is the reference
@@ -18,7 +18,7 @@ skill wins** and this doc should be corrected.
 | Layer | Lives at | Authoritative for | Edited by |
 |---|---|---|---|
 | **Skills** | `skills/<name>/SKILL.md` in this repo | The exact commands, gates, and sequences the agent runs | Claude |
-| **Skills (installed)** | `~/.cursor/skills/<name>/` via `npx skills add` | Runtime copy Cursor loads globally | Install script |
+| **Skills (installed)** | Agent skills dir via `npx skills add` | Runtime copy your agent loads | Install once; `npx skills update` to refresh |
 | **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
 | **Instructions** | Claude Desktop settings (a pointer to this doc) | Telling Claude this doc exists | You (once) |
 
@@ -33,21 +33,16 @@ human's role, and the reasoning behind the design.
 
 GitHub is the entire project-management system: **issues** say what to build,
 **branches** are where work happens, **PRs** record what shipped. You don't need
-to know git — five Cursor skills run every git operation and stop to ask you
+to know git — five skills run every git operation and stop to ask you
 whenever a decision matters. Your job is to describe work well, answer the skills'
 questions deliberately, and read diffs before merging.
 
-**Prerequisites:** Cursor with the five GNADD skills installed (`prime`,
-`new-issue`, `start-issue`, `commit`, `resolve-issue`), the GitHub CLI (`gh`)
-installed and authenticated, and a GitHub account.
+**Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
+with the five GNADD skills installed (`prime`, `new-issue`, `start-issue`, `commit`,
+`resolve-issue`), the GitHub CLI (`gh`) installed and authenticated, and a GitHub
+account.
 
-**Install skills:**
-
-```bash
-npx skills add AlexHagemeister/gnadd -g -a cursor --copy -y
-```
-
-Authors editing skills in this repo sync locally with `./scripts/sync.sh`. See [README.md](README.md).
+**Install skills:** see [README.md](README.md).
 
 ---
 
@@ -72,7 +67,7 @@ problem. Applied to the usual kit:
 | Decisions file (`decisions.md`, ADRs) | **Mostly gone, relocated** | Decisions made *while implementing* go in the PR body for that work — permanently attached to the exact change they explain. Scope decisions ("we're deliberately not doing X") go in the issue's Constraints/Non-goals section. The rare cross-cutting decision no single PR owns can live in the README. |
 | Spec / PRD | **Keep a thin one, demoted** | A short README: vision (what this is, for whom) plus a **"What done looks like"** section holding the project-level acceptance criteria as *statements*. It is *not* the thing the agent decomposes, checks progress against, or updates as it goes. Satisfaction *state* is never stored here — it's derived from the issue/PR record. See "Where the higher-order requirements live" below. |
 
-A project-conventions file (`AGENTS.md`, Cursor rules) is also fine to keep — it's
+A project-conventions file (`AGENTS.md`, agent rules) is also fine to keep — it's
 read-only orientation, not state.
 
 And when you're unsure about any file:
@@ -264,7 +259,7 @@ inside them — the one they can't catch is merging without looking.
 
 ### The skills
 
-All five are global Cursor skills (available in every repo). Each is invoked
+All five are global skills when installed with `-g` (available in every repo). Each is invoked
 explicitly; none fire on their own except `commit`, which can also trigger on
 "commit this" or similar.
 
@@ -353,7 +348,7 @@ says main has diverged, that's the real thing — don't wave it through.
 Caught by the skills — you'll be stopped and offered a safe path, so these are
 recoverable, not catastrophic:
 
-- **Editing before starting the issue.** You open Cursor, change files while on `main`,
+- **Editing before starting the issue.** You open the project, change files while on `main`,
   then remember `/start-issue`. The skill carries your changes onto the new issue branch
   rather than committing them to `main`. The most likely mistake, fully recoverable.
 - **"Commit this" while on `main`.** `commit` stops and asks; it won't quietly put work

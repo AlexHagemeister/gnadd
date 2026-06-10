@@ -1,22 +1,33 @@
 # GNADD
 
-Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five Cursor skills handle the git mechanics.
+Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five [Agent Skills](https://agentskills.io) handle the git mechanics.
+
+Works with any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and others).
 
 **Full guide:** [GNADD.md](GNADD.md)
 
-## Install skills (Cursor)
+## Install
 
-Requires [Node.js](https://nodejs.org/) (for `npx`) and Cursor.
+Requires [Node.js](https://nodejs.org/) (for `npx`) and an agent with shell access.
 
-### Recommended: global install
-
-GNADD skills are meant to run in **every repo** you work in (`/prime`, `/commit`, etc.), not only inside this repo. Install globally:
+**Global install (recommended)** — skills available in every repo:
 
 ```bash
-npx skills add AlexHagemeister/gnadd -g -a cursor --copy -y
+npx skills add AlexHagemeister/gnadd -g -a <agent> --copy -y
 ```
 
-Installs to `~/.cursor/skills/`. Verify in **Cursor Settings → Rules**.
+Replace `<agent>` with your agent (`cursor`, `claude-code`, `codex`, etc.). See the [supported agents list](https://github.com/vercel-labs/skills#supported-agents).
+
+Omit `-g` to install project-local only (skills live in `.agents/skills/` and travel with that repo).
+
+**Update after a new release:**
+
+```bash
+npx skills update -g -y    # global
+npx skills update -p -y    # project
+```
+
+Use the same scope (`-g` or project) you used at install. Flag details and interactive options are in the [skills CLI docs](https://github.com/vercel-labs/skills) — no need to track them here.
 
 | Skill | Invocation |
 |---|---|
@@ -26,74 +37,14 @@ Installs to `~/.cursor/skills/`. Verify in **Cursor Settings → Rules**.
 | `commit` | `/commit` |
 | `resolve-issue` | `/resolve-issue` |
 
-### Project install (optional)
+## Authoring (repo maintainers)
 
-If you prefer skills to live only in a specific repo (e.g. a team pins GNADD to one codebase), omit `-g`:
-
-```bash
-npx skills add AlexHagemeister/gnadd -a cursor --copy -y
-```
-
-Installs to `.agents/skills/` in the current directory. Skills are available when Cursor is working in that project.
-
-### Install scope
-
-The [skills CLI](https://github.com/vercel-labs/skills) supports two scopes:
-
-| Scope | Flag | Installs to | Best for |
-|---|---|---|---|
-| **Global** | `-g` | `~/.cursor/skills/` | GNADD default — use `/prime` and friends in any repo |
-| **Project** | (none) | `.agents/skills/` in cwd | Team pins GNADD to one repo; skills travel with that git clone |
-
-Use the **same scope** for `add` and `update`. If you installed globally, update globally (`-g`). If you installed per-project, run `update` from that repo without `-g`, or use `-p`.
-
-### Common flags
-
-| Flag | Meaning |
-|---|---|
-| `-g` | Global (user-level) install or update |
-| `-p` | Project-level update only |
-| `-a cursor` | Target Cursor (also loads `.cursor/skills/` from the install) |
-| `--copy` | Copy files instead of symlinking — more reliable across agents |
-| `-y` | Skip interactive prompts (scope, confirmations) |
-
-Drop `-y` if you want the CLI to ask where to install or which skills to pick.
-
-## Authoring
-
-Clone this repo, edit skills under `skills/<name>/SKILL.md`, then refresh your install.
-
-### Local changes (not pushed yet)
-
-Re-install from your working tree. Match the scope you chose above (`-g` for global):
+Edit `skills/<name>/SKILL.md`, then refresh your local install:
 
 ```bash
 ./scripts/sync.sh
 ```
 
-`sync.sh` runs `npx skills add . -g -a cursor --copy -y` — global by default.
+Defaults to `AGENT=cursor`. Override: `AGENT=claude-code ./scripts/sync.sh`.
 
-For project scope:
-
-```bash
-npx skills add . -a cursor --copy -y
-```
-
-### After pushing to GitHub
-
-Pull the latest from the remote source the CLI recorded at install time:
-
-```bash
-# global install
-npx skills update -g -y
-
-# project install (from the repo where skills were installed)
-npx skills update -p -y
-```
-
-| Command | When to use |
-|---|---|
-| `npx skills add . …` | Refresh from **local files** on disk |
-| `npx skills update …` | Refresh from **GitHub** (or whatever source was used at install) |
-
-`-g` on `update` means "only touch global installs." Without it, the CLI may prompt or default based on your current directory.
+After pushing to GitHub: `npx skills update -g -y` (or project scope if that's how you installed).
