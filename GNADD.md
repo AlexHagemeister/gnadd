@@ -38,9 +38,9 @@ whenever a decision matters. Your job is to describe work well, answer the skill
 questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
-with the five GNADD skills installed (`prime`, `new-issue`, `start-issue`, `commit`,
-`resolve-issue`), the GitHub CLI (`gh`) installed and authenticated, and a GitHub
-account.
+with the GNADD skills installed (`gnadd-context`, `prime`, `new-issue`,
+`start-issue`, `commit`, `resolve-issue`), the GitHub CLI (`gh`) installed and
+authenticated, and a GitHub account.
 
 **Install skills:** see [README.md](README.md).
 
@@ -259,12 +259,14 @@ inside them — the one they can't catch is merging without looking.
 
 ### The skills
 
-All five are global skills when installed with `-g` (available in every repo). Each is invoked
-explicitly; none fire on their own except `commit`, which can also trigger on
-"commit this" or similar.
+All six are global skills when installed with `-g` (available in every repo). The
+five operational skills handle mechanics; `gnadd-context` provides lightweight
+workflow orientation. Operational skills are invoked explicitly except `commit`,
+which can also trigger on "commit this" or similar.
 
 | Skill | Invocation | Source | Does |
 |---|---|---|---|
+| `gnadd-context` | Auto when workflow-shaped; `/gnadd-context` | `skills/gnadd-context/SKILL.md` | Orient agents on the GNADD model, describe-vs-track file rule, skill routing, and pinned canonical guide |
 | `prime` | `/prime` | `skills/prime/SKILL.md` | Orient a new session: fetches remote, reports project shape, branch state, whether main is behind or diverged, stashes, open issues, open + merged PRs |
 | `new-issue` | `/new-issue` | `skills/new-issue/SKILL.md` | Draft a behavioral issue (with acceptance criteria) and create it after review |
 | `start-issue` | `/start-issue <N>` | `skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the issue as the working spec |

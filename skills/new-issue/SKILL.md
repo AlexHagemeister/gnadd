@@ -8,6 +8,13 @@ disable-model-invocation: true
 
 Write GitHub issues from natural language descriptions. After the user approves the draft, either **present** it for copy-paste into the GitHub Issues UI or **create** it with `gh` — depending on their preference.
 
+## GNADD Invariants
+
+- Issues are the backlog and the working spec; do not create or update markdown task lists as a substitute.
+- Capture intent as observable behavior: what changes, why it matters, and what proves it is done.
+- Prefer thin vertical slices over broad plans or horizontal implementation layers.
+- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
 ## Delivery Mode
 
 Two ways to finalize an approved draft:

@@ -10,7 +10,7 @@
 ## Learned Workspace Facts
 
 - GitHub remote: `AlexHagemeister/gnadd`.
-- Five GNADD skills live under `skills/<name>/SKILL.md`: `prime`, `new-issue`, `start-issue`, `commit`, `resolve-issue`.
+- Six GNADD skills live under `skills/<name>/SKILL.md`: `gnadd-context`, `prime`, `new-issue`, `start-issue`, `commit`, `resolve-issue`.
 - GNADD workflow: GitHub Issues, branches, PRs, and git history are the sole system of record.
 - `GNADD.md` is the canonical workflow guide; `README.md` covers install; skills are the executable spec.
 - Author local sync: `./scripts/sync.sh`; post-push refresh: `npx skills update` with the same scope (`-g` or project) used at install.

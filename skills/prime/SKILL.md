@@ -13,6 +13,13 @@ disable-model-invocation: true
 
 Orient a new chat session with the project's current state. This is read-only: do not create, edit, stage, commit, stash, or delete files.
 
+## GNADD Invariants
+
+- `prime` gives spatial awareness and momentum; it does not load implementation context speculatively.
+- GitHub is the system of record, so open issues, open PRs, recent merged PRs, branches, and commits are the working state.
+- Surface local `main` divergence and stashes prominently, but do not fix them here; this skill is read-only.
+- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
 ## Purpose
 
 Build a lightweight working model of:

@@ -1,6 +1,6 @@
 # GNADD
 
-Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five [Agent Skills](https://agentskills.io) handle the git mechanics.
+Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five operational [Agent Skills](https://agentskills.io) handle the git mechanics, plus one small context skill orients agents on the workflow.
 
 Works with any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and others).
 
@@ -31,6 +31,7 @@ Use the same scope (`-g` or project) you used at install. Flag details and inter
 
 | Skill | Invocation |
 |---|---|
+| `gnadd-context` | Auto when workflow-shaped; `/gnadd-context` |
 | `prime` | `/prime` |
 | `new-issue` | `/new-issue` |
 | `start-issue` | `/start-issue <N>` |
