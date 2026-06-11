@@ -283,3 +283,16 @@ git push origin --delete issue-<N>/<slug>
 ```
 
 Report what was cleaned up.
+
+## Closing Guidance
+
+Offer a brief next-step nudge only at natural completion — not at intermediate gates (wrong branch, unmet criteria discussion, commit/PR approval waits, merge conflicts, failing CI, or main divergence during cleanup).
+
+**Natural completion:**
+
+- Merged and branch cleanup finished → nudge toward `/prime` for the next session.
+- PR created but left open → nudge toward reviewing the diff or addressing feedback — not `/start-issue` for new work.
+
+**Stopped on a blocker:** nudge only toward resolving that blocker (conflicts, divergence, failed checks the user has not acknowledged).
+
+Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

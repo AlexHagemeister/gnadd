@@ -147,13 +147,14 @@ Keep context lean. Let the user request more.
 
 ## 6. Ask How To Proceed
 
-Stop after setup and ask where the user wants to start.
+Stop after setup. This is the skill's closing — do not add a separate next-step section after it.
 
-The user may want to:
+Offer one context-aware suggestion plus alternatives when the path isn't obvious. Tone is invitational ("Want me to…?"), not prescriptive.
 
-- Discuss approach
-- Clarify scope
-- Inspect related context
-- Say "go"
+**Skip this closing** (blocker-first only) when the skill stopped earlier: dirty tree awaiting a choice, diverged `main`, closed issue, pull refused, or switching away from a different issue branch without confirmation.
+
+**Fresh start:** suggest discussing approach, clarifying scope, or saying "go" to implement.
+
+**Resume:** suggest continuing where the branch left off, re-reading acceptance criteria, or saying "go."
 
 The issue is the contract. Implementation is a conversation.

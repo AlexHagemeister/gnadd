@@ -168,3 +168,19 @@ Produce a concise, scannable orientation summary:
 ```
 
 Keep the summary short enough to use as quick working context.
+
+## Closing Guidance
+
+Offer a brief next-step nudge only when orientation completed successfully — not when `gh` auth failed or the skill halted mid-run.
+
+**Skip** when blockers were surfaced in the summary (diverged `main`, stashes, dirty tree on the wrong branch). Nudge toward resolving those first, not advancing the happy-path loop.
+
+**Infer one primary suggestion** from repo state, plus at least one alternative when ambiguous:
+
+1. Open PR awaiting review → review or merge before starting new work.
+2. On `issue-<N>/*` with a dirty tree → `/commit` or continue implementation.
+3. On `issue-<N>/*`, clean → continue that issue's work.
+4. On clean `main` with open issues → `/start-issue <N>` on the most actionable issue.
+5. No open issues → `/new-issue`.
+
+Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

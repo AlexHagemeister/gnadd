@@ -53,3 +53,13 @@ https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962c
 
 This URL is pinned to a commit, not `main`, so installed skills do not drift with
 unreleased guide changes.
+
+## Closing Guidance
+
+Do not nudge after every answer. Match nudge depth to user intent:
+
+- **Purely informational** (describe-vs-track, "which skill does X?", rationale questions): no nudge — the answer stands alone.
+- **Routing toward action** ("how do I start?", "where should this state live?"): light nudge — one skill pointer (e.g. `/prime`, `/new-issue`), no full loop recap.
+- **Session bootstrap** ("I'm new here", end-to-end workflow orientation): full nudge toward `/prime` to see live repo state.
+
+When nudging, keep it to a sentence with an invitational option. Do not restate the skill router table.
