@@ -38,7 +38,7 @@ whenever a decision matters. Your job is to describe work well, answer the skill
 questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
-with the GNADD skills installed (`gnadd-context`, `prime`, `new-issue`,
+with the GNADD skills installed (`gnadd-context`, `gnadd-audit`, `prime`, `new-issue`,
 `start-issue`, `commit`, `resolve-issue`), the GitHub CLI (`gh`) installed and
 authenticated, and a GitHub account.
 
@@ -139,6 +139,10 @@ how the truth changed lives where all decision history lives — in merged PRs.
    one trivial thing" is a legitimate vertical slice — repo scaffold, hello-world
    behavior, maybe deploy. It gets the loop turning immediately.
 5. **`/start-issue 1`** and you're in the development loop.
+
+**Adopting GNADD on an existing repo?** Run `/gnadd-audit` first — it reviews
+context files and workflow alignment, then proposes minimal fixes to capture as
+issues before you enter the loop.
 
 ---
 
@@ -259,14 +263,16 @@ inside them — the one they can't catch is merging without looking.
 
 ### The skills
 
-All six are global skills when installed with `-g` (available in every repo). The
+All seven are global skills when installed with `-g` (available in every repo). The
 five operational skills handle mechanics; `gnadd-context` provides lightweight
-workflow orientation. Operational skills are invoked explicitly except `commit`,
+workflow orientation; `gnadd-audit` reviews alignment when adopting or
+realigning a repo. Operational skills are invoked explicitly except `commit`,
 which can also trigger on "commit this" or similar.
 
 | Skill | Invocation | Source | Does |
 |---|---|---|---|
 | `gnadd-context` | Auto when workflow-shaped; `/gnadd-context` | `skills/gnadd-context/SKILL.md` | Orient agents on the GNADD model, describe-vs-track file rule, skill routing, and pinned canonical guide |
+| `gnadd-audit` | `/gnadd-audit` | `skills/gnadd-audit/SKILL.md` | Read-only alignment audit: scrutinize context files, shallow git/workflow check, report minimal fixes |
 | `prime` | `/prime` | `skills/prime/SKILL.md` | Orient a new session: fetches remote, reports project shape, branch state, whether main is behind or diverged, stashes, open issues, open + merged PRs |
 | `new-issue` | `/new-issue` | `skills/new-issue/SKILL.md` | Draft a behavioral issue (with acceptance criteria) and create it after review |
 | `start-issue` | `/start-issue <N>` | `skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the issue as the working spec |

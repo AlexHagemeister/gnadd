@@ -36,6 +36,7 @@ not exist.
 
 ## Skill Router
 
+- Adopt or realign a repo: use `/gnadd-audit`.
 - Start a session or inspect state: use `/prime`.
 - Capture new work: use `/new-issue`.
 - Begin or resume issue work: use `/start-issue <N>`.
