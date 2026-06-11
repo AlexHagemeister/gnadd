@@ -172,13 +172,14 @@ split. You approve the draft before anything is created.
 
 ### 3. `/start-issue <N>` — when you're ready to work
 
-It branches off main, loads the issue as your working spec, and asks where you
-want to start. If you have uncommitted changes lying around, it stops and asks
+It branches off main, loads the issue as your working spec, and proposes an
+ordered plan derived from the acceptance criteria. Review it — confirm, correct
+intent, or redirect — before any implementation begins; say "go" when the plan
+looks right. If you have uncommitted changes lying around, it stops and asks
 what to do with them: **choose "commit" unless you have a specific reason not
 to** — a commit is visible and recoverable; a stash is invisible and easy to
 lose. If you already started editing files before remembering to run this
 (everyone does), don't worry: it carries your changes onto the new branch safely.
-Then discuss the approach in chat, or just say "go."
 
 ### 4. `/commit` — early and often while working
 
@@ -275,7 +276,7 @@ which can also trigger on "commit this" or similar.
 | `gnadd-audit` | `/gnadd-audit` | `skills/gnadd-audit/SKILL.md` | Read-only alignment audit: scrutinize context files, shallow git/workflow check, report minimal fixes |
 | `prime` | `/prime` | `skills/prime/SKILL.md` | Orient a new session: fetches remote, reports project shape, branch state, whether main is behind or diverged, stashes, open issues, open + merged PRs |
 | `new-issue` | `/new-issue` | `skills/new-issue/SKILL.md` | Draft a behavioral issue (with acceptance criteria) and create it after review |
-| `start-issue` | `/start-issue <N>` | `skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the issue as the working spec |
+| `start-issue` | `/start-issue <N>` | `skills/start-issue/SKILL.md` | Protect in-progress work, branch off main, load the spec, propose a plan, wait for approval |
 | `commit` | `/commit` or "commit this" | `skills/commit/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main |
 | `resolve-issue` | `/resolve-issue` | `skills/resolve-issue/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
 
@@ -304,7 +305,7 @@ which can also trigger on "commit this" or similar.
 ```
 /prime            → orient: where things stand, what's behind, what's open
 /new-issue        → capture intent as a behavioral spec + acceptance criteria
-/start-issue <N>  → branch off main, load the spec, decide approach
+/start-issue <N>  → branch off main, load the spec, propose plan, get approval
   …work, /commit frequently as save points…
 /resolve-issue    → verify against criteria → PR → check mergeability + CI → merge → clean up
 /prime            → next session: your merged PR shows as shipped, pick the next issue

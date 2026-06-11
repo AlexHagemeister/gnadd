@@ -2,8 +2,9 @@
 name: start-issue
 description: >-
   Set up work on a GitHub issue using gh and git: identify the issue, resume or
-  create the issue branch, load the issue spec, and ask how to proceed. Use only
-  when explicitly invoked with /start-issue.
+  create the issue branch, load the issue spec, propose an implementation plan,
+  and wait for user approval before coding. Use only when explicitly invoked with
+  /start-issue.
 disable-model-invocation: true
 ---
 
@@ -16,7 +17,7 @@ Set up a working session for a GitHub issue using `gh` and `git`. Do not start c
 - Work happens on issue branches; protect any in-progress work before switching branches.
 - A real commit is preferred over a stash because commits are visible and recoverable.
 - Never create local-main divergence while rescuing work; carry dirty `main` changes onto a fresh issue branch when the user confirms that path.
-- The issue is the contract for the work session; implementation is discussed after setup.
+- The issue is the contract for the work session; propose a plan and get approval before implementation.
 - For broader workflow or file-hygiene guidance, use `gnadd-context`.
 
 ## Invocation
@@ -145,16 +146,40 @@ Example: "This references #11. Want me to pull that up?"
 
 Keep context lean. Let the user request more.
 
-## 6. Ask How To Proceed
+## 6. Propose A Plan
 
-Stop after setup. This is the skill's closing — do not add a separate next-step section after it.
+After the working-spec summary, translate the vertical slice into a systematic path — ordered steps derived from the acceptance criteria (and subtasks, if present). This is the skill's closing; do not add a separate next-step section after the approval ask in step 7.
 
-Offer one context-aware suggestion plus alternatives when the path isn't obvious. Tone is invitational ("Want me to…?"), not prescriptive.
+**Plan quality:**
 
-**Skip this closing** (blocker-first only) when the skill stopped earlier: dirty tree awaiting a choice, diverged `main`, closed issue, pull refused, or switching away from a different issue branch without confirmation.
+- Derive steps from the issue spec — acceptance criteria first, then constraints and subtasks.
+- Stay at the "systematic path" level: what to do, in what order, and why it maps to done.
+- Do not read source files, draft code, or do deep implementation exploration to build the plan. The issue is enough until the user confirms direction.
+- Keep the plan proportional — a few ordered steps for thin slices, more only when the issue genuinely decomposes that way.
 
-**Fresh start:** suggest discussing approach, clarifying scope, or saying "go" to implement.
+**Fresh start:** Present an ordered implementation plan mapping acceptance criteria to sequential work steps.
 
-**Resume:** suggest continuing where the branch left off, re-reading acceptance criteria, or saying "go."
+**Resume:** Present a lighter plan. Use shallow branch signals to reconcile progress:
 
-The issue is the contract. Implementation is a conversation.
+```bash
+git log --oneline main..HEAD
+git diff --stat main...HEAD
+```
+
+Summarize what appears done on the branch, which acceptance criteria remain open, and proposed next steps. Do not turn this into a commit-by-commit archaeology session.
+
+**Skip steps 6 and 7** (blocker-first only) when the skill stopped earlier: dirty tree awaiting a choice, diverged `main`, closed issue, pull refused, or switching away from a different issue branch without confirmation.
+
+## 7. Wait For Approval
+
+Stop after the plan. Do not start coding, editing files, or deep implementation exploration until the user responds.
+
+Explicitly ask whether:
+
+- The plan looks right and they want to proceed.
+- Intent needs correction — something in the issue was misunderstood.
+- They want a different approach than the one proposed.
+
+Tone is invitational ("Does this plan look right?"), not prescriptive. Honor corrections and revise the plan before proceeding.
+
+Implementation begins only after the user approves the plan or gives an explicit go-ahead (e.g. "go", "looks good", "proceed"). The issue is the contract; the plan is the agreed path.
