@@ -206,3 +206,13 @@ Use the current repository unless the user specifies another repo.
 
 - **Present:** Confirm the draft is ready to paste. No issue URL.
 - **Create:** Confirm with the issue number and URL.
+
+## Closing Guidance
+
+Offer a brief next-step nudge only after finalization — not during extraction, at the review gate, or while awaiting delivery-mode choice.
+
+**Present (copy-paste):** remind the user to paste and apply the label in GitHub. Do not nudge `/start-issue` until the issue exists.
+
+**Create via `gh`:** nudge toward `/start-issue <N>` as the primary next step. If the user was capturing side work mid-session, offer returning to that work as an alternative.
+
+Keep it to a sentence or two with invitational options.

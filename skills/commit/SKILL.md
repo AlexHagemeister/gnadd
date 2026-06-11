@@ -124,3 +124,21 @@ Use:
 ```bash
 git log -1 --format="%h %s"
 ```
+
+## Closing Guidance
+
+Offer a brief next-step nudge only after the commit succeeds and the hash is reported — not when the branch guard stopped the flow, there were no changes, or commit message approval is still pending.
+
+After reporting the commit, check whether work remains:
+
+```bash
+git status --porcelain
+```
+
+**Still dirty:** nudge toward continuing implementation or `/commit` again — not `/resolve-issue`.
+
+**Clean on an issue branch:** nudge toward continuing work; offer `/resolve-issue` only as a secondary option ("when you feel done"), never as the primary suggestion.
+
+**Clean, not on an issue branch:** suggest `/start-issue` if appropriate.
+
+Keep it to a sentence or two with invitational options. Do not verify acceptance criteria here — that belongs to `resolve-issue`.
