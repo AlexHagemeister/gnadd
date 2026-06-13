@@ -2,7 +2,7 @@
 name: resolve-issue
 description: >-
   Wrap up work on a GitHub issue using git and gh: identify the issue branch,
-  check completeness against the issue spec, commit with approval, create a PR,
+  check completeness against the issue spec, commit final changes, create a PR,
   check mergeability and CI, optionally merge, and clean up. Does not rebase.
   Use when issue work appears complete, the user wants to ship an issue branch,
   or the next step is verification, PR creation, merge decision, and cleanup.
@@ -60,7 +60,7 @@ Verify the finished work against the acceptance criteria specifically — these 
 
 Do not silently skip obvious unmet criteria or checklist items.
 
-## 3. Stage And Draft Commit
+## 3. Stage And Commit
 
 Inspect the working tree, then stage intended changes:
 
@@ -72,7 +72,7 @@ git add <relevant-files>
 
 **If the working tree is clean** (all work was already committed via `/commit`), skip the staging and commit below and go straight to step 4 — nothing needs to be invented or re-staged. The PR body's `Closes #<N>` (step 5) still auto-closes the issue on merge, so no final commit is required to carry it.
 
-Draft a conventional commit message. Choose the type from the **actual change**, not from the label alone. The issue label is a default starting point:
+Choose a conventional commit message. Choose the type from the **actual change**, not from the label alone. The issue label is a default starting point:
 
 - `bug` -> usually `fix: <summary>`
 - `feature` -> usually `feat: <summary>`
@@ -85,10 +85,6 @@ Commit body requirements:
 - Reference the issue with `Closes #<N>`.
 - Briefly describe what was done.
 - Keep the description behavioral and outcome-focused.
-
-Show the draft commit message and ask for approval before committing.
-
-Commit only after approval:
 
 ```bash
 git commit -m "$(cat <<'EOF'
