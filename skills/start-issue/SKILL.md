@@ -3,14 +3,19 @@ name: start-issue
 description: >-
   Set up work on a GitHub issue using gh and git: identify the issue, resume or
   create the issue branch, load the issue spec, propose an implementation plan,
-  and wait for user approval before coding. Use only when explicitly invoked with
-  /start-issue.
-disable-model-invocation: true
+  and wait for user approval before coding. Use when the user wants to begin or
+  resume work from an open GitHub issue, switch into issue work, or turn an
+  issue into an implementation session.
+disable-model-invocation: false
 ---
 
 # Start Issue
 
 Set up a working session for a GitHub issue using `gh` and `git`. Do not start coding.
+
+## Auto-Invocation Gate
+
+If this skill was auto-selected from context rather than explicitly invoked with `/start-issue`, stop before running git or GitHub commands. Briefly explain why starting issue work appears useful and ask: "Run `/start-issue` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 

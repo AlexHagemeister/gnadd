@@ -1,12 +1,16 @@
 ---
 name: new-issue
-description: Draft GitHub issues from natural language descriptions. Use only when explicitly invoked with /new-issue to interview for requirements as needed, confirm the draft, and create the issue via the GitHub CLI after approval.
-disable-model-invocation: true
+description: Draft GitHub issues from natural language descriptions. Use when the user describes new work, asks to capture a backlog item, or needs a behavior-focused GitHub issue; interviews for requirements as needed, confirms the draft, and creates the issue via GitHub CLI after approval.
+disable-model-invocation: false
 ---
 
 # New Issue
 
 Write GitHub issues from natural language descriptions. After the user approves the draft, create the issue with `gh`.
+
+## Auto-Invocation Gate
+
+If this skill was auto-selected from context rather than explicitly invoked with `/new-issue`, stop before interviewing or drafting. Briefly explain why capturing a GitHub issue appears useful and ask: "Run `/new-issue` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
