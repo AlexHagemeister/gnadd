@@ -4,14 +4,19 @@ description: >-
   Orient a new chat session with a read-only project snapshot using tree, git,
   and gh: project shape, current branch state, whether main is behind origin,
   stashes, recent commits, open issues, open and merged PRs, and active issue
-  context. Fetches latest remote state first. Use only when explicitly invoked
-  with /prime.
-disable-model-invocation: true
+  context. Fetches latest remote state first. Use when the user asks to inspect
+  project state, orient a session, see what work is open, or decide what to do
+  next.
+disable-model-invocation: false
 ---
 
 # Prime
 
 Orient a new chat session with the project's current state. This is read-only: do not create, edit, stage, commit, stash, or delete files.
+
+## Auto-Invocation Gate
+
+If this skill was auto-selected from context rather than explicitly invoked with `/prime`, stop before running commands. Briefly explain why a repo snapshot appears useful and ask: "Run `/prime` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 

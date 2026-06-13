@@ -5,8 +5,9 @@ description: >-
   files for describe-vs-track violations, perform a shallow git/workflow check,
   and return a severity-grouped report with minimal proposed fixes. Nudges
   /new-issue for remediation slices; never edits files or creates issues. Use
-  only when explicitly invoked with /gnadd-audit.
-disable-model-invocation: true
+  when the user asks to audit GNADD alignment, review workflow hygiene, check
+  project context files, or find describe-vs-track violations.
+disable-model-invocation: false
 ---
 
 # GNADD Audit
@@ -14,6 +15,10 @@ disable-model-invocation: true
 Review a repository against GNADD workflow principles and propose a minimal set
 of alignment fixes. This is read-only: do not create, edit, stage, commit, stash,
 or delete files; do not auto-create GitHub issues.
+
+## Auto-Invocation Gate
+
+If this skill was auto-selected from context rather than explicitly invoked with `/gnadd-audit`, stop before running commands or reading repo context. Briefly explain why a GNADD audit appears useful and ask: "Run `/gnadd-audit` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 

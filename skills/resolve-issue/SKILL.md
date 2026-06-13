@@ -4,13 +4,18 @@ description: >-
   Wrap up work on a GitHub issue using git and gh: identify the issue branch,
   check completeness against the issue spec, commit with approval, create a PR,
   check mergeability and CI, optionally merge, and clean up. Does not rebase.
-  Use only when explicitly invoked with /resolve-issue.
-disable-model-invocation: true
+  Use when issue work appears complete, the user wants to ship an issue branch,
+  or the next step is verification, PR creation, merge decision, and cleanup.
+disable-model-invocation: false
 ---
 
 # Resolve Issue
 
 Wrap up work on a GitHub issue using `git` and `gh`. Do not commit, create a PR, or merge without user approval at the required gates.
+
+## Auto-Invocation Gate
+
+If this skill was auto-selected from context rather than explicitly invoked with `/resolve-issue`, stop before running git or GitHub commands. Briefly explain why resolving the current issue appears useful and ask: "Run `/resolve-issue` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
