@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Make atomic git commits during active development. Use when the user invokes /commit or asks to commit, save progress, checkpoint work, or create a git commit; reviews changes, confirms staging, drafts a conventional commit message, and commits after approval.
+description: Make atomic git commits during active development. Use when the user invokes /commit or asks to commit, save progress, checkpoint work, or create a git commit; reviews changes, confirms staging, writes a conventional commit message, creates the commit, and reports the result.
 disable-model-invocation: false
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: false
 
 Make an atomic git commit during active development. Work with the current branch and integrate with issue branches when applicable.
 
-Do not stage files, commit, amend, push, stash, or clean up without user approval where required below.
+Do not stage files, amend, push, stash, or clean up without user approval where required below.
 
 ## GNADD Invariants
 
@@ -66,7 +66,7 @@ Present the file list and recommended inclusion set.
 
 Stage only confirmed files.
 
-## 3. Draft Commit Message
+## 3. Choose Commit Message
 
 Use conventional commits:
 
@@ -100,11 +100,7 @@ If the current branch matches `issue-<N>/<slug>`, include `Re #<N>` in the commi
 
 If not on an issue branch, omit issue references.
 
-Show the draft commit message and ask for approval before committing. Accept user edits.
-
 ## 4. Commit
-
-After approval:
 
 ```bash
 git add <confirmed-files>
@@ -127,7 +123,7 @@ git log -1 --format="%h %s"
 
 ## Closing Guidance
 
-Offer a brief next-step nudge only after the commit succeeds and the hash is reported — not when the branch guard stopped the flow, there were no changes, or commit message approval is still pending.
+Offer a brief next-step nudge only after the commit succeeds and the hash is reported — not when the branch guard stopped the flow or there were no changes.
 
 After reporting the commit, check whether work remains:
 
