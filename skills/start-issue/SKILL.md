@@ -183,3 +183,15 @@ Explicitly ask whether:
 Tone is invitational ("Does this plan look right?"), not prescriptive. Honor corrections and revise the plan before proceeding.
 
 Implementation begins only after the user approves the plan or gives an explicit go-ahead (e.g. "go", "looks good", "proceed"). The issue is the contract; the plan is the agreed path.
+
+## 8. After Approval
+
+When the user approves the plan, implement the issue on the current issue branch.
+
+- Stay aligned with the approved plan and issue acceptance criteria.
+- Pause for user direction if new evidence changes the scope or approach.
+- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work.
+- Use the issue-branch commit convention from `commit`: conventional commit message with `Re #<N>` in the body.
+- Report whether the issue work is complete, partial, or blocked. Include what changed, what was verified, and any remaining gaps.
+
+When work appears complete and the working tree is clean, nudge to `/resolve-issue` as the next operational step. `resolve-issue` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.
