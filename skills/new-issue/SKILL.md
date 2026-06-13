@@ -1,12 +1,12 @@
 ---
 name: new-issue
-description: Draft GitHub issues from natural language descriptions. Use only when explicitly invoked with /new-issue to interview for requirements as needed, confirm, and either present for copy-paste or create via the GitHub CLI.
+description: Draft GitHub issues from natural language descriptions. Use only when explicitly invoked with /new-issue to interview for requirements as needed, confirm the draft, and create the issue via the GitHub CLI after approval.
 disable-model-invocation: true
 ---
 
 # New Issue
 
-Write GitHub issues from natural language descriptions. After the user approves the draft, either **present** it for copy-paste into the GitHub Issues UI or **create** it with `gh` — depending on their preference.
+Write GitHub issues from natural language descriptions. After the user approves the draft, create the issue with `gh`.
 
 ## GNADD Invariants
 
@@ -15,24 +15,22 @@ Write GitHub issues from natural language descriptions. After the user approves 
 - Prefer thin vertical slices over broad plans or horizontal implementation layers.
 - For broader workflow or file-hygiene guidance, use `gnadd-context`.
 
-## Delivery Mode
+## Creation Mode
 
-Two ways to finalize an approved draft:
+Finalize approved drafts with GitHub CLI:
 
-- **Present (copy-paste):** Show the title, suggested label, and body in a copy-friendly format. The user pastes into GitHub themselves. Use when they ask to copy/paste, prefer the web UI, or do not want the agent to run `gh`.
-- **Create (`gh`):** Create the issue via GitHub CLI after approval. Use when they ask to create/file the issue, or when they confirm they want `gh` to handle it.
-
-**Default:** If delivery mode is unclear at the review gate, ask once: present for copy-paste, or create via `gh`?
-
-Honor an explicit preference stated earlier in the conversation; do not ask again.
+- Show the issue draft for review before creation.
+- Accept user edits to title, body, scope, criteria, and label.
+- Ask whether to create the approved issue with `gh`.
+- Do not create an issue until the user approves the draft and confirms creation.
 
 ## Workflow
 
 1. **Assess** — Inventory what is already known from the invocation and conversation.
 2. **Extract** — Interview the user for anything still missing (see below). Do not draft until extraction is complete.
 3. **Draft** — Structure the resolved details into the issue format.
-4. **Review** — Present the draft; get approval and delivery-mode choice.
-5. **Finalize** — Present for copy-paste or create via `gh`.
+4. **Review** — Present the draft; get approval and creation confirmation.
+5. **Finalize** — Create the issue via `gh`.
 
 ## Extraction
 
@@ -173,23 +171,11 @@ Label: <bug|feature|chore>
 
 Omit empty optional sections (Subtasks, Constraints / Non-goals, Context). Acceptance Criteria should be present for all but single-action fixes. If the draft still looks like multiple issues in one, flag scope creep again before asking for approval. Accept user edits to title, body, scope, criteria, and label.
 
-If delivery mode is not already clear, ask whether to present for copy-paste or create via `gh`.
+Ask whether to create the approved issue with `gh`.
 
 ## Finalize
 
-After approval, follow the chosen delivery mode.
-
-### Present for copy-paste
-
-Output in this order so the user can paste into GitHub Issues:
-
-1. **Title** — plain text on its own line (no `Title:` prefix).
-2. **Suggested label** — one line, e.g. `Suggested label: bug`.
-3. **Body** — the issue body only, as markdown inside a single fenced code block. Omit the title and label from the body block.
-
-Do not run `gh`. Remind the user to apply the suggested label in the GitHub UI if their repo uses it.
-
-### Create via `gh`
+After approval and creation confirmation, create the issue via `gh`.
 
 1. Ensure the selected label exists. If needed, create it:
   ```bash
@@ -204,15 +190,12 @@ Use the current repository unless the user specifies another repo.
 
 ## Report Back
 
-- **Present:** Confirm the draft is ready to paste. No issue URL.
-- **Create:** Confirm with the issue number and URL.
+Confirm with the issue number and URL.
 
 ## Closing Guidance
 
-Offer a brief next-step nudge only after finalization — not during extraction, at the review gate, or while awaiting delivery-mode choice.
+Offer a brief next-step nudge only after finalization — not during extraction, at the review gate, or while awaiting creation confirmation.
 
-**Present (copy-paste):** remind the user to paste and apply the label in GitHub. Do not nudge `/start-issue` until the issue exists.
-
-**Create via `gh`:** nudge toward `/start-issue <N>` as the primary next step. If the user was capturing side work mid-session, offer returning to that work as an alternative.
+Nudge toward `/start-issue <N>` as the primary next step. If the user was capturing side work mid-session, offer returning to that work as an alternative.
 
 Keep it to a sentence or two with invitational options.
