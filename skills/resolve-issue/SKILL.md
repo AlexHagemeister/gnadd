@@ -169,14 +169,16 @@ git checkout main
 git fetch origin main
 ```
 
-Before updating local `main`, distinguish two states (see **Main branch safety** below). After a merge, local `main` is normally just **behind** origin by the squash commit you just created — this is expected and safe to fast-forward. A true **divergence** (local `main` holding commits origin lacks) is the dangerous case. Pull only in the safe case:
+Before updating local `main`, distinguish two states (see **Main branch safety** below). After a merge, local `main` is normally just **behind** origin by the squash commit you just created — this is expected and safe to fast-forward. A true **divergence** (local `main` holding commits origin lacks) is the dangerous case. Fast-forward only in the safe case:
 
 ```bash
-git pull --ff-only origin main
+git merge --ff-only origin/main
 git log -1 --format="%H"
 ```
 
-`--ff-only` is the mechanical backstop: if `main` cannot fast-forward for any reason, the pull refuses rather than creating a merge commit on `main` — even if the classification above was somehow missed or stale.
+`--ff-only` is the mechanical backstop: if `main` cannot fast-forward for any reason, the merge refuses rather than creating a merge commit on `main` — even if the classification above was somehow missed or stale.
+
+Use the explicit `origin/main` remote-tracking ref here instead of pull-based integration. The workflow already fetched, and `pull` fetches again and integrates through `FETCH_HEAD`; naming `origin/main` avoids ambiguous or duplicated `FETCH_HEAD` entries while preserving the same fast-forward-only safety.
 
 Report the merge commit hash so the user can revert if needed.
 
@@ -232,14 +234,14 @@ git log --oneline main..origin/main    # commits ORIGIN has that local main lack
 
 Read them like this:
 
-- **Behind (safe, normal after a merge):** the first command is **empty**, the second shows commits (typically the squash commit just merged). Local `main` simply needs to catch up. `git pull --ff-only origin main` will fast-forward cleanly. **Proceed.**
-- **Up to date:** both empty. Nothing to pull. **Proceed.**
-- **Diverged (dangerous — STOP):** the **first command shows any commits**. This means local `main` holds commits that are not on origin — usually a sign something was committed directly to local `main` or its history was rewritten. A plain pull cannot fast-forward this.
+- **Behind (safe, normal after a merge):** the first command is **empty**, the second shows commits (typically the squash commit just merged). Local `main` simply needs to catch up. `git merge --ff-only origin/main` will fast-forward cleanly. **Proceed.**
+- **Up to date:** both empty. Nothing to fast-forward. **Proceed.**
+- **Diverged (dangerous — STOP):** the **first command shows any commits**. This means local `main` holds commits that are not on origin — usually a sign something was committed directly to local `main` or its history was rewritten. A fast-forward from `origin/main` cannot safely proceed.
 
 **Stop and do not proceed** if:
 
 - `git log --oneline origin/main..main` shows **any** commits (local `main` has unpushed/divergent commits), or
-- `git pull --ff-only origin main` refuses, fails, or leaves `main` and `origin/main` out of sync. A refused pull is a stop-and-report event — never retry it without `--ff-only` and never "fix" it with a merge, rebase, or reset.
+- `git merge --ff-only origin/main` refuses, fails, or leaves `main` and `origin/main` out of sync. A refused fast-forward merge is a stop-and-report event — never retry it without `--ff-only` and never "fix" it with a non-fast-forward merge, rebase, or reset.
 
 > The danger signal is specifically `origin/main..main` (local-ahead), **not** `main..origin/main` (local-behind). Being behind is the normal, safe state after every merge — do not treat it as divergence, or the skill will false-alarm on every single resolve and the warning becomes noise.
 
@@ -253,7 +255,7 @@ When stopped:
    - User decides / handles manually
 4. Wait for the user's choice before running any further git commands on `main`.
 
-Only proceed with cleanup when local `main` is successfully aligned with `origin/main` (no divergence, pull clean).
+Only proceed with cleanup when local `main` is successfully aligned with `origin/main` (no divergence, fast-forward clean).
 
 ### Verify the merge before deleting (hard rule)
 
