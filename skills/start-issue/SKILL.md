@@ -119,13 +119,13 @@ git log --oneline origin/main..main
 - If it is empty, proceed:
 
 ```bash
-git pull --ff-only origin main
+git merge --ff-only origin/main
 git checkout -b issue-<N>/<slug>
 ```
 
-`--ff-only` is the backstop: if `main` cannot fast-forward for any reason, the pull refuses rather than creating a merge commit on `main`. A refused or failed pull here is a **stop-and-report** event, not something to fix autonomously.
+`--ff-only` is the backstop: if `main` cannot fast-forward for any reason, the merge refuses rather than creating a merge commit on `main`. A refused or failed fast-forward here is a **stop-and-report** event, not something to fix autonomously.
 
-(If arriving here via the dirty-tree carry from step 2, skip the fetch/pull — don't sync `main` with a dirty tree — and go straight to `git checkout -b`.)
+(If arriving here via the dirty-tree carry from step 2, skip the fetch/fast-forward — don't sync `main` with a dirty tree — and go straight to `git checkout -b`.)
 
 Derive `<slug>` from the issue title:
 
