@@ -1,0 +1,21 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skill copies in sync with bin/gnadd
+        run: |
+          for skill in prime start-issue commit resolve-issue; do
+            diff "bin/gnadd" "skills/$skill/gnadd.sh" \
+              || { echo "skills/$skill/gnadd.sh drifted — run scripts/build.sh"; exit 1; }
+          done
+      - name: Test suite
+        run: bash test/run.sh
+      - name: Shellcheck
+        run: shellcheck -S warning bin/gnadd scripts/*.sh
