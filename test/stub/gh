@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Fake `gh` for the gnadd test suite. Behavior is driven by GH_STUB_* env
+# vars; every invocation is appended to $GH_STUB_LOG so tests can assert
+# which gh operations ran (and which did not).
+#
+#   GH_STUB_PR_STATE      e.g. OPEN / MERGED / CLOSED   (unset = "no PR")
+#   GH_STUB_PR_NUMBER     e.g. 7
+#   GH_STUB_PR_URL        e.g. https://github.com/o/r/pull/7
+#   GH_STUB_MERGEABLE     e.g. MERGEABLE / CONFLICTING / UNKNOWN
+#   GH_STUB_MERGED_AT     e.g. 2026-07-17T00:00:00Z     (unset = null)
+#   GH_STUB_MERGE_COMMIT  e.g. abc123
+#   GH_STUB_FAIL          set = every command fails
+
+set -u
+
+[ -n "${GH_STUB_LOG:-}" ] && printf 'gh %s\n' "$*" >> "$GH_STUB_LOG"
+
+[ -n "${GH_STUB_FAIL:-}" ] && exit 1
+
+# Extract the --jq expression if present.
+jq_expr=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = "--jq" ] && jq_expr="$a"
+  prev="$a"
+done
+
+emit_or_missing() { # emit_or_missing <value>
+  if [ -n "$1" ]; then
+    printf '%s\n' "$1"
+    exit 0
+  fi
+  exit 1
+}
+
+case "$1" in
+  auth)
+    exit 0
+    ;;
+  pr)
+    case "$2" in
+      view)
+        # "No PR for this branch" is modeled as unset GH_STUB_PR_STATE.
+        [ -z "${GH_STUB_PR_STATE:-}" ] && exit 1
+        case "$jq_expr" in
+          .state)            emit_or_missing "${GH_STUB_PR_STATE:-}" ;;
+          .number)           emit_or_missing "${GH_STUB_PR_NUMBER:-}" ;;
+          .url)              emit_or_missing "${GH_STUB_PR_URL:-}" ;;
+          .mergeable)        emit_or_missing "${GH_STUB_MERGEABLE:-}" ;;
+          .mergedAt)         printf '%s\n' "${GH_STUB_MERGED_AT:-null}"; exit 0 ;;
+          .mergeCommit.oid)  emit_or_missing "${GH_STUB_MERGE_COMMIT:-}" ;;
+          *)                 exit 0 ;;
+        esac
+        ;;
+      checks)
+        echo "no checks reported"
+        exit 0
+        ;;
+      merge)
+        exit 0
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  repo)
+    case "$2" in
+      view) emit_or_missing "stub-owner/stub-repo" ;;
+      edit) exit 0 ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  api)
+    # Ruleset list returns empty; ruleset create succeeds.
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac

@@ -1,0 +1,380 @@
+#!/usr/bin/env bash
+# Test suite for bin/gnadd. Zero dependencies beyond bash + git: gh is
+# stubbed (test/stub/gh), remotes are local bare repos.
+#
+# Every incident that shaped a GNADD design decision (GNADD.md Part 5) has a
+# regression test here. If you change bin/gnadd, this suite is what tells
+# you whether the guarantees still hold.
+
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+GNADD="$ROOT/bin/gnadd"
+STUB="$ROOT/test/stub/gh"
+
+PASS=0
+FAIL=0
+CURRENT=""
+FAILURES=()
+
+# ---------------------------------------------------------------- helpers
+
+fail() {
+  FAIL=$((FAIL+1))
+  FAILURES+=("$CURRENT: $*")
+  printf 'FAIL %s: %s\n' "$CURRENT" "$*"
+}
+
+ok() { PASS=$((PASS+1)); }
+
+expect_status() { # expect_status <want> <got>
+  [ "$2" = "$1" ] && ok || fail "expected exit $1, got $2 — output: $OUT"
+}
+
+expect_contains() { # expect_contains <needle>
+  case "$OUT" in
+    *"$1"*) ok ;;
+    *) fail "output missing '$1' — output: $OUT" ;;
+  esac
+}
+
+expect_not_contains() {
+  case "$OUT" in
+    *"$1"*) fail "output unexpectedly contains '$1' — output: $OUT" ;;
+    *) ok ;;
+  esac
+}
+
+run() { # run <args...> — capture OUT and ST
+  OUT="$("$GNADD" "$@" 2>&1)"
+  ST=$?
+}
+
+git_q() { git "$@" >/dev/null 2>&1; }
+
+# Fresh sandbox: bare origin + working clone with one commit on main.
+setup_repo() {
+  SANDBOX="$(mktemp -d)"
+  cd "$SANDBOX"
+  git_q init --bare origin.git
+  git -C origin.git symbolic-ref HEAD refs/heads/main
+  git_q clone origin.git work
+  cd work
+  git config user.email test@test && git config user.name test
+  git config commit.gpgsign false
+  echo "hello" > README.md
+  git_q add README.md && git_q commit -m "init"
+  git_q branch -M main
+  git_q push -u origin main
+  export GNADD_GH="$STUB" GH_STUB_LOG="$SANDBOX/gh.log"
+  unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
+        GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT GH_STUB_FAIL 2>/dev/null || true
+}
+
+# Push a commit to origin/main from a second clone (simulates a merge or a
+# collaborator) without touching the working clone.
+advance_origin_main() {
+  ( cd "$SANDBOX"
+    git_q clone origin.git other
+    cd other
+    git config user.email o@o && git config user.name o
+    echo "$RANDOM" >> upstream.txt
+    git_q add upstream.txt && git_q commit -m "upstream change"
+    git_q push origin main )
+}
+
+t() { CURRENT="$1"; }
+
+# ---------------------------------------------------------------- state
+
+t state_synced; setup_repo
+run state
+expect_status 0 "$ST"
+expect_contains "main_state=synced"
+expect_contains "tree=clean"
+expect_contains "branch=main"
+
+t state_behind; setup_repo
+advance_origin_main
+run state
+expect_status 0 "$ST"
+expect_contains "main_state=behind"
+expect_contains "main_behind=1"
+
+t state_diverged; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit on main"
+run state
+expect_status 0 "$ST"
+expect_contains "main_state=diverged"
+expect_contains "main_ahead=1"
+expect_contains "stray commit on main"
+
+t state_reports_stash; setup_repo
+echo x > s.txt && git_q add s.txt && git stash >/dev/null 2>&1
+run state
+expect_contains "stashes=1"
+
+# ---------------------------------------------------------------- start
+
+t start_fresh; setup_repo
+run start 5 fix-thing
+expect_status 0 "$ST"
+expect_contains "result=created"
+expect_contains "branch=issue-5/fix-thing"
+[ "$(git symbolic-ref --short HEAD)" = "issue-5/fix-thing" ] && ok || fail "not on new branch"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main moved"
+
+t start_syncs_behind_main; setup_repo
+advance_origin_main
+run start 6 sync-me
+expect_status 0 "$ST"
+expect_contains "result=created"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main not fast-forwarded"
+
+t start_halts_on_diverged_main; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+run start 7 nope
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
+git show-ref --verify --quiet refs/heads/issue-7/nope && fail "branch was created despite halt" || ok
+
+t start_halts_on_dirty_tree; setup_repo
+echo x > dirty.txt
+run start 8 nope
+expect_status 2 "$ST"
+expect_contains "state=DIRTY_TREE"
+git show-ref --verify --quiet refs/heads/issue-8/nope && fail "branch was created despite halt" || ok
+
+t start_carry; setup_repo
+echo x > dirty.txt
+run start 9 rescue --carry
+expect_status 0 "$ST"
+expect_contains "result=created-carry"
+[ "$(git symbolic-ref --short HEAD)" = "issue-9/rescue" ] && ok || fail "not on carry branch"
+[ -f dirty.txt ] && ok || fail "dirty file lost in carry"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main gained a commit"
+
+t start_carry_refuses_off_main; setup_repo
+git_q checkout -b issue-1/elsewhere
+echo x > dirty.txt
+run start 9 rescue --carry
+expect_status 2 "$ST"
+expect_contains "state=NOT_ON_MAIN"
+
+t start_resume_pulls_remote; setup_repo
+run start 10 resume-me
+git_q push -u origin HEAD
+# Advance the issue branch on the remote from a second clone.
+( cd "$SANDBOX" && git_q clone origin.git other2 && cd other2
+  git config user.email o@o && git config user.name o
+  git_q checkout issue-10/resume-me
+  echo remote >> r.txt && git_q add r.txt && git_q commit -m "remote work"
+  git_q push origin issue-10/resume-me )
+git_q checkout main
+run start 10 resume-me
+expect_status 0 "$ST"
+expect_contains "result=resumed"
+[ -f r.txt ] && ok || fail "remote work not pulled on resume"
+
+t start_resume_halts_on_diverged_branch; setup_repo
+run start 11 diverge-me
+git_q push -u origin HEAD
+( cd "$SANDBOX" && git_q clone origin.git other3 && cd other3
+  git config user.email o@o && git config user.name o
+  git_q checkout issue-11/diverge-me
+  echo remote >> r.txt && git_q add r.txt && git_q commit -m "remote work"
+  git_q push origin issue-11/diverge-me )
+echo local >> l.txt && git_q add l.txt && git_q commit -m "local work"
+git_q checkout main
+run start 11 diverge-me
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_DIVERGED_FROM_REMOTE"
+
+# ---------------------------------------------------------------- guard-commit
+
+t guard_commit_on_main; setup_repo
+run guard-commit
+expect_status 2 "$ST"
+expect_contains "state=ON_MAIN"
+
+t guard_commit_on_issue_branch; setup_repo
+git_q checkout -b issue-3/ok
+run guard-commit
+expect_status 0 "$ST"
+expect_contains "issue=3"
+
+t guard_commit_detached; setup_repo
+git_q checkout --detach HEAD
+run guard-commit
+expect_status 2 "$ST"
+expect_contains "state=DETACHED_HEAD"
+
+# ---------------------------------------------------------------- ship
+
+t ship_push_happy; setup_repo
+run start 12 shippable
+echo work > w.txt && git_q add w.txt && git_q commit -m "work"
+run ship push
+expect_status 0 "$ST"
+expect_contains "pushed=true"
+expect_contains "pr_exists=false"
+git ls-remote --exit-code --heads origin issue-12/shippable >/dev/null 2>&1 && ok || fail "branch not on remote"
+
+t ship_push_nothing_to_ship; setup_repo
+run start 13 empty
+run ship push
+expect_status 2 "$ST"
+expect_contains "state=NOTHING_TO_SHIP"
+
+t ship_push_refuses_main; setup_repo
+run ship push
+expect_status 2 "$ST"
+expect_contains "state=ON_MAIN"
+
+t ship_push_refuses_random_branch; setup_repo
+git_q checkout -b experiment
+echo x > x.txt && git_q add x.txt && git_q commit -m x
+run ship push
+expect_status 2 "$ST"
+expect_contains "state=NOT_ISSUE_BRANCH"
+run ship push --any-branch
+expect_status 0 "$ST"
+
+t ship_push_detects_existing_pr; setup_repo
+run start 14 has-pr
+echo work > w.txt && git_q add w.txt && git_q commit -m "work"
+export GH_STUB_PR_STATE=OPEN GH_STUB_PR_NUMBER=44 GH_STUB_PR_URL=https://x/pull/44
+run ship push
+expect_status 0 "$ST"
+expect_contains "pr_exists=true"
+expect_contains "pr_number=44"
+
+t ship_merge_conflicting_never_merges; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=CONFLICTING
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=PR_CONFLICTING"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "gh pr merge was called on a conflicting PR" || ok
+
+t ship_merge_ok; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+run ship merge 44
+expect_status 0 "$ST"
+expect_contains "merged=true"
+grep -q "pr merge 44 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+
+t ship_merge_unknown_mergeability; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=UNKNOWN
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=MERGEABILITY_UNKNOWN"
+
+# ---------------------------------------------------------------- sync-main / cleanup
+
+t sync_main_fast_forwards; setup_repo
+git_q checkout -b issue-15/done
+advance_origin_main
+run sync-main
+expect_status 0 "$ST"
+expect_contains "synced=true"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main not synced"
+
+t sync_main_halts_on_divergence; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+git_q checkout -b issue-16/done
+run sync-main
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
+
+t cleanup_refuses_unmerged; setup_repo
+git_q branch issue-17/keep
+export GH_STUB_PR_STATE=OPEN
+run cleanup 45 issue-17/keep
+expect_status 2 "$ST"
+expect_contains "state=NOT_MERGED"
+git show-ref --verify --quiet refs/heads/issue-17/keep && ok || fail "branch deleted despite unmerged PR"
+
+t cleanup_after_merge; setup_repo
+git_q checkout -b issue-18/gone
+echo x > x.txt && git_q add x.txt && git_q commit -m x
+git_q push -u origin HEAD
+git_q checkout main
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z GH_STUB_MERGE_COMMIT=deadbeef
+run cleanup 46 issue-18/gone
+expect_status 0 "$ST"
+expect_contains "local_deleted=true"
+expect_contains "remote_deleted=true"
+expect_contains "merge_commit=deadbeef"
+git show-ref --verify --quiet refs/heads/issue-18/gone && fail "local branch survived" || ok
+git ls-remote --exit-code --heads origin issue-18/gone >/dev/null 2>&1 && fail "remote branch survived" || ok
+
+t cleanup_refuses_from_target_branch; setup_repo
+git_q checkout -b issue-19/here
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z
+run cleanup 47 issue-19/here
+expect_status 2 "$ST"
+expect_contains "state=ON_TARGET_BRANCH"
+
+# ---------------------------------------------------------------- doctor
+
+t doctor_clean; setup_repo
+run doctor
+expect_status 0 "$ST"
+expect_contains "findings=0"
+
+t doctor_finds_bad_states; setup_repo
+echo x > s.txt && git_q add s.txt && git stash >/dev/null 2>&1
+echo y > local.txt && git_q add local.txt && git_q commit -m "stray"
+run doctor
+expect_status 0 "$ST"
+expect_contains "finding=DIVERGED_MAIN"
+expect_contains "finding=STASHES"
+
+t doctor_rescue_main; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit"
+STRAY="$(git rev-parse HEAD)"
+run doctor --rescue-main rescue/stray
+expect_status 0 "$ST"
+expect_contains "rescued=true"
+[ "$(git rev-parse rescue/stray)" = "$STRAY" ] && ok || fail "rescue branch lost the stray commit"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main not realigned"
+[ "$(git symbolic-ref --short HEAD)" = "rescue/stray" ] && ok || fail "not standing on rescue branch"
+
+t doctor_rescue_refuses_when_not_diverged; setup_repo
+run doctor --rescue-main rescue/nothing
+expect_status 2 "$ST"
+expect_contains "state=NOT_DIVERGED"
+
+# ---------------------------------------------------------------- test / misc
+
+t test_detects_makefile; setup_repo
+printf 'test:\n\t@echo make-tests-ran\n' > Makefile
+run test
+expect_status 0 "$ST"
+expect_contains "runner=make"
+expect_contains "make-tests-ran"
+
+t test_no_tests; setup_repo
+run test
+expect_status 0 "$ST"
+expect_contains "state=NO_TESTS"
+
+t skill_copies_in_sync; CURRENT=skill_copies_in_sync
+for skill in prime start-issue commit resolve-issue; do
+  if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
+    fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
+  elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then
+    fail "skills/$skill/gnadd.sh out of sync with bin/gnadd — run scripts/build.sh"
+  else
+    ok
+  fi
+done
+
+# ---------------------------------------------------------------- summary
+
+echo
+echo "passed: $PASS  failed: $FAIL"
+if [ "$FAIL" -gt 0 ]; then
+  printf '  %s\n' "${FAILURES[@]}"
+  exit 1
+fi
