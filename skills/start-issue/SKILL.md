@@ -1,17 +1,18 @@
 ---
 name: start-issue
 description: >-
-  Set up work on a GitHub issue using gh and git: identify the issue, resume or
-  create the issue branch, load the issue spec, propose an implementation plan,
-  and wait for user approval before coding. Use when the user wants to begin or
-  resume work from an open GitHub issue, switch into issue work, or turn an
-  issue into an implementation session.
+  Set up work on a GitHub issue using the bundled gnadd script and gh: identify
+  the issue, protect any in-progress work, resume or create the issue branch,
+  load the issue spec, propose an implementation plan, and wait for user
+  approval before coding. Use when the user wants to begin or resume work from
+  an open GitHub issue, switch into issue work, or turn an issue into an
+  implementation session.
 disable-model-invocation: false
 ---
 
 # Start Issue
 
-Set up a working session for a GitHub issue using `gh` and `git`. Do not start coding.
+Set up a working session for a GitHub issue. Do not start coding until the plan is approved.
 
 ## Auto-Invocation Gate
 
@@ -25,12 +26,9 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - The issue is the contract for the work session; propose a plan and get approval before implementation.
 - For broader workflow or file-hygiene guidance, use `gnadd-context`.
 
-## Invocation
+## Mechanics
 
-The user invokes `/start-issue` with either:
-
-- An issue number, e.g. `/start-issue 14`
-- A natural language description, e.g. `/start-issue the navbar caching bug`
+All branch mechanics run through the bundled script — `gnadd.sh` in this skill's directory. It enforces the invariants deterministically: working-tree protection before any checkout, fast-forward-only syncs onto `main`, and a hard stop on the dangerous divergence direction. When it exits with `state=<NAME>`, that is a **human decision point** — have the conversation below, never work around the script with raw git. If the script is missing, stop and tell the user to reinstall the GNADD skills (`npx skills update -g -y`).
 
 ## 1. Identify The Issue
 
@@ -55,87 +53,55 @@ Find the best matching open issue.
 
 Do not continue past a closed issue until the user clarifies.
 
-## 2. Protect Any In-Progress Work (before any checkout)
-
-**Do this before checking out or creating any branch** — including before resuming an existing issue branch. Switching branches with a dirty working tree can either fail or silently carry uncommitted changes onto the wrong branch. Never let that happen.
-
-First, see the current branch and working state:
+## 2. Survey The Ground
 
 ```bash
-git branch --show-current
-git status
+bash "<skill-dir>/gnadd.sh" state
 ```
 
-**If the working tree is dirty** (staged, unstaged, or untracked changes), stop and ask how to handle it before going any further:
+Two situations need a conversation **before** touching branches:
 
-- **Commit it to the current branch** (preferred) — a real commit is visible, recoverable, and survives sessions.
-- **Stash it** — only if the user explicitly chooses this. Note the tradeoff: a stash is invisible to `git status`/`git log` and easy to forget. Prefer a WIP commit.
-- **Abort** the issue start.
+**Dirty working tree** (`tree=dirty`) — the script will refuse to switch branches on it, by design. Ask the user how to handle it:
 
-**Special case — dirty tree while on `main`:** never commit the changes to `main`; that creates the local-ahead divergence the workflow treats as dangerous. Instead:
+- **On an issue branch or other work branch:** offer — commit it to the current branch (**preferred**: a real commit is visible, recoverable, and survives sessions), stash it (only on explicit request; note that a stash is invisible and easy to forget), or abort. For the commit path, follow the `commit` skill's conventions (conventional message, `Re #<M>` if on `issue-<M>/*`).
+- **On `main`, no branch for this issue yet:** the correct rescue is carrying the changes onto the new issue branch — this is the "started editing before starting the issue" case, and it is lossless by construction. Confirm with the user, then use `--carry` in step 3. Never commit the changes to `main`.
+- **On `main`, issue branch already exists:** carrying changes across a real checkout can conflict. Offer an explicit, supervised stash-carry — `git stash push -u`, check out the branch, `git stash pop`, report the result — or abort. If the pop conflicts, stop immediately and report; do not resolve it autonomously.
 
-- **Fresh start** (no `issue-<N>/*` branch exists yet — check with `git branch --list "issue-<N>/*"`): prefer **carrying the changes onto the new issue branch**. `git checkout -b` preserves the working tree, and since the new branch starts at main's current commit nothing can conflict or be lost. This is the correct rescue for "started editing before starting the issue" — confirm with the user, then proceed to step 4 with the changes carried along (skip the pull in step 4 if the tree is dirty; sync main next time it is clean).
-- **Resume** (the issue branch already exists): carrying changes across a real checkout can conflict or silently land them on the wrong branch. Offer an explicit, supervised stash-carry — `git stash push -u`, check out the branch, `git stash pop`, report the result — or abort. Never do this silently, and stop immediately and report if the pop conflicts; do not resolve it autonomously.
+**Currently on a different issue branch** (`issue=<M>` where M ≠ N) — confirm the switch explicitly before proceeding, even with a clean tree. Do not switch away from someone's in-progress issue silently.
 
-Do not silently stash. Do not proceed on a dirty working tree, with one exception: the explicit, user-confirmed fresh-start carry from `main` described above.
+**`main_state=diverged`** — the script will halt in step 3 anyway, but if you already see it here, surface it now and point to `gnadd.sh doctor` before anything else.
 
-**If the current branch is a *different* issue branch** (`issue-<M>/*` where `<M>` is not the issue being started), make the switch explicit. Combined with the dirty-tree handling above, the choice is:
+## 3. Resume Or Create The Branch
 
-- Commit current work to `issue-<M>`, then switch (preferred).
-- Stash, then switch (only on explicit request).
-- Abort.
+Derive `<slug>` from the issue title: short kebab-case, most specific nouns and verbs, full branch name under ~50 characters (e.g. `issue-14/stale-navbar-data`).
 
-Do not switch away from a different issue branch without explicit confirmation.
-
-Only once the working tree is clean (or the user has chosen commit/stash/abort) may you proceed to resume or create a branch.
-
-## 3. Check For An Existing Branch
-
-With the working tree now safe, check local branches:
+Normal path (clean tree, or cleaned up via the step-2 conversation):
 
 ```bash
-git branch --list "issue-<N>/*"
+bash "<skill-dir>/gnadd.sh" start <N> <slug>
 ```
 
-If a matching branch exists, treat this as a **resume**:
-
-1. Check out the branch (safe now that the working tree is clean).
-2. If it has a remote tracking branch, pull with `git pull --ff-only`. If the pull refuses (the branch has diverged from its remote — e.g. someone pushed to it while local work continued), **stop and report**; do not merge or rebase autonomously.
-3. Skip to "Load The Issue Spec".
-
-If no matching branch exists, treat this as a **fresh start** and continue.
-
-## 4. Create The Branch
-
-For a clean fresh start, first make sure local `main` is safe to build on:
+Confirmed dirty-main rescue only:
 
 ```bash
-git checkout main
-git fetch origin main
-git log --oneline origin/main..main
+bash "<skill-dir>/gnadd.sh" start <N> <slug> --carry
 ```
 
-- If that log shows **any commits**, local `main` has diverged: it holds commits origin lacks (usually a sign something was committed directly to local `main`). **Stop.** Do not pull, reset, or reconcile autonomously. Explain the state, show both directions (`origin/main..main` and `main..origin/main`), offer the options (rebase local main onto origin, merge origin into local main, or user handles it), and wait for the user's choice.
-- If it is empty, proceed:
+The script resumes an existing `issue-<N>/*` branch (with a fast-forward-only pull if it has a remote) or creates a fresh one off a verified-safe, freshly synced `main`. Handle its outcomes:
 
-```bash
-git merge --ff-only origin/main
-git checkout -b issue-<N>/<slug>
-```
+| Output | Meaning | What to do |
+|---|---|---|
+| `result=created` | Fresh branch off synced main | Continue to step 4 |
+| `result=resumed` | Existing branch checked out and up to date | Continue to step 4 (resume flavor) |
+| `result=created-carry` | Branch created with your uncommitted changes carried | Continue; sync `main` next time the tree is clean |
+| `state=DIRTY_TREE` | Tree not clean | Return to the step-2 conversation |
+| `state=DIVERGED_MAIN` | Local main has commits origin lacks | **Stop.** Show the listed commits, explain, offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Do not pull, reset, or reconcile yourself |
+| `state=BRANCH_DIVERGED_FROM_REMOTE` | Issue branch and its remote diverged | **Stop and report.** Do not merge or rebase autonomously |
+| `state=FF_REFUSED` | Main could not fast-forward | **Stop and report.** Never retry without `--ff-only` |
 
-`--ff-only` is the backstop: if `main` cannot fast-forward for any reason, the merge refuses rather than creating a merge commit on `main`. A refused or failed fast-forward here is a **stop-and-report** event, not something to fix autonomously.
+A halt is the system working, not breaking. When halted, skip steps 5–6 (blocker-first) and resolve the blocker with the user.
 
-(If arriving here via the dirty-tree carry from step 2, skip the fetch/fast-forward — don't sync `main` with a dirty tree — and go straight to `git checkout -b`.)
-
-Derive `<slug>` from the issue title:
-
-- Use short kebab-case.
-- Keep the full branch name under about 50 characters.
-- Prefer the most specific nouns and verbs from the title.
-
-Example: `issue-14/stale-navbar-data`
-
-## 5. Load The Issue Spec
+## 4. Load The Issue Spec
 
 Read the issue title and body. Present a brief working-spec summary:
 
@@ -145,15 +111,11 @@ Read the issue title and body. Present a brief working-spec summary:
 - **Constraints / Non-goals:** Mention if present — boundaries to respect.
 - **Subtasks:** Include only if the issue has them.
 
-If the issue's **Context** section references other issues or artifacts, mention them without fetching automatically.
+If the issue's **Context** section references other issues or artifacts, mention them without fetching automatically ("This references #11. Want me to pull that up?"). Keep context lean; let the user request more.
 
-Example: "This references #11. Want me to pull that up?"
+## 5. Propose A Plan
 
-Keep context lean. Let the user request more.
-
-## 6. Propose A Plan
-
-After the working-spec summary, translate the vertical slice into a systematic path — ordered steps derived from the acceptance criteria (and subtasks, if present). This is the skill's closing; do not add a separate next-step section after the approval ask in step 7.
+Translate the vertical slice into a systematic path — ordered steps derived from the acceptance criteria (and subtasks, if present). This is the skill's closing; do not add a separate next-step section after the approval ask.
 
 **Plan quality:**
 
@@ -162,20 +124,18 @@ After the working-spec summary, translate the vertical slice into a systematic p
 - Do not read source files, draft code, or do deep implementation exploration to build the plan. The issue is enough until the user confirms direction.
 - Keep the plan proportional — a few ordered steps for thin slices, more only when the issue genuinely decomposes that way.
 
-**Fresh start:** Present an ordered implementation plan mapping acceptance criteria to sequential work steps.
+**Fresh start:** an ordered implementation plan mapping acceptance criteria to sequential work steps.
 
-**Resume:** Present a lighter plan. Use shallow branch signals to reconcile progress:
+**Resume:** a lighter plan. Reconcile progress from shallow branch signals:
 
 ```bash
 git log --oneline main..HEAD
 git diff --stat main...HEAD
 ```
 
-Summarize what appears done on the branch, which acceptance criteria remain open, and proposed next steps. Do not turn this into a commit-by-commit archaeology session.
+Summarize what appears done, which acceptance criteria remain open, and proposed next steps. No commit-by-commit archaeology.
 
-**Skip steps 6 and 7** (blocker-first only) when the skill stopped earlier: dirty tree awaiting a choice, diverged `main`, closed issue, pull refused, or switching away from a different issue branch without confirmation.
-
-## 7. Wait For Approval
+## 6. Wait For Approval
 
 Stop after the plan. Do not start coding, editing files, or deep implementation exploration until the user responds.
 
@@ -185,18 +145,15 @@ Explicitly ask whether:
 - Intent needs correction — something in the issue was misunderstood.
 - They want a different approach than the one proposed.
 
-Tone is invitational ("Does this plan look right?"), not prescriptive. Honor corrections and revise the plan before proceeding.
+Tone is invitational ("Does this plan look right?"), not prescriptive. Honor corrections and revise the plan before proceeding. Implementation begins only after an explicit go-ahead ("go", "looks good", "proceed"). The issue is the contract; the plan is the agreed path.
 
-Implementation begins only after the user approves the plan or gives an explicit go-ahead (e.g. "go", "looks good", "proceed"). The issue is the contract; the plan is the agreed path.
+## 7. After Approval
 
-## 8. After Approval
-
-When the user approves the plan, implement the issue on the current issue branch.
+Implement the issue on the current issue branch.
 
 - Stay aligned with the approved plan and issue acceptance criteria.
 - Pause for user direction if new evidence changes the scope or approach.
-- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work.
-- Use the issue-branch commit convention from `commit`: conventional commit message with `Re #<N>` in the body.
+- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work — using the `commit` skill's conventions (`Re #<N>` in the body).
 - Report whether the issue work is complete, partial, or blocked. Include what changed, what was verified, and any remaining gaps.
 
 When work appears complete and the working tree is clean, nudge to `/resolve-issue` as the next operational step. `resolve-issue` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.
