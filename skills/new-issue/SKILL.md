@@ -181,9 +181,10 @@ Ask whether to create the approved issue with `gh`.
 
 After approval and creation confirmation, create the issue via `gh`.
 
-1. Ensure the selected label exists. If needed, create it:
+1. Ensure the selected label exists — create it **only if missing** (`gh label create` errors on an existing label):
   ```bash
-   gh label create "<label>"
+   gh label list --search "<label>" --json name --jq '.[].name' | grep -qx "<label>" \
+     || gh label create "<label>"
   ```
 2. Create the issue:
   ```bash

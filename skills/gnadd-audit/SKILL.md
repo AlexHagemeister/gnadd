@@ -59,6 +59,8 @@ Before inspecting the repo, load GNADD file-hygiene and workflow principles:
 
    https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962cf3fe250672dccbf3/GNADD.md
 
+   (The pin is rewritten by `scripts/release.sh` at release time.)
+
 3. If the repo being audited contains a local `GNADD.md`, reading Part 1 locally
    is an acceptable fallback or supplement.
 
@@ -190,7 +192,10 @@ Examples:
   done looks like'; move actionable specifics to issues."
 - GNADD skills not detected → "Install GNADD skills globally per README."
 - Diverged local `main` → "Resolve main divergence before starting new issue
-  work."
+  work — the sanctioned path is `gnadd.sh doctor --rescue-main <name>` (bundled
+  with the `prime` skill), which is lossless and never resets."
+- No branch ruleset / merge policy on the repo → "Run `gnadd.sh init` once to
+  enforce squash-only merges and PR-required main at the server."
 
 Keep the fix set minimal — prefer the smallest change that restores alignment.
 

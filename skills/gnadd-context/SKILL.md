@@ -19,8 +19,16 @@ skills.
 
 - GitHub is the system of record: issues capture intent, branches hold work, PRs
   record what shipped, and git history is the audit trail.
-- The five operational skills handle git mechanics: `prime`, `new-issue`,
-  `start-issue`, `commit`, and `resolve-issue`.
+- The five operational skills drive the loop: `prime`, `new-issue`,
+  `start-issue`, `commit`, and `resolve-issue`. Their git mechanics run through
+  a bundled deterministic script (`gnadd.sh`), not improvised commands.
+- Enforcement is layered, lowest layer that can hold each invariant: GitHub
+  server rules (`gnadd init` — squash-only merges, PR-required main), the
+  script (ff-only syncs, divergence halts, gated cleanup), the skills
+  (judgment and conversation), and the human (reading the diff before merge).
+- Recovery from bad states has a sanctioned path: `gnadd.sh doctor` (bundled
+  with `prime`) diagnoses and offers lossless fixes. Never improvise
+  `reset`/`force` recoveries.
 - The user's load-bearing job is to describe desired behavior, answer scope
   questions, and read diffs before merge.
 
@@ -42,6 +50,10 @@ not exist.
 - Begin or resume issue work: use `/start-issue <N>`.
 - Save progress on an issue branch: use `/commit`.
 - Verify, PR, merge, and clean up: use `/resolve-issue`.
+- Diagnose or recover from a bad git state (diverged main, stashes,
+  leftovers): run `gnadd.sh doctor` from the `prime` skill's directory.
+- Set up server-side rails on a new repo: `gnadd.sh init` (squash-only
+  merges, branch ruleset on main; `--ci` adds a test workflow stub).
 - If a git operation seems needed and no skill covers it, ask for a
   skill-shaped path before improvising raw git commands.
 
@@ -53,7 +65,8 @@ covered here, fetch the canonical guide from this pinned URL:
 https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962cf3fe250672dccbf3/GNADD.md
 
 This URL is pinned to a commit, not `main`, so installed skills do not drift with
-unreleased guide changes.
+unreleased guide changes. The pin is rewritten by `scripts/release.sh` at release
+time — do not hand-edit it out of band.
 
 ## Closing Guidance
 

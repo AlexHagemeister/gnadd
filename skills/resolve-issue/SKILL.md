@@ -1,17 +1,19 @@
 ---
 name: resolve-issue
 description: >-
-  Wrap up work on a GitHub issue using git and gh: identify the issue branch,
-  check completeness against the issue spec, commit final changes, create a PR,
-  check mergeability and CI, optionally merge, and clean up. Does not rebase.
-  Use when issue work appears complete, the user wants to ship an issue branch,
-  or the next step is verification, PR creation, merge decision, and cleanup.
+  Wrap up work on a GitHub issue using the bundled gnadd script and gh:
+  identify the issue branch, verify the work against acceptance criteria, run
+  the project's tests, commit final changes, create or resume the PR, check
+  mergeability and CI, optionally merge, sync the issue record, and clean up.
+  Does not rebase. Use when issue work appears complete, the user wants to
+  ship an issue branch, or the next step is verification, PR creation, merge
+  decision, and cleanup.
 disable-model-invocation: false
 ---
 
 # Resolve Issue
 
-Wrap up work on a GitHub issue using `git` and `gh`. Do not commit, create a PR, or merge without user approval at the required gates.
+Wrap up work on a GitHub issue. Do not commit, create a PR, or merge without user approval at the required gates.
 
 ## Auto-Invocation Gate
 
@@ -22,24 +24,24 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - Resolve verifies the issue contract against actual changes before anything ships.
 - The PR records what shipped, including descopes, divergences, and non-obvious decisions.
 - GitHub computes mergeability; do not locally rebase or resolve conflicts autonomously.
-- The human must review the diff before merge. CI and mergeability checks support that decision; they do not replace it.
+- The human must review the diff before merge. Tests, CI, and mergeability checks support that decision; they do not replace it.
 - For broader workflow or file-hygiene guidance, use `gnadd-context`.
+
+## Mechanics
+
+Ship mechanics run through the bundled script — `gnadd.sh` in this skill's directory. It enforces the invariants deterministically: never ships from `main`, refuses conflicting merges, halts on the dangerous divergence direction, and deletes branches only after GitHub confirms the merge. When it exits with `state=<NAME>`, that is a human decision point — have the conversation, never work around it with raw git. If the script is missing, stop and tell the user to reinstall the GNADD skills (`npx skills update -g -y`).
 
 ## 1. Identify The Issue
 
-Infer the issue number from the current branch:
-
 ```bash
-git branch --show-current
+bash "<skill-dir>/gnadd.sh" state --no-fetch
 ```
 
-Expected branch format: `issue-<N>/<slug>`.
+- If `issue=<N>`, that is the issue being resolved.
+- If on `main`, `master`, or detached HEAD, **stop**. Never run this flow from main: shipping from main would push unreviewed work straight to `origin/main`, bypassing the PR gate (the script refuses this too). List local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and switch to it — applying the same working-tree protection as `start-issue` (never switch on a dirty tree without an explicit commit/stash/abort choice).
+- If on some other non-issue branch, ask the user to confirm this branch holds the work to resolve. Only after explicit confirmation, use `--any-branch` in step 4; everything below still applies.
 
-- If the current branch matches, use `<N>` as the issue number.
-- If the current branch is `main`, `master`, or **empty** (detached HEAD), **stop**. Never run this flow from main: every step below commits to and pushes the *current* branch, which on main would ship unreviewed work straight to `origin/main` — bypassing the PR gate entirely. Instead, list local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and switch to it, applying the same working-tree protection as `start-issue` (never switch on a dirty tree without an explicit commit/stash/abort choice).
-- If the current branch is some other non-issue branch, ask the user to confirm that this branch holds the work to resolve. Proceed on it only after explicit confirmation; everything below (PR, merge gate, cleanup) still applies.
-
-## 2. Sanity Check Completeness
+## 2. Verify Completeness
 
 Fetch the issue:
 
@@ -47,22 +49,27 @@ Fetch the issue:
 gh issue view <N>
 ```
 
-Review the issue title, body, labels, **Acceptance Criteria**, and any subtask checklist.
+Verify the finished work against the **Acceptance Criteria** — the issue's definition of done:
 
-Verify the finished work against the acceptance criteria specifically — these are the issue's definition of done:
+- Assess each criterion against the **actual diff and observable behavior**, not from memory of the session. Inspect `git diff origin/main...HEAD` to ground the assessment in what actually changed.
+- Treat checkboxes already ticked in the issue as **claims, not facts** — later work may have invalidated them. Re-verify every criterion regardless of checkbox state.
+- For each criterion, report: **met**, **not met**, or **descoped** (with a reason). Do the same for any subtask checklist.
+- Flag anything unmet as a check, not a hard blocker. The user may override and proceed — but say so explicitly rather than skipping silently.
+- Note any descopes or divergences now; they go in the PR body in step 5.
 
-- Go through each acceptance criterion and assess it against the **actual diff and observable behavior**, not from memory of the session. Inspect `git diff origin/main...HEAD` if needed to ground the assessment in what actually changed.
-- Treat any checkboxes already checked in the issue (e.g. ticked mid-work) as **claims, not facts** — later work may have invalidated them. Re-verify every criterion regardless of its current checkbox state.
-- For each criterion, report: **met**, **not met**, or **descoped** (with a reason).
-- Do the same for any subtask checklist items.
-- Flag anything unmet as a check, not a hard blocker. The user may override and proceed if remaining items are unnecessary or will be handled separately — but say so explicitly rather than skipping silently.
-- If criteria were descoped or the outcome diverged from the spec, note it now; it will go in the PR body in step 5.
+Then run the project's tests:
 
-Do not silently skip obvious unmet criteria or checklist items.
+```bash
+bash "<skill-dir>/gnadd.sh" test
+```
+
+It auto-detects the test command (npm/make/cargo/go/pytest). Report the result alongside the criteria assessment. `state=NO_TESTS` means nothing automated verified this work — say so; the diff review is then the only safeguard. A failing suite is a stop-and-discuss, not something to wave past.
 
 ## 3. Stage And Commit
 
-Inspect the working tree, then stage intended changes:
+**If the working tree is clean** (all work already committed via `/commit`), skip to step 4 — nothing needs to be invented or re-staged. The PR body's `Closes #<N>` still auto-closes the issue on merge.
+
+Otherwise inspect and stage intended changes:
 
 ```bash
 git status
@@ -70,59 +77,66 @@ git diff
 git add <relevant-files>
 ```
 
-**If the working tree is clean** (all work was already committed via `/commit`), skip the staging and commit below and go straight to step 4 — nothing needs to be invented or re-staged. The PR body's `Closes #<N>` (step 5) still auto-closes the issue on merge, so no final commit is required to carry it.
-
-Choose a conventional commit message. Choose the type from the **actual change**, not from the label alone. The issue label is a default starting point:
-
-- `bug` -> usually `fix: <summary>`
-- `feature` -> usually `feat: <summary>`
-- `chore` -> usually `chore: <summary>`
-
-Override when the diff warrants it — a `chore`-labeled issue may land a `docs`, `refactor`, or `test` commit. The allowed types are the same as the `commit` skill: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `perf`.
-
-Commit body requirements:
-
-- Reference the issue with `Closes #<N>`.
-- Briefly describe what was done.
-- Keep the description behavioral and outcome-focused.
+Choose a conventional commit message from the **actual change** (the issue label is only a starting point: `bug`→`fix`, `feature`→`feat`, `chore`→`chore`; override when the diff warrants it). Allowed types match the `commit` skill: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `perf`.
 
 ```bash
 git commit -m "$(cat <<'EOF'
-<summary>
+<type>: <summary>
 
-<body>
+<brief behavioral description>
 
 Closes #<N>
 EOF
 )"
 ```
 
-## 4. No Local Rebase (conflict policy)
+## 4. Push (and detect an existing PR)
 
-This workflow does **not** rebase the issue branch onto `main` before merging. GitHub's squash-merge already applies the branch as a single new commit on top of the latest `main`, so a local pre-rebase is redundant — and it is the single most dangerous operation to hand an agent (it rewrites history and forces a force-push). It was deliberately removed.
-
-> If strictly linear history ever becomes a requirement (e.g. the project grows to a team that bisects `main`), a pre-rebase step can be reintroduced here — paired with a hard `git push --force-with-lease` rule (never bare `--force`) and explicit rebase-abort handling. For a small repo this cost is not worth paying.
-
-Conflict policy: mergeability is checked against GitHub **after** the PR exists (in step 6), not via a local rebase. If `main` has moved and the PR conflicts, **stop and hand it to the user** — the agent never resolves conflicts autonomously. Concrete handling is in step 6.
-
-## 5. Push And Draft PR
-
-Push the branch:
+This workflow does **not** rebase the issue branch onto `main` — GitHub's squash-merge already applies the branch as one commit on top of latest main, and rebase is the most dangerous operation to hand an agent. Conflicts are detected via GitHub after the PR exists (step 6) and handed to the human.
 
 ```bash
-git push -u origin HEAD
+bash "<skill-dir>/gnadd.sh" ship push
 ```
 
-Draft a PR with:
+Outcomes:
 
-- **Title:** Same as or close to the commit summary line.
-- **Body:** Concise behavioral summary of what was actually done.
-- Include any divergence from the original issue spec, such as descoped work or follow-up issues.
-- Include `Closes #<N>`.
+- **`pr_exists=true` with `pr_number=<PR>`:** an open PR already exists for this branch — this is a **resume** (e.g. the PR was left open in a previous session). New commits are now pushed to it. Skip step 5 and go straight to the merge gate in step 6 with `<PR>`.
+- **`pr_exists=false`:** continue to step 5 to create the PR.
+- **`state=NOTHING_TO_SHIP`:** no commits beyond `origin/main` — nothing to resolve; stop and say so.
+- **`state=ON_MAIN` / `NOT_ISSUE_BRANCH` / `DIRTY_TREE` / `DETACHED_HEAD`:** return to the step 1/3 conversations.
+- **`state=PUSH_FAILED`:** report; retry after the user checks network/auth.
 
-Show the draft PR title and body for approval before creating it.
+## 5. Draft And Create The PR
 
-Create only after approval:
+Draft the PR and show it for approval **before** creating:
+
+- **Title:** same as or close to the final commit summary.
+- **Body** (this exact structure — step 7 updates it after merge):
+
+```markdown
+<concise behavioral summary of what was actually done>
+
+## Acceptance Criteria
+
+| Criterion | Status |
+|---|---|
+| <criterion text> | Met / Not verified / Descoped — <reason> |
+
+## Decisions & Divergences
+
+<non-obvious implementation decisions made during the work, descopes,
+follow-ups; omit the section if genuinely none — but remember chat
+evaporates and PRs are permanent>
+
+## Test Plan
+
+- [ ] Automated tests pass (<runner from step 2, or "none configured">)
+- [ ] Diff reviewed by a human before merge
+
+Closes #<N>
+```
+
+Create only after approval, and **capture the PR number from the output URL** — issues and PRs share a number space, so the issue number is never the PR number:
 
 ```bash
 gh pr create --title "<title>" --body "$(cat <<'EOF'
@@ -131,89 +145,63 @@ EOF
 )"
 ```
 
-Report the PR URL.
+Report the PR URL. `<PR>` below means this captured PR number.
 
 ## 6. Merge Only If Confirmed
 
-After creating the PR, ask whether to merge now or leave it open. Do not auto-merge.
-
-Before presenting the merge choice, surface two signals so the decision is informed, not blind:
-
-**Mergeability:**
+Surface the two signals, then ask whether to merge now or leave the PR open. Do not auto-merge.
 
 ```bash
-gh pr view <N> --json mergeable
+bash "<skill-dir>/gnadd.sh" ship status <PR>
 ```
 
-- `MERGEABLE` — proceed.
-- `CONFLICTING` — **do not offer to merge.** `main` has moved and the PR conflicts. Report it and hand resolution to the user: they can resolve in GitHub's web editor or via a deliberate local rebase they invoke, then come back. The agent does **not** resolve conflicts autonomously.
-- `UNKNOWN` — GitHub is still computing; wait briefly and re-check.
+- **`mergeable=MERGEABLE`** — present the merge choice.
+- **`mergeable=CONFLICTING`** — **do not offer to merge.** `main` has moved and the PR conflicts. Hand resolution to the user: GitHub's web editor, or a deliberate local resolution they drive. The agent never resolves conflicts autonomously.
+- **`mergeable=UNKNOWN`** — GitHub is still computing; wait briefly and re-run.
+- **Checks:** if failing, say so explicitly and require the user to acknowledge before merging anyway. If none are configured, note that nothing automated verified this PR beyond the local test run.
 
-**CI / checks status:**
+> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive. If the user hasn't looked at the diff, offer it (`gh pr diff <PR>`).
+
+If — and only if — the user confirms:
 
 ```bash
-gh pr checks <N>
+bash "<skill-dir>/gnadd.sh" ship merge <PR>
+bash "<skill-dir>/gnadd.sh" sync-main
 ```
 
-- If checks are passing, note it and proceed.
-- If checks are failing, **say so explicitly** and require the user to acknowledge before merging anyway.
-- If there are no checks configured, note that nothing automated verified this PR — the diff is the only safeguard. Encourage the user to review it.
+`ship merge` squash-merges only when the PR is OPEN and MERGEABLE. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
 
-> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive.
+If the user leaves the PR open: stop here. Next session, `/resolve-issue` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
 
-If the user confirms:
+## 7. Sync The Record (Issue + PR)
 
-```bash
-gh pr merge --squash
-git checkout main
-git fetch origin main
-```
-
-Before updating local `main`, distinguish two states (see **Main branch safety** below). After a merge, local `main` is normally just **behind** origin by the squash commit you just created — this is expected and safe to fast-forward. A true **divergence** (local `main` holding commits origin lacks) is the dangerous case. Fast-forward only in the safe case:
-
-```bash
-git merge --ff-only origin/main
-git log -1 --format="%H"
-```
-
-`--ff-only` is the mechanical backstop: if `main` cannot fast-forward for any reason, the merge refuses rather than creating a merge commit on `main` — even if the classification above was somehow missed or stale.
-
-Use the explicit `origin/main` remote-tracking ref here instead of pull-based integration. The workflow already fetched, and `pull` fetches again and integrates through `FETCH_HEAD`; naming `origin/main` avoids ambiguous or duplicated `FETCH_HEAD` entries while preserving the same fast-forward-only safety.
-
-Report the merge commit hash so the user can revert if needed.
-
-## 7. Sync Acceptance Criteria (Issue + PR)
-
-After merge (or when closing the issue without merge), sync **both** the GitHub issue and the PR body with the step-2 assessment. Do this **before** reporting resolve complete.
+After merge (or when closing the issue without merge), sync both the issue and the PR body with the step-2 assessment. Do this before reporting resolve complete.
 
 ### Issue
 
-1. Edit each **Acceptance Criteria** checkbox in the issue body:
-   - `- [x]` for criteria assessed **met**
-   - `- [ ]` for criteria **not met** or **not verified**
-2. Append or update a **## Resolution** section with:
-   - PR link and merge commit (if merged)
-   - One line per unchecked criterion explaining why the issue still closed (e.g. deferred, not verified, acceptable for ship)
-   - Explicit callout if closing with any criteria unchecked
+**Fetch the current body fresh immediately before editing** — never reconstruct it from memory or an earlier read; `gh issue edit --body` replaces the whole body, so a stale copy silently destroys collaborator edits:
+
+```bash
+gh issue view <N> --json body --jq .body
+```
+
+Modify **only**: acceptance-criteria checkboxes (`- [x]` for met, `- [ ]` for not met / not verified) and an appended **## Resolution** section (PR link, merge commit, one line per unchecked criterion explaining why the issue still closed). Preserve everything else verbatim.
 
 ```bash
 gh issue edit <N> --body "$(cat <<'EOF'
-<full updated issue body with checkboxes and Resolution section>
+<full updated issue body>
 EOF
 )"
 ```
 
-If the issue auto-closed from `Closes #<N>` in the PR, editing the body still works on closed issues.
+Editing works on closed issues, so auto-close from `Closes #<N>` is not a problem.
 
 ### PR
 
-Update the merged PR so its checklist matches what was actually verified:
-
-1. **Acceptance criteria table** — set `Status` to **Met** / **Not verified** / **Descoped** per criterion (mirror the issue assessment).
-2. **Test plan checkboxes** — `- [x]` for steps completed (merge/deploy, prod smoke, manual path, etc.); leave optional or unrun steps unchecked.
+Same fetch-fresh rule (`gh pr view <PR> --json body --jq .body`), then update the step-5 structure to match what was actually verified: the acceptance-criteria table's Status column, and the Test Plan checkboxes for steps that actually ran.
 
 ```bash
-gh pr edit <pr-number> --body "$(cat <<'EOF'
+gh pr edit <PR> --body "$(cat <<'EOF'
 <full updated PR body>
 EOF
 )"
@@ -223,79 +211,26 @@ The issue is the canonical record; the PR is the ship-time audit trail — both 
 
 ## 8. Clean Up After Merge
 
-**Never run `git reset` on `main` to discard commits.** This applies to `--hard`, `--soft`, `--mixed`, or any reset intended to drop local commits. Losing local commits silently is never acceptable — even if they appear redundant with what just merged.
-
-After `git fetch origin main`, classify the state with these two commands:
-
 ```bash
-git log --oneline origin/main..main    # commits LOCAL main has that origin lacks
-git log --oneline main..origin/main    # commits ORIGIN has that local main lacks
+bash "<skill-dir>/gnadd.sh" cleanup <PR> issue-<N>/<slug>
 ```
 
-Read them like this:
+The script confirms via GitHub that the PR actually merged (`state=MERGED` with a real `mergedAt`) **before** force-deleting the branch — that check is what makes `-D` provably non-destructive after a squash-merge (safe `-d` always refuses, because squash commits are not ancestors of the branch). It then removes the remote branch if GitHub's auto-delete hasn't already, and reports `merge_commit=<hash>`.
 
-- **Behind (safe, normal after a merge):** the first command is **empty**, the second shows commits (typically the squash commit just merged). Local `main` simply needs to catch up. `git merge --ff-only origin/main` will fast-forward cleanly. **Proceed.**
-- **Up to date:** both empty. Nothing to fast-forward. **Proceed.**
-- **Diverged (dangerous — STOP):** the **first command shows any commits**. This means local `main` holds commits that are not on origin — usually a sign something was committed directly to local `main` or its history was rewritten. A fast-forward from `origin/main` cannot safely proceed.
+- **`state=NOT_MERGED`:** the PR didn't merge (left open, or merge failed) — the branch is **not** deleted. Stop and report.
+- **Never run `git reset` on `main` to discard commits** — in any form, for any reason. If anything about main looks wrong here, `gnadd.sh doctor` is the sanctioned path.
 
-**Stop and do not proceed** if:
-
-- `git log --oneline origin/main..main` shows **any** commits (local `main` has unpushed/divergent commits), or
-- `git merge --ff-only origin/main` refuses, fails, or leaves `main` and `origin/main` out of sync. A refused fast-forward merge is a stop-and-report event — never retry it without `--ff-only` and never "fix" it with a non-fast-forward merge, rebase, or reset.
-
-> The danger signal is specifically `origin/main..main` (local-ahead), **not** `main..origin/main` (local-behind). Being behind is the normal, safe state after every merge — do not treat it as divergence, or the skill will false-alarm on every single resolve and the warning becomes noise.
-
-When stopped:
-
-1. Explain clearly that local `main` has commits not on `origin/main` (or that pull failed).
-2. Show both sides using the log commands above — what is on local that is not on origin, and vice versa.
-3. Offer options only; **do not resolve divergence autonomously**:
-   - Rebase local `main` onto `origin/main`
-   - Merge `origin/main` into local `main`
-   - User decides / handles manually
-4. Wait for the user's choice before running any further git commands on `main`.
-
-Only proceed with cleanup when local `main` is successfully aligned with `origin/main` (no divergence, fast-forward clean).
-
-### Verify the merge before deleting (hard rule)
-
-A squash-merge creates a **new** commit on `main` that is not a descendant of the issue branch's commits. Because of this, `git branch -d` (safe delete) will **refuse** to delete the branch — git cannot see it as "merged" — and will fail on every successful squash-merge resolve.
-
-The correct delete is `git branch -D` (force delete), but **only after confirming the PR actually merged**. The merge-state check is what makes the force delete provably non-destructive: if the PR merged, the work is on `main` via the squash commit, so the branch is genuinely redundant.
-
-Confirm the merge first:
-
-```bash
-gh pr view <N> --json state,mergedAt
-```
-
-Proceed only if `state` is `MERGED` and `mergedAt` is non-null. If the PR did not merge (e.g. left open in step 6, or merge failed), **do not delete the branch** — stop and report.
-
-Once merge is confirmed, delete the local issue branch:
-
-```bash
-git branch -D issue-<N>/<slug>
-```
-
-> Do not "simplify" this back to `git branch -d`. After a squash-merge it will always fail. `-D` is correct and safe **only** because the `gh pr view` check above proved the work is on `main`.
-
-If the remote branch was not auto-deleted by GitHub, delete it:
-
-```bash
-git push origin --delete issue-<N>/<slug>
-```
-
-Report what was cleaned up.
+Report what was cleaned up, and give the user the merge commit hash — their one-command undo for the whole feature (`git revert <hash>`).
 
 ## Closing Guidance
 
-Offer a brief next-step nudge only at natural completion — not at intermediate gates (wrong branch, unmet criteria discussion, commit/PR approval waits, merge conflicts, failing CI, or main divergence during cleanup).
+Offer a brief next-step nudge only at natural completion — not at intermediate gates (wrong branch, unmet criteria discussion, commit/PR approval waits, merge conflicts, failing tests or CI, or main divergence during cleanup).
 
 **Natural completion:**
 
-- Merged and branch cleanup finished → nudge toward `/prime` for the next session.
+- Merged and cleanup finished → nudge toward `/prime` for the next session.
 - PR created but left open → nudge toward reviewing the diff or addressing feedback — not `/start-issue` for new work.
 
-**Stopped on a blocker:** nudge only toward resolving that blocker (conflicts, divergence, failed checks the user has not acknowledged).
+**Stopped on a blocker:** nudge only toward resolving that blocker.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

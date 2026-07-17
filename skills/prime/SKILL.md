@@ -1,12 +1,12 @@
 ---
 name: prime
 description: >-
-  Orient a new chat session with a read-only project snapshot using tree, git,
-  and gh: project shape, current branch state, whether main is behind origin,
-  stashes, recent commits, open issues, open and merged PRs, and active issue
-  context. Fetches latest remote state first. Use when the user asks to inspect
-  project state, orient a session, see what work is open, or decide what to do
-  next.
+  Orient a new chat session with a read-only project snapshot using the bundled
+  gnadd script, git, and gh: project shape, current branch state, whether main
+  is behind or diverged from origin, stashes, recent commits, open issues, open
+  and merged PRs, and active issue context. Fetches latest remote state first.
+  Use when the user asks to inspect project state, orient a session, see what
+  work is open, or decide what to do next.
 disable-model-invocation: false
 ---
 
@@ -25,53 +25,47 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - Surface local `main` divergence and stashes prominently, but do not fix them here; this skill is read-only.
 - For broader workflow or file-hygiene guidance, use `gnadd-context`.
 
-## Purpose
+## Mechanics
 
-Build a lightweight working model of:
-
-- Where things live
-- What changed recently
-- What work is outstanding
-- Whether the current branch maps to an active issue
-
-Do not read individual source files, schemas, or entry points. This skill is for spatial awareness and momentum, not deep implementation context.
-
-Assume `AGENTS.md` and project rules are already loaded. Do not read or summarize them.
+Git state classification runs through the bundled script — `gnadd.sh` in this skill's directory (the directory containing this SKILL.md). If the script is missing, stop and tell the user to reinstall the GNADD skills (`npx skills update -g -y`); do not reconstruct its logic from raw git commands.
 
 ## Commands
 
-First, verify the GitHub CLI is installed and authenticated:
+Run the state snapshot first:
+
+```bash
+bash "<skill-dir>/gnadd.sh" state
+```
+
+It fetches (`git fetch --prune` — updates remote-tracking refs only, touching no working files, so it honors the read-only contract) and reports: current branch, detached HEAD, tree clean/dirty, stash count, active issue number, and the main classification (`synced` / `behind` / `diverged`, with the divergent commits listed when dangerous). If the repo has no remote it reports `remote=none` — note that and move on.
+
+Then gather orientation context:
+
+```bash
+tree -L 2 -I 'node_modules|__pycache__|.git|dist|build|.next|.venv|coverage|target|vendor|.pytest_cache|*.egg-info'
+git log --oneline -15
+git branch --list
+```
+
+If `tree` is not installed, use `find . -maxdepth 2 -type d -not -path './.git*' -not -path './node_modules*'` instead.
+
+Then check GitHub CLI auth:
 
 ```bash
 gh auth status
 ```
 
-If `gh` is not installed or is not authenticated:
+**If `gh` is unavailable or unauthenticated:** do not abort. Report the local snapshot anyway — it contains the safety-relevant signals (divergence, stashes, dirty tree) — and note that issue/PR context was skipped; suggest `gh auth login`.
 
-- Warn the user.
-- Tell them to run `gh auth login`.
-- Do not proceed with the rest of the orientation until `gh auth status` is confirmed working.
-
-After GitHub CLI auth is confirmed, run these commands from the repo root:
+When auth is confirmed:
 
 ```bash
-tree -L 2 -I 'node_modules|__pycache__|.git|dist|build|.next|.venv|coverage|target|vendor|.pytest_cache|*.egg-info'
-git fetch --prune origin
-git log --oneline -15
-git status
-git branch --show-current
-git branch --list
-git stash list
-git log --oneline main..origin/main
-git log --oneline origin/main..main
 gh issue list --state open
 gh pr list --state open
 gh pr list --state merged --limit 10
 ```
 
-`git fetch --prune` updates remote-tracking refs only — it does not touch your working tree, branches, or commits, so it stays within this skill's read-only contract. It is what makes the rest of the snapshot reflect reality rather than a stale local cache. (If the repo has no remote, `fetch` and the `main..origin/main` comparison will no-op or error harmlessly — note "no remote configured" and move on.)
-
-If the current branch matches `issue-<N>/<slug>`, also run:
+If `state` reported an active issue N (`issue=<N>`), also run:
 
 ```bash
 gh issue view <N>
@@ -81,73 +75,39 @@ gh issue view <N>
 
 ### Project Shape
 
-Use the `tree` output to identify the top-level layout:
-
-- Where source appears to live
-- Where config appears to live
-- Where tests appear to live
-- Any notable docs, scripts, assets, or deployment files
-
-Keep this shallow. Do not inspect files unless the user asks.
+Use the tree output to identify the top-level layout: where source, config, tests, docs, and scripts appear to live. Keep this shallow. Do not inspect files unless the user asks.
 
 ### Recent Git History
 
-Use `git log --oneline -15` to infer the recent trajectory:
-
-- Active areas of the codebase
-- Development focus
-- Recently completed issue or PR themes
-
-Avoid over-explaining individual commits.
+Use `git log --oneline -15` to infer the recent trajectory — active areas, development focus, recently completed themes. Avoid over-explaining individual commits.
 
 ### Current State
 
-Use `git status`, current branch, local branch list, `git stash list`, and `git log main..origin/main` to report:
+From the `state` output, report:
 
-- Active branch
-- Whether the working tree is clean
-- Other local branches that may indicate in-progress work
-- **Behind origin:** If `git log --oneline main..origin/main` shows commits, `main` is behind origin by that many commits. Surface this plainly — e.g. "local `main` is 2 commits behind origin; pull before starting new work." This is the signal that someone (you elsewhere, or a collaborator) has merged since you last synced.
-- **Diverged (dangerous):** If `git log --oneline origin/main..main` shows commits, local `main` holds commits that origin lacks — usually a sign something was committed directly to local `main`. This is the dangerous state the other skills halt on. **Flag it as the first line of the summary**, recommend resolving it before starting any new work, and do not attempt to fix it from this skill — prime is read-only. (Behind is normal; ahead is the alarm.)
-- **Stashes:** If `git stash list` is non-empty, surface it — e.g. "you have 1 stashed change; don't forget it's there." Stashes are invisible to every other command here and easy to abandon.
+- Active branch and whether the working tree is clean.
+- Other local branches that may indicate in-progress work.
+- **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue`."
+- **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks. **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
+- **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 
 ### Open Issues
 
-Use `gh issue list --state open` to summarize pending work.
-
-- Group by label when labels are present.
-- Prefer labels `bug`, `feature`, and `chore` when available.
-- Keep issue titles and numbers visible.
+Summarize pending work from `gh issue list`. Group by label when present; keep issue titles and numbers visible.
 
 ### Open PRs
 
-Use `gh pr list --state open` to surface work in flight that is not yet merged.
-
-- Include PR numbers and titles.
-- Flag PRs awaiting review — these are the most actionable items, especially with a collaborator. A PR sitting open is either waiting on you to review/merge or waiting on feedback.
+Surface work in flight. Flag PRs awaiting review — a PR sitting open is either waiting on you to review/merge or waiting on feedback.
 
 ### Recent Completions
 
-Use `gh pr list --state merged --limit 10` to summarize what shipped recently.
-
-- Include PR numbers and titles.
-- Highlight momentum, not every detail.
+Summarize the last ~10 merged PRs. Highlight momentum, not every detail.
 
 ### Active Issue
 
-Only include this section when the branch matches `issue-<N>/<slug>`.
-
-Use `gh issue view <N>` to summarize:
-
-- Problem
-- Desired outcome
-- Subtasks, if present
-
-Do not fetch referenced issues or artifacts automatically.
+Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desired outcome, and subtasks. Do not fetch referenced issues or artifacts automatically.
 
 ## Output Format
-
-Produce a concise, scannable orientation summary:
 
 ```markdown
 ## Project Shape
@@ -176,9 +136,9 @@ Keep the summary short enough to use as quick working context.
 
 ## Closing Guidance
 
-Offer a brief next-step nudge only when orientation completed successfully — not when `gh` auth failed or the skill halted mid-run.
+Offer a brief next-step nudge only when orientation completed successfully — not when the skill halted mid-run.
 
-**Skip** when blockers were surfaced in the summary (diverged `main`, stashes, dirty tree on the wrong branch). Nudge toward resolving those first, not advancing the happy-path loop.
+**Skip** when blockers were surfaced in the summary (diverged `main`, stashes, dirty tree on the wrong branch). Nudge toward resolving those first — for a diverged main, that means `gnadd.sh doctor` — not advancing the happy-path loop.
 
 **Infer one primary suggestion** from repo state, plus at least one alternative when ambiguous:
 
