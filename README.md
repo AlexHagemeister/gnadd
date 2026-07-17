@@ -1,6 +1,6 @@
 # GNADD
 
-Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five operational [Agent Skills](https://agentskills.io) handle the git mechanics, plus context and audit skills orient and align agents on the workflow.
+Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five operational [Agent Skills](https://agentskills.io) drive the loop, backed by a tested, deterministic script (`gnadd.sh`, bundled inside the skills) that enforces the git invariants in code — plus context and audit skills that orient and align agents on the workflow.
 
 Works with any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and others).
 
@@ -39,9 +39,35 @@ Use the same scope (`-g` or project) you used at install. Flag details and inter
 | `commit` | `/commit` |
 | `resolve-issue` | `/resolve-issue` |
 
+## Per-project setup (recommended)
+
+Once per repo, turn on the server-side rails:
+
+```bash
+bash <path-to-installed-prime-skill>/gnadd.sh init        # add --ci for a test workflow stub
+```
+
+This makes GitHub itself enforce the workflow's core invariants: squash-only merges (with the PR body as the commit message), auto-deleted merged branches, and a ruleset on `main` requiring PRs and blocking force pushes. See GNADD.md Part 4 ("The enforcement layers").
+
+## Repo layout
+
+| Path | Role |
+|---|---|
+| `bin/gnadd` | Canonical mechanics script — the single source of truth |
+| `skills/<name>/SKILL.md` | The skills: judgment + conversation around the script |
+| `skills/<name>/gnadd.sh` | Generated copies of `bin/gnadd` — never edit these |
+| `scripts/build.sh` | Copies `bin/gnadd` into the operational skills |
+| `test/run.sh` | Test suite (bash + git only; `gh` is stubbed) |
+| `scripts/release.sh` | Stamps version, repins guide URLs to the release tag |
+| `GNADD.md` | Canonical workflow guide and design rationale |
+
 ## Authoring (repo maintainers)
 
-Edit `skills/<name>/SKILL.md`, then refresh your local install:
+- Skill behavior: edit `skills/<name>/SKILL.md`.
+- Git mechanics: edit `bin/gnadd`, then `./scripts/build.sh` (test/run.sh fails if copies drift).
+- Always: `bash test/run.sh` before committing — every safety guarantee is a test.
+
+Refresh your local install after changes:
 
 ```bash
 ./scripts/sync.sh
@@ -49,4 +75,4 @@ Edit `skills/<name>/SKILL.md`, then refresh your local install:
 
 Defaults to `AGENT=cursor`. Override: `AGENT=claude-code ./scripts/sync.sh`.
 
-After pushing to GitHub: `npx skills update -g -y` (or project scope if that's how you installed).
+Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps (it stamps the version, repins the canonical-guide URLs in `gnadd-context`/`gnadd-audit` to the tag, and re-runs the tests). After pushing to GitHub, consumers refresh with `npx skills update -g -y` (or project scope if that's how you installed).
