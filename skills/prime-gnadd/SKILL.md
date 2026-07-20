@@ -1,5 +1,5 @@
 ---
-name: prime
+name: prime-gnadd
 description: >-
   Orient a new chat session with a read-only project snapshot using the bundled
   gnadd script, git, and gh: project shape, current branch state, whether main
@@ -16,14 +16,14 @@ Orient a new chat session with the project's current state. This is read-only: d
 
 ## Auto-Invocation Gate
 
-If this skill was auto-selected from context rather than explicitly invoked with `/prime`, stop before running commands. Briefly explain why a repo snapshot appears useful and ask: "Run `/prime` now?" Proceed only after confirmation.
+If this skill was auto-selected from context rather than explicitly invoked with `/prime-gnadd`, stop before running commands. Briefly explain why a repo snapshot appears useful and ask: "Run `/prime-gnadd` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
-- `prime` gives spatial awareness and momentum; it does not load implementation context speculatively.
+- `prime-gnadd` gives spatial awareness and momentum; it does not load implementation context speculatively.
 - GitHub is the system of record, so open issues, open PRs, recent merged PRs, branches, and commits are the working state.
 - Surface local `main` divergence and stashes prominently, but do not fix them here; this skill is read-only.
-- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+- For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## Mechanics
 
@@ -87,7 +87,7 @@ From the `state` output, report:
 
 - Active branch and whether the working tree is clean.
 - Other local branches that may indicate in-progress work.
-- **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue`."
+- **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`."
 - **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks. **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 
@@ -143,9 +143,9 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 **Infer one primary suggestion** from repo state, plus at least one alternative when ambiguous:
 
 1. Open PR awaiting review → review or merge before starting new work.
-2. On `issue-<N>/*` with a dirty tree → `/commit` or continue implementation.
+2. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
 3. On `issue-<N>/*`, clean → continue that issue's work.
-4. On clean `main` with open issues → `/start-issue <N>` on the most actionable issue.
-5. No open issues → `/new-issue`.
+4. On clean `main` with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
+5. No open issues → `/new-issue-gnadd`.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

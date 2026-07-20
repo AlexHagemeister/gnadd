@@ -31,13 +31,13 @@ Use the same scope (`-g` or project) you used at install. Flag details and inter
 
 | Skill | Invocation |
 |---|---|
-| `gnadd-context` | Auto when workflow-shaped; `/gnadd-context` |
-| `gnadd-audit` | `/gnadd-audit` |
-| `prime` | `/prime` |
-| `new-issue` | `/new-issue` |
-| `start-issue` | `/start-issue <N>` |
-| `commit` | `/commit` |
-| `resolve-issue` | `/resolve-issue` |
+| `help-gnadd` | Auto when workflow-shaped; `/help-gnadd` |
+| `audit-gnadd` | `/audit-gnadd` |
+| `prime-gnadd` | `/prime-gnadd` |
+| `new-issue-gnadd` | `/new-issue-gnadd` |
+| `start-issue-gnadd` | `/start-issue-gnadd <N>` |
+| `commit-gnadd` | `/commit-gnadd` |
+| `resolve-issue-gnadd` | `/resolve-issue-gnadd` |
 
 ## Per-project setup (recommended)
 
@@ -75,4 +75,4 @@ Refresh your local install after changes:
 
 Defaults to `AGENT=cursor`. Override: `AGENT=claude-code ./scripts/sync.sh`.
 
-Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps (it stamps the version, repins the canonical-guide URLs in `gnadd-context`/`gnadd-audit` to the tag, and re-runs the tests). After pushing to GitHub, consumers refresh with `npx skills update -g -y` (or project scope if that's how you installed).
+Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps (it stamps the version, repins the canonical-guide URLs in `help-gnadd`/`audit-gnadd` to the tag, and re-runs the tests). After pushing to GitHub, consumers refresh with `npx skills update -g -y` (or project scope if that's how you installed).

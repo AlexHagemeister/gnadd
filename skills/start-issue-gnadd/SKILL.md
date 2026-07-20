@@ -1,5 +1,5 @@
 ---
-name: start-issue
+name: start-issue-gnadd
 description: >-
   Set up work on a GitHub issue using the bundled gnadd script and gh: identify
   the issue, protect any in-progress work, resume or create the issue branch,
@@ -16,7 +16,7 @@ Set up a working session for a GitHub issue. Do not start coding until the plan 
 
 ## Auto-Invocation Gate
 
-If this skill was auto-selected from context rather than explicitly invoked with `/start-issue`, stop before running git or GitHub commands. Briefly explain why starting issue work appears useful and ask: "Run `/start-issue` now?" Proceed only after confirmation.
+If this skill was auto-selected from context rather than explicitly invoked with `/start-issue-gnadd`, stop before running git or GitHub commands. Briefly explain why starting issue work appears useful and ask: "Run `/start-issue-gnadd` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
@@ -24,7 +24,7 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - A real commit is preferred over a stash because commits are visible and recoverable.
 - Never create local-main divergence while rescuing work; carry dirty `main` changes onto a fresh issue branch when the user confirms that path.
 - The issue is the contract for the work session; propose a plan and get approval before implementation.
-- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+- For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## Mechanics
 
@@ -63,7 +63,7 @@ Two situations need a conversation **before** touching branches:
 
 **Dirty working tree** (`tree=dirty`) — the script will refuse to switch branches on it, by design. Ask the user how to handle it:
 
-- **On an issue branch or other work branch:** offer — commit it to the current branch (**preferred**: a real commit is visible, recoverable, and survives sessions), stash it (only on explicit request; note that a stash is invisible and easy to forget), or abort. For the commit path, follow the `commit` skill's conventions (conventional message, `Re #<M>` if on `issue-<M>/*`).
+- **On an issue branch or other work branch:** offer — commit it to the current branch (**preferred**: a real commit is visible, recoverable, and survives sessions), stash it (only on explicit request; note that a stash is invisible and easy to forget), or abort. For the commit path, follow the `commit-gnadd` skill's conventions (conventional message, `Re #<M>` if on `issue-<M>/*`).
 - **On `main`, no branch for this issue yet:** the correct rescue is carrying the changes onto the new issue branch — this is the "started editing before starting the issue" case, and it is lossless by construction. Confirm with the user, then use `--carry` in step 3. Never commit the changes to `main`.
 - **On `main`, issue branch already exists:** carrying changes across a real checkout can conflict. Offer an explicit, supervised stash-carry — `git stash push -u`, check out the branch, `git stash pop`, report the result — or abort. If the pop conflicts, stop immediately and report; do not resolve it autonomously.
 
@@ -107,7 +107,7 @@ Read the issue title and body. Present a brief working-spec summary:
 
 - **Problem:** Observable problem or missing behavior.
 - **Desired outcome:** Behavioral target state.
-- **Acceptance criteria:** List them if present — these are the definition of done you'll be building toward and that `resolve-issue` will check against.
+- **Acceptance criteria:** List them if present — these are the definition of done you'll be building toward and that `resolve-issue-gnadd` will check against.
 - **Constraints / Non-goals:** Mention if present — boundaries to respect.
 - **Subtasks:** Include only if the issue has them.
 
@@ -153,7 +153,7 @@ Implement the issue on the current issue branch.
 
 - Stay aligned with the approved plan and issue acceptance criteria.
 - Pause for user direction if new evidence changes the scope or approach.
-- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work — using the `commit` skill's conventions (`Re #<N>` in the body).
+- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work — using the `commit-gnadd` skill's conventions (`Re #<N>` in the body).
 - Report whether the issue work is complete, partial, or blocked. Include what changed, what was verified, and any remaining gaps.
 
-When work appears complete and the working tree is clean, nudge to `/resolve-issue` as the next operational step. `resolve-issue` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.
+When work appears complete and the working tree is clean, nudge to `/resolve-issue-gnadd` as the next operational step. `resolve-issue-gnadd` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.

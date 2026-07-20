@@ -1,10 +1,10 @@
 ---
-name: gnadd-audit
+name: audit-gnadd
 description: >-
   Read-only GNADD alignment audit: load workflow principles, scrutinize context
   files for describe-vs-track violations, perform a shallow git/workflow check,
   and return a severity-grouped report with minimal proposed fixes. Nudges
-  /new-issue for remediation slices; never edits files or creates issues. Use
+  /new-issue-gnadd for remediation slices; never edits files or creates issues. Use
   when the user asks to audit GNADD alignment, review workflow hygiene, check
   project context files, or find describe-vs-track violations.
 disable-model-invocation: false
@@ -18,7 +18,7 @@ or delete files; do not auto-create GitHub issues.
 
 ## Auto-Invocation Gate
 
-If this skill was auto-selected from context rather than explicitly invoked with `/gnadd-audit`, stop before running commands or reading repo context. Briefly explain why a GNADD audit appears useful and ask: "Run `/gnadd-audit` now?" Proceed only after confirmation.
+If this skill was auto-selected from context rather than explicitly invoked with `/audit-gnadd`, stop before running commands or reading repo context. Briefly explain why a GNADD audit appears useful and ask: "Run `/audit-gnadd` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
@@ -26,11 +26,11 @@ If this skill was auto-selected from context rather than explicitly invoked with
   and commits — not in markdown files.
 - Context-file scrutiny is the primary audit dimension; git/workflow checks are
   secondary alignment signals.
-- The audit complements `prime` (live snapshot) — it does not replace session
+- The audit complements `prime-gnadd` (live snapshot) — it does not replace session
   orientation or duplicate its narrative output.
-- Proposed fixes are slices for the user to capture via `/new-issue`; the agent
+- Proposed fixes are slices for the user to capture via `/new-issue-gnadd`; the agent
   never files issues autonomously.
-- For broader workflow rationale, use `gnadd-context`.
+- For broader workflow rationale, use `help-gnadd`.
 
 ## Purpose
 
@@ -42,7 +42,7 @@ Build a structured report covering:
 - Context files that violate or risk violating the describe-vs-track rule
 - Shallow git/workflow misalignment (orphaned branches, diverged `main`, stashes)
 - Whether GNADD skills appear installed
-- Minimal proposed fixes, each mappable to one `/new-issue`
+- Minimal proposed fixes, each mappable to one `/new-issue-gnadd`
 
 Do not read source code, schemas, tests, or dependencies. Do not perform deep
 commit archaeology.
@@ -53,9 +53,9 @@ commit archaeology.
 
 Before inspecting the repo, load GNADD file-hygiene and workflow principles:
 
-1. Use the describe-vs-track rule from `gnadd-context` if already in context.
+1. Use the describe-vs-track rule from `help-gnadd` if already in context.
 2. Fetch Part 1 of the canonical guide from this pinned URL (same pin as
-   `gnadd-context` — do not use `main`):
+   `help-gnadd` — do not use `main`):
 
    https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962cf3fe250672dccbf3/GNADD.md
 
@@ -119,7 +119,7 @@ Determine whether GNADD skills appear available to the agent:
 ls .agents/skills/ 2>/dev/null
 ```
 
-Look for `gnadd-context`, `prime`, `new-issue`, or similar GNADD skill names.
+Look for `help-gnadd`, `prime-gnadd`, `new-issue-gnadd`, or similar GNADD skill names.
 Optionally try `npx skills list 2>/dev/null` if the skills CLI is available.
 
 If undetectable or absent, report as **Info** — not a blocker. Include the
@@ -156,7 +156,7 @@ gh pr list --state open 2>/dev/null
 ```
 
 `git fetch --prune` updates remote-tracking refs only — read-only, same as
-`prime`. If no remote is configured, note it and continue with local signals.
+`prime-gnadd`. If no remote is configured, note it and continue with local signals.
 
 Interpret for **alignment only** — do not produce a session-orientation
 narrative:
@@ -180,7 +180,7 @@ branch names (`issue-<N>/...`).
 
 For every Violation and Warning, propose **one concrete minimal fix** — not a
 broad rewrite plan. Group related fixes into **proposed issue slices** the user
-can capture separately via `/new-issue`.
+can capture separately via `/new-issue-gnadd`.
 
 Examples:
 
@@ -193,7 +193,7 @@ Examples:
 - GNADD skills not detected → "Install GNADD skills globally per README."
 - Diverged local `main` → "Resolve main divergence before starting new issue
   work — the sanctioned path is `gnadd.sh doctor --rescue-main <name>` (bundled
-  with the `prime` skill), which is lossless and never resets."
+  with the `prime-gnadd` skill), which is lossless and never resets."
 - No branch ruleset / merge policy on the repo → "Run `gnadd.sh init` once to
   enforce squash-only merges and PR-required main at the server."
 
@@ -242,7 +242,7 @@ issue with no branch yet, `main` behind origin).
 <detected / not detected / undetermined + install note if needed>
 
 ## Proposed Fixes
-1. <minimal fix mappable to one /new-issue>
+1. <minimal fix mappable to one /new-issue-gnadd>
 2. ...
 
 ## Already Aligned
@@ -263,15 +263,15 @@ user what's missing first.
 **Infer one primary suggestion** from findings, plus at least one alternative
 when ambiguous:
 
-1. **Violations present** → nudge `/new-issue` for the highest-severity fix;
+1. **Violations present** → nudge `/new-issue-gnadd` for the highest-severity fix;
    offer capturing the full proposed-fix list as separate issues.
 2. **Warnings only, no violations** → nudge confirming which warnings are
-   intentional before filing issues; offer `/new-issue` for any the user wants
+   intentional before filing issues; offer `/new-issue-gnadd` for any the user wants
    to act on.
-3. **Clean audit** → nudge `/prime` for ongoing session work, or `/new-issue`
+3. **Clean audit** → nudge `/prime-gnadd` for ongoing session work, or `/new-issue-gnadd`
    if new work is ready to capture.
 4. **GNADD skills not detected on a repo being adopted** → nudge installing
-   skills first, then re-running `/gnadd-audit` after remediation issues are
+   skills first, then re-running `/audit-gnadd` after remediation issues are
    filed.
 
 Keep it to a sentence or two with invitational options. Do not restate the full

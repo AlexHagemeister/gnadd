@@ -1,6 +1,6 @@
 ---
-name: commit
-description: Make atomic git commits during active development. Use when the user invokes /commit or asks to commit, save progress, checkpoint work, or create a git commit; reviews changes, confirms staging, writes a conventional commit message, creates the commit, and reports the result.
+name: commit-gnadd
+description: Make atomic git commits during active development. Use when the user invokes /commit-gnadd or asks to commit, save progress, checkpoint work, or create a git commit; reviews changes, confirms staging, writes a conventional commit message, creates the commit, and reports the result.
 disable-model-invocation: false
 ---
 
@@ -13,9 +13,9 @@ Do not stage files, amend, push, stash, or clean up without user approval where 
 ## GNADD Invariants
 
 - Commits are visible save points during issue work; keep them atomic and recoverable.
-- `commit` can trigger from casual phrasing, so it must guard against accidental commits on `main`, `master`, or detached HEAD.
-- Do not cross-check issue completion here; drift and acceptance criteria verification belong to `resolve-issue`.
-- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+- `commit-gnadd` can trigger from casual phrasing, so it must guard against accidental commits on `main`, `master`, or detached HEAD.
+- Do not cross-check issue completion here; drift and acceptance criteria verification belong to `resolve-issue-gnadd`.
+- For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## 1. Branch Guard (before anything else)
 
@@ -25,11 +25,11 @@ Run the guard from the bundled script (`gnadd.sh` in this skill's directory; if 
 bash "<skill-dir>/gnadd.sh" guard-commit
 ```
 
-- **`state=ON_MAIN`:** stop. This workflow routes work through issue branches; committing to local `main` creates the exact local-ahead divergence the other skills halt on as dangerous. Say so plainly, and offer: switch to or start an issue branch (suggest `/start-issue` — it can carry uncommitted changes onto the new branch safely), or — only with the user's explicit confirmation — commit to `main` anyway with raw git.
+- **`state=ON_MAIN`:** stop. This workflow routes work through issue branches; committing to local `main` creates the exact local-ahead divergence the other skills halt on as dangerous. Say so plainly, and offer: switch to or start an issue branch (suggest `/start-issue-gnadd` — it can carry uncommitted changes onto the new branch safely), or — only with the user's explicit confirmation — commit to `main` anyway with raw git.
 - **`state=DETACHED_HEAD`:** stop. Commits made in detached HEAD belong to no branch and are easy to lose permanently. Recommend creating a branch first (`git switch -c <name>`); proceed only on explicit confirmation.
 - **Success:** the output includes `issue=<N>` when on an issue branch — use it for the message convention below.
 
-This guard matters because `commit` is the one skill that can auto-trigger from casual phrasing ("commit this") — it must not be an unguarded path onto `main`.
+This guard matters because `commit-gnadd` is the one skill that can auto-trigger from casual phrasing ("commit this") — it must not be an unguarded path onto `main`.
 
 ## 2. Review Changes
 
@@ -112,10 +112,10 @@ After reporting the commit, check whether work remains:
 git status --porcelain
 ```
 
-**Still dirty:** nudge toward continuing implementation or `/commit` again — not `/resolve-issue`.
+**Still dirty:** nudge toward continuing implementation or `/commit-gnadd` again — not `/resolve-issue-gnadd`.
 
-**Clean on an issue branch:** nudge toward continuing work; offer `/resolve-issue` only as a secondary option ("when you feel done"), never as the primary suggestion.
+**Clean on an issue branch:** nudge toward continuing work; offer `/resolve-issue-gnadd` only as a secondary option ("when you feel done"), never as the primary suggestion.
 
-**Clean, not on an issue branch:** suggest `/start-issue` if appropriate.
+**Clean, not on an issue branch:** suggest `/start-issue-gnadd` if appropriate.
 
-Keep it to a sentence or two with invitational options. Do not verify acceptance criteria here — that belongs to `resolve-issue`.
+Keep it to a sentence or two with invitational options. Do not verify acceptance criteria here — that belongs to `resolve-issue-gnadd`.
