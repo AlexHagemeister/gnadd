@@ -7,6 +7,7 @@
 - Position shareable repos as agent-agnostic; personally develop with Cursor and Claude Code (`AGENTS="cursor claude-code"` default in `scripts/sync.sh`).
 - Solo, single-threaded GNADD usage; one active issue at a time is the normal pattern.
 - Ask for critical-path confidence before large implementations; proceed when the user says go/proceed.
+- CodeRabbit check failures from rate limiting ("Review rate limited") are not merge blockers; the CI `test` check is the gate that matters.
 
 ## Learned Workspace Facts
 
