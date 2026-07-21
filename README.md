@@ -1,6 +1,6 @@
 # GNADD
 
-Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Five operational [Agent Skills](https://agentskills.io) drive the loop, backed by a tested, deterministic script (`gnadd.sh`, bundled inside the skills) that enforces the git invariants in code — plus context and audit skills that orient and align agents on the workflow.
+Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Seven operational [Agent Skills](https://agentskills.io) drive the loop — from issue capture through gated resolution, plus a no-issue quickfix path and an autonomous YOLO mode — backed by a tested, deterministic script (`gnadd.sh`, bundled inside the skills) that enforces the git invariants in code. Help and audit skills orient and align agents on the workflow.
 
 Works with any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and others).
 
