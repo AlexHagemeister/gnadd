@@ -57,7 +57,7 @@ Before inspecting the repo, load GNADD file-hygiene and workflow principles:
 2. Fetch Part 1 of the canonical guide from this pinned URL (same pin as
    `help-gnadd` — do not use `main`):
 
-   https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962cf3fe250672dccbf3/GNADD.md
+   https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.3.0/GNADD.md
 
    (The pin is rewritten by `scripts/release.sh` at release time.)
 
