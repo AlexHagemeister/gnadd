@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in a GNADD skill or gnadd.sh behaved wrong or unsafely
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did the skill or script do, and what did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Skill or subcommand
+      placeholder: e.g. resolve-issue-gnadd / gnadd.sh ship merge
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      placeholder: e.g. Cursor, Claude Code, Codex
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: gnadd version
+      description: Output of `bash <skill-dir>/gnadd.sh version`
+      placeholder: gnadd 0.2.0
+  - type: textarea
+    id: state
+    attributes:
+      label: State and trace output
+      description: If relevant, paste `gnadd.sh state` and `gnadd.sh trace show` output (redact anything private).
+      render: text
