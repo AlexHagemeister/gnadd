@@ -68,7 +68,7 @@ not exist.
 For startup guidance, file-hygiene questions, rationale, or edge cases not
 covered here, fetch the canonical guide from this pinned URL:
 
-https://raw.githubusercontent.com/AlexHagemeister/gnadd/6471f13ed95d99785fd3962cf3fe250672dccbf3/GNADD.md
+https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.3.0/GNADD.md
 
 This URL is pinned to a commit, not `main`, so installed skills do not drift with
 unreleased guide changes. The pin is rewritten by `scripts/release.sh` at release

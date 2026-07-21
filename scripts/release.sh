@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Cut a GNADD release: stamp the version, repin the canonical-guide URLs to
-# the release tag, rebuild skill copies, and run the tests. Prints the final
-# commit/tag/push commands instead of running them — the release commit goes
-# through the normal loop like any other change.
+# Cut a GNADD release: verify the changelog entry, stamp the version, repin
+# the canonical-guide URLs to the release tag, rebuild skill copies, and run
+# the tests. Prints the final commit/tag/release commands instead of running
+# them — the release commit goes through the normal loop like any other
+# change, and the GitHub Release is created after the tag exists.
 #
-# Usage: scripts/release.sh v0.2.0
+# Usage: scripts/release.sh v0.3.0
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +14,12 @@ cd "$REPO_ROOT"
 TAG="${1:-}"
 [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: scripts/release.sh vX.Y.Z" >&2; exit 1; }
 VERSION="${TAG#v}"
+
+# 0. Changelog gate: no release without a written entry for it.
+grep -q "^## \[$VERSION\]" CHANGELOG.md || {
+  echo "CHANGELOG.md has no \"## [$VERSION]\" entry — write the release notes first" >&2
+  exit 1
+}
 
 # 1. Stamp the CLI version.
 sed -i.bak -E "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" bin/gnadd && rm bin/gnadd.bak
@@ -32,8 +39,10 @@ bash test/run.sh
 
 echo
 echo "Release $TAG prepared. Ship it through the loop:"
-echo "  1. review the diff (version stamp + repinned URLs + skill copies)"
+echo "  1. review the diff (changelog + version stamp + repinned URLs + skill copies)"
 echo "  2. commit:   git commit -am \"chore: release $TAG\""
 echo "  3. after the PR merges to main:"
 echo "       git tag $TAG <merge-commit> && git push origin $TAG"
-echo "  4. consumers refresh with: npx skills update -g -y"
+echo "  4. publish the GitHub Release with the changelog entry as notes:"
+echo "       gh release create $TAG --title \"gnadd $TAG\" --notes \"<the [$VERSION] section of CHANGELOG.md>\""
+echo "  5. consumers refresh with: npx skills update -g -y"
