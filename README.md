@@ -73,6 +73,6 @@ Refresh your local install after changes:
 ./scripts/sync.sh
 ```
 
-Defaults to `AGENT=cursor`. Override: `AGENT=claude-code ./scripts/sync.sh`.
+Installs to Cursor and Claude Code by default. Override the agent list (space-separated, [supported agents](https://github.com/vercel-labs/skills#supported-agents)): `AGENTS="cursor" ./scripts/sync.sh`.
 
 Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps (it stamps the version, repins the canonical-guide URLs in `help-gnadd`/`audit-gnadd` to the tag, and re-runs the tests). After pushing to GitHub, consumers refresh with `npx skills update -g -y` (or project scope if that's how you installed).
