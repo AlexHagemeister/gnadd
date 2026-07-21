@@ -4,7 +4,7 @@
 - Keep consumer install docs minimal and set-and-forget; link to the [skills CLI](https://github.com/vercel-labs/skills) for agent names, flags, and scope details.
 - Use `gh` for GitHub operations rather than the web portal.
 - Superseded (2026-07, "Server-side rails" decision in GNADD.md Part 5): direct commits to `main` for small doc-only changes. All changes route through the loop; if micro-task overhead bites, that triggers the deferred `quick` skill.
-- Position shareable repos as agent-agnostic; personally develop with Cursor (`AGENT=cursor` default in `scripts/sync.sh`).
+- Position shareable repos as agent-agnostic; personally develop with Cursor and Claude Code (`AGENTS="cursor claude-code"` default in `scripts/sync.sh`).
 - Solo, single-threaded GNADD usage; one active issue at a time is the normal pattern.
 - Ask for critical-path confidence before large implementations; proceed when the user says go/proceed.
 
