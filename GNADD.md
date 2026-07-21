@@ -595,12 +595,12 @@ branch, including before checking out an existing issue branch.
 silently carry uncommitted changes onto the wrong branch — the quiet-data-movement bug
 the whole workflow is meant to design out. Protecting the working tree first closes it.
 
-### prime fetches remote state (and stays read-only)
+### prime-gnadd fetches remote state (and stays read-only)
 **Decision:** `prime-gnadd` runs `git fetch --prune` and surfaces behind-count, divergence,
 stashes, and open PRs.
-**Why:** Without a fetch, prime reports a stale local cache — invisible to collaborators'
+**Why:** Without a fetch, prime-gnadd reports a stale local cache — invisible to collaborators'
 pushes and blind to local main being behind. `fetch --prune` updates remote-tracking
-refs only; it touches no working files or branches, so it honors prime's read-only
+refs only; it touches no working files or branches, so it honors prime-gnadd's read-only
 contract.
 
 ### Skills deferred (not built speculatively)
