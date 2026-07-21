@@ -1,5 +1,5 @@
 ---
-name: gnadd-context
+name: help-gnadd
 description: >-
   GNADD workflow orientation: GitHub issues as backlog, describe-vs-track file
   rule, and which GNADD skill handles each workflow step. Use when the user asks
@@ -9,7 +9,7 @@ description: >-
 disable-model-invocation: false
 ---
 
-# GNADD Context
+# GNADD Help
 
 Provide lightweight orientation for Git-Native Agent-Driven Development (GNADD).
 Do not run git commands from this skill; route mechanics to the operational
@@ -19,15 +19,15 @@ skills.
 
 - GitHub is the system of record: issues capture intent, branches hold work, PRs
   record what shipped, and git history is the audit trail.
-- The five operational skills drive the loop: `prime`, `new-issue`,
-  `start-issue`, `commit`, and `resolve-issue`. Their git mechanics run through
+- The five operational skills drive the loop: `prime-gnadd`, `new-issue-gnadd`,
+  `start-issue-gnadd`, `commit-gnadd`, and `resolve-issue-gnadd`. Their git mechanics run through
   a bundled deterministic script (`gnadd.sh`), not improvised commands.
 - Enforcement is layered, lowest layer that can hold each invariant: GitHub
   server rules (`gnadd init` — squash-only merges, PR-required main), the
   script (ff-only syncs, divergence halts, gated cleanup), the skills
   (judgment and conversation), and the human (reading the diff before merge).
 - Recovery from bad states has a sanctioned path: `gnadd.sh doctor` (bundled
-  with `prime`) diagnoses and offers lossless fixes. Never improvise
+  with `prime-gnadd`) diagnoses and offers lossless fixes. Never improvise
   `reset`/`force` recoveries.
 - The user's load-bearing job is to describe desired behavior, answer scope
   questions, and read diffs before merge.
@@ -44,14 +44,14 @@ not exist.
 
 ## Skill Router
 
-- Adopt or realign a repo: use `/gnadd-audit`.
-- Start a session or inspect state: use `/prime`.
-- Capture new work: use `/new-issue`.
-- Begin or resume issue work: use `/start-issue <N>`.
-- Save progress on an issue branch: use `/commit`.
-- Verify, PR, merge, and clean up: use `/resolve-issue`.
+- Adopt or realign a repo: use `/audit-gnadd`.
+- Start a session or inspect state: use `/prime-gnadd`.
+- Capture new work: use `/new-issue-gnadd`.
+- Begin or resume issue work: use `/start-issue-gnadd <N>`.
+- Save progress on an issue branch: use `/commit-gnadd`.
+- Verify, PR, merge, and clean up: use `/resolve-issue-gnadd`.
 - Diagnose or recover from a bad git state (diverged main, stashes,
-  leftovers): run `gnadd.sh doctor` from the `prime` skill's directory.
+  leftovers): run `gnadd.sh doctor` from the `prime-gnadd` skill's directory.
 - Set up server-side rails on a new repo: `gnadd.sh init` (squash-only
   merges, branch ruleset on main; `--ci` adds a test workflow stub).
 - If a git operation seems needed and no skill covers it, ask for a
@@ -73,7 +73,7 @@ time — do not hand-edit it out of band.
 Do not nudge after every answer. Match nudge depth to user intent:
 
 - **Purely informational** (describe-vs-track, "which skill does X?", rationale questions): no nudge — the answer stands alone.
-- **Routing toward action** ("how do I start?", "where should this state live?"): light nudge — one skill pointer (e.g. `/prime`, `/new-issue`), no full loop recap.
-- **Session bootstrap** ("I'm new here", end-to-end workflow orientation): full nudge toward `/prime` to see live repo state.
+- **Routing toward action** ("how do I start?", "where should this state live?"): light nudge — one skill pointer (e.g. `/prime-gnadd`, `/new-issue-gnadd`), no full loop recap.
+- **Session bootstrap** ("I'm new here", end-to-end workflow orientation): full nudge toward `/prime-gnadd` to see live repo state.
 
 When nudging, keep it to a sentence with an invitational option. Do not restate the skill router table.

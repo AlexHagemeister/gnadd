@@ -1,5 +1,5 @@
 ---
-name: new-issue
+name: new-issue-gnadd
 description: Draft GitHub issues from natural language descriptions. Use when the user describes new work, asks to capture a backlog item, or needs a behavior-focused GitHub issue; interviews for requirements as needed, confirms the draft, and creates the issue via GitHub CLI after approval.
 disable-model-invocation: false
 ---
@@ -10,14 +10,14 @@ Write GitHub issues from natural language descriptions. After the user approves 
 
 ## Auto-Invocation Gate
 
-If this skill was auto-selected from context rather than explicitly invoked with `/new-issue`, stop before interviewing or drafting. Briefly explain why capturing a GitHub issue appears useful and ask: "Run `/new-issue` now?" Proceed only after confirmation.
+If this skill was auto-selected from context rather than explicitly invoked with `/new-issue-gnadd`, stop before interviewing or drafting. Briefly explain why capturing a GitHub issue appears useful and ask: "Run `/new-issue-gnadd` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
 - Issues are the backlog and the working spec; do not create or update markdown task lists as a substitute.
 - Capture intent as observable behavior: what changes, why it matters, and what proves it is done.
 - Prefer thin vertical slices over broad plans or horizontal implementation layers.
-- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+- For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## Creation Mode
 
@@ -42,8 +42,8 @@ Interview the user relentlessly until every detail needed for a quality, actiona
 
 ### Entry mode
 
-- **Mid-conversation:** `/new-issue` during an existing discussion. Mine the conversation for problem, outcome, scope, and criteria. Do not ask the user to re-describe what was just discussed. Interview only for **outstanding gaps** — ambiguities, missing boundaries, unstated acceptance conditions, or unresolved scope forks. If the user adds a scoping note, use it to narrow the issue.
-- **Cold start:** `/new-issue` with little or no context (e.g. a fresh chat). Run a **full extraction interview** from scratch. Treat a brief description as a starting point, not a complete spec.
+- **Mid-conversation:** `/new-issue-gnadd` during an existing discussion. Mine the conversation for problem, outcome, scope, and criteria. Do not ask the user to re-describe what was just discussed. Interview only for **outstanding gaps** — ambiguities, missing boundaries, unstated acceptance conditions, or unresolved scope forks. If the user adds a scoping note, use it to narrow the issue.
+- **Cold start:** `/new-issue-gnadd` with little or no context (e.g. a fresh chat). Run a **full extraction interview** from scratch. Treat a brief description as a starting point, not a complete spec.
 
 ### What must be resolved
 
@@ -201,6 +201,6 @@ Confirm with the issue number and URL.
 
 Offer a brief next-step nudge only after finalization — not during extraction, at the review gate, or while awaiting creation confirmation.
 
-Nudge toward `/start-issue <N>` as the primary next step. If the user was capturing side work mid-session, offer returning to that work as an alternative.
+Nudge toward `/start-issue-gnadd <N>` as the primary next step. If the user was capturing side work mid-session, offer returning to that work as an alternative.
 
 Keep it to a sentence or two with invitational options.

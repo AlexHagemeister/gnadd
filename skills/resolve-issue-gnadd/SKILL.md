@@ -1,5 +1,5 @@
 ---
-name: resolve-issue
+name: resolve-issue-gnadd
 description: >-
   Wrap up work on a GitHub issue using the bundled gnadd script and gh:
   identify the issue branch, verify the work against acceptance criteria, run
@@ -17,7 +17,7 @@ Wrap up work on a GitHub issue. Do not commit, create a PR, or merge without use
 
 ## Auto-Invocation Gate
 
-If this skill was auto-selected from context rather than explicitly invoked with `/resolve-issue`, stop before running git or GitHub commands. Briefly explain why resolving the current issue appears useful and ask: "Run `/resolve-issue` now?" Proceed only after confirmation.
+If this skill was auto-selected from context rather than explicitly invoked with `/resolve-issue-gnadd`, stop before running git or GitHub commands. Briefly explain why resolving the current issue appears useful and ask: "Run `/resolve-issue-gnadd` now?" Proceed only after confirmation.
 
 ## GNADD Invariants
 
@@ -25,7 +25,7 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - The PR records what shipped, including descopes, divergences, and non-obvious decisions.
 - GitHub computes mergeability; do not locally rebase or resolve conflicts autonomously.
 - The human must review the diff before merge. Tests, CI, and mergeability checks support that decision; they do not replace it.
-- For broader workflow or file-hygiene guidance, use `gnadd-context`.
+- For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## Mechanics
 
@@ -38,7 +38,7 @@ bash "<skill-dir>/gnadd.sh" state --no-fetch
 ```
 
 - If `issue=<N>`, that is the issue being resolved.
-- If on `main`, `master`, or detached HEAD, **stop**. Never run this flow from main: shipping from main would push unreviewed work straight to `origin/main`, bypassing the PR gate (the script refuses this too). List local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and switch to it — applying the same working-tree protection as `start-issue` (never switch on a dirty tree without an explicit commit/stash/abort choice).
+- If on `main`, `master`, or detached HEAD, **stop**. Never run this flow from main: shipping from main would push unreviewed work straight to `origin/main`, bypassing the PR gate (the script refuses this too). List local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and switch to it — applying the same working-tree protection as `start-issue-gnadd` (never switch on a dirty tree without an explicit commit/stash/abort choice).
 - If on some other non-issue branch, ask the user to confirm this branch holds the work to resolve. Only after explicit confirmation, use `--any-branch` in step 4; everything below still applies.
 
 ## 2. Verify Completeness
@@ -67,7 +67,7 @@ It auto-detects the test command (npm/make/cargo/go/pytest). Report the result a
 
 ## 3. Stage And Commit
 
-**If the working tree is clean** (all work already committed via `/commit`), skip to step 4 — nothing needs to be invented or re-staged. The PR body's `Closes #<N>` still auto-closes the issue on merge.
+**If the working tree is clean** (all work already committed via `/commit-gnadd`), skip to step 4 — nothing needs to be invented or re-staged. The PR body's `Closes #<N>` still auto-closes the issue on merge.
 
 Otherwise inspect and stage intended changes:
 
@@ -77,7 +77,7 @@ git diff
 git add <relevant-files>
 ```
 
-Choose a conventional commit message from the **actual change** (the issue label is only a starting point: `bug`→`fix`, `feature`→`feat`, `chore`→`chore`; override when the diff warrants it). Allowed types match the `commit` skill: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `perf`.
+Choose a conventional commit message from the **actual change** (the issue label is only a starting point: `bug`→`fix`, `feature`→`feat`, `chore`→`chore`; override when the diff warrants it). Allowed types match the `commit-gnadd` skill: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `perf`.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -171,7 +171,7 @@ bash "<skill-dir>/gnadd.sh" sync-main
 
 `ship merge` squash-merges only when the PR is OPEN and MERGEABLE. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
 
-If the user leaves the PR open: stop here. Next session, `/resolve-issue` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
+If the user leaves the PR open: stop here. Next session, `/resolve-issue-gnadd` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
 
 ## 7. Sync The Record (Issue + PR)
 
@@ -228,8 +228,8 @@ Offer a brief next-step nudge only at natural completion — not at intermediate
 
 **Natural completion:**
 
-- Merged and cleanup finished → nudge toward `/prime` for the next session.
-- PR created but left open → nudge toward reviewing the diff or addressing feedback — not `/start-issue` for new work.
+- Merged and cleanup finished → nudge toward `/prime-gnadd` for the next session.
+- PR created but left open → nudge toward reviewing the diff or addressing feedback — not `/start-issue-gnadd` for new work.
 
 **Stopped on a blocker:** nudge only toward resolving that blocker.
 

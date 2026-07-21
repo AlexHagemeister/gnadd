@@ -360,7 +360,7 @@ expect_status 0 "$ST"
 expect_contains "state=NO_TESTS"
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
-for skill in prime start-issue commit resolve-issue; do
+for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd; do
   if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
     fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
   elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then

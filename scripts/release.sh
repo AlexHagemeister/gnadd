@@ -19,8 +19,8 @@ sed -i.bak -E "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" bin/gnadd && rm bin/
 
 # 2. Repin the canonical guide URLs to the release tag (raw.githubusercontent
 #    resolves tag names directly). This is the only sanctioned way to move
-#    the pin — see gnadd-context / gnadd-audit.
-for f in skills/gnadd-context/SKILL.md skills/gnadd-audit/SKILL.md; do
+#    the pin — see help-gnadd / audit-gnadd.
+for f in skills/help-gnadd/SKILL.md skills/audit-gnadd/SKILL.md; do
   sed -i.bak -E \
     "s#raw\.githubusercontent\.com/AlexHagemeister/gnadd/[^/]+/GNADD\.md#raw.githubusercontent.com/AlexHagemeister/gnadd/$TAG/GNADD.md#g" \
     "$f" && rm "$f.bak"

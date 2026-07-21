@@ -402,7 +402,7 @@ cmd_doctor() {
   if [ "$br" = "$MAIN" ] && tree_dirty; then
     findings=$((findings+1))
     say "finding=DIRTY_TREE_ON_MAIN"
-    note "recipe: /start-issue carries these changes onto a fresh issue branch losslessly"
+    note "recipe: /start-issue-gnadd carries these changes onto a fresh issue branch losslessly"
   fi
 
   local stashes; stashes=$(git stash list | wc -l | tr -d ' ')
