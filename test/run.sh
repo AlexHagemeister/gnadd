@@ -68,7 +68,8 @@ setup_repo() {
   git_q push -u origin main
   export GNADD_GH="$STUB" GH_STUB_LOG="$SANDBOX/gh.log"
   unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
-        GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT GH_STUB_FAIL 2>/dev/null || true
+        GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
+        GH_STUB_CHECKS GH_STUB_FAIL 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -359,8 +360,133 @@ run test
 expect_status 0 "$ST"
 expect_contains "state=NO_TESTS"
 
+# ---------------------------------------------------------------- quickfix
+
+t quickfix_start_creates_branch; setup_repo
+run quickfix start fix-typo
+expect_status 0 "$ST"
+expect_contains "result=created"
+expect_contains "branch=quickfix/fix-typo"
+
+t quickfix_start_carries_dirty_main; setup_repo
+echo tweak >> README.md
+run quickfix start doc-tweak --carry
+expect_status 0 "$ST"
+expect_contains "result=created-carry"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main was modified by carry"
+
+t quickfix_start_refuses_existing_branch; setup_repo
+git_q branch quickfix/dup
+run quickfix start dup
+expect_status 2 "$ST"
+expect_contains "state=QF_BRANCH_EXISTS"
+
+t quickfix_start_halts_on_diverged_main; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+run quickfix start anything
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
+
+t quickfix_guard_small_change_ok; setup_repo
+run quickfix start small
+echo tweak >> README.md && git_q add README.md && git_q commit -m "tweak"
+run quickfix guard
+expect_status 0 "$ST"
+expect_contains "guard=ok"
+expect_contains "files=1"
+
+t quickfix_guard_refuses_too_many_lines; setup_repo
+run quickfix start big
+seq 1 40 > big.txt && git_q add big.txt && git_q commit -m "big"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=TOO_BIG"
+
+t quickfix_guard_refuses_too_many_files; setup_repo
+run quickfix start wide
+for f in a b c d; do echo x > "$f.txt"; done
+git_q add . && git_q commit -m "wide"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=TOO_BIG"
+
+t quickfix_guard_refuses_protected_paths; setup_repo
+run quickfix start sneaky
+mkdir -p scripts && echo x > scripts/hack.sh
+git_q add . && git_q commit -m "sneaky"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=PROTECTED_PATH"
+
+t quickfix_guard_refuses_gnadd_copies; setup_repo
+run quickfix start copy-edit
+mkdir -p skills/foo && echo x > skills/foo/gnadd.sh
+git_q add . && git_q commit -m "copy edit"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=PROTECTED_PATH"
+
+t quickfix_ship_happy; setup_repo
+run quickfix start shippable
+echo tweak >> README.md && git_q add README.md && git_q commit -m "tweak"
+run quickfix ship
+expect_status 0 "$ST"
+expect_contains "guard=ok"
+expect_contains "pushed=true"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main gained a commit"
+
+t quickfix_ship_refuses_non_quickfix_branch; setup_repo
+git_q checkout -b issue-20/not-quickfix
+run quickfix ship
+expect_status 2 "$ST"
+expect_contains "state=NOT_QUICKFIX_BRANCH"
+
+t quickfix_merge_waits_for_ci; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='test\tpending\t0\turl'
+run quickfix merge 50
+expect_status 2 "$ST"
+expect_contains "state=QF_CHECKS_PENDING"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with CI still pending" || ok
+
+t quickfix_merge_refuses_failed_ci; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='test\tfail\t5s\turl'
+run quickfix merge 50
+expect_status 2 "$ST"
+expect_contains "state=QF_CHECK_FAILED"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged despite failing CI" || ok
+
+t quickfix_merge_after_green_ci; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='CodeRabbit\tfail\t0\turl\ntest\tpass\t5s\turl'
+run quickfix merge 50
+expect_status 0 "$ST"
+expect_contains "check_status=pass"
+expect_contains "merged=true"
+grep -q "pr merge 50 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+
+t quickfix_merge_refuses_when_no_checks; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+run quickfix merge 50
+expect_status 2 "$ST"
+expect_contains "state=QF_NO_CHECKS"
+run quickfix merge 50 --no-check
+expect_status 0 "$ST"
+expect_contains "merged=true"
+
+t quickfix_merge_unknown_check_name; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='ci-build\tpass\t5s\turl'
+run quickfix merge 50
+expect_status 2 "$ST"
+expect_contains "state=QF_CHECK_NOT_FOUND"
+run quickfix merge 50 --check ci-build
+expect_status 0 "$ST"
+expect_contains "merged=true"
+
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
-for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd; do
+for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd; do
   if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
     fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
   elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then

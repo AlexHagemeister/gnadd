@@ -38,6 +38,7 @@ Use the same scope (`-g` or project) you used at install. Flag details and inter
 | `start-issue-gnadd` | `/start-issue-gnadd <N>` |
 | `commit-gnadd` | `/commit-gnadd` |
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` |
+| `quickfix-gnadd` | `/quickfix-gnadd` |
 
 ## Per-project setup (recommended)
 

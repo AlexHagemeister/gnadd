@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Skill copies in sync with bin/gnadd
         run: |
-          for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd; do
+          for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd; do
             diff "bin/gnadd" "skills/$skill/gnadd.sh" \
               || { echo "skills/$skill/gnadd.sh drifted — run scripts/build.sh"; exit 1; }
           done

@@ -42,8 +42,8 @@ questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
 with the GNADD skills installed (`help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`,
-`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`), the GitHub CLI (`gh`) installed and
-authenticated, and a GitHub account.
+`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`), the GitHub CLI
+(`gh`) installed and authenticated, and a GitHub account.
 
 **Install skills:** see [README.md](README.md).
 
@@ -327,7 +327,7 @@ the states it can encounter.
 ### The skills
 
 All seven are global skills when installed with `-g` (available in every repo). The
-five operational skills drive the loop — their git mechanics run through the
+six operational skills drive the loop — their git mechanics run through the
 bundled `gnadd.sh` script, not improvised commands; `help-gnadd` provides
 lightweight workflow orientation; `audit-gnadd` reviews alignment when adopting
 or realigning a repo. Operational skills are invoked explicitly except `commit-gnadd`,
@@ -342,6 +342,7 @@ which can also trigger on "commit this" or similar.
 | `start-issue-gnadd` | `/start-issue-gnadd <N>` | `skills/start-issue-gnadd/SKILL.md` | Protect in-progress work, branch off main, load the spec, propose a plan, wait for approval |
 | `commit-gnadd` | `/commit-gnadd` or "commit this" | `skills/commit-gnadd/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main |
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | `skills/resolve-issue-gnadd/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
+| `quickfix-gnadd` | `/quickfix-gnadd` | `skills/quickfix-gnadd/SKILL.md` | Land one trivial change via a CI-gated squash-merged PR, no issue; guard refuses large or mechanics-touching diffs |
 
 ### The core principles
 
@@ -615,10 +616,11 @@ contract.
   requests changes and the real shape is known. A separate need from `update-issue`.
   (The narrower "merge the PR I left open yesterday" case is already covered:
   `resolve-issue-gnadd` detects an existing open PR and resumes at the merge gate.)
-- **`quick`** (fast-path through the rails for trivial fixes): build if micro-task
-  overhead actually becomes annoying — especially now that `init`'s ruleset closes
-  the direct-to-main side door for doc typos. A fast path *through* the safety
-  rails, never a bypass *around* them.
+- **`quick`** — landed as `quickfix-gnadd` (2026-07): the micro-task overhead
+  trigger fired in practice. One trivial change per invocation, no issue (the PR
+  is the record), with a deterministic guard (small diffs only; never `bin/`,
+  `scripts/`, `.github/`, or `gnadd.sh` copies) and a CI-gated squash merge
+  enforced in the script. A fast path *through* the safety rails, not around them.
 - **Hard CI gate** in `resolve-issue-gnadd`: partially landed — `resolve-issue-gnadd` runs the
   project's test suite locally via `gnadd.sh test` before the PR, and `gnadd.sh
   init --ci` bootstraps a GitHub Actions workflow. Make the GitHub-side check
