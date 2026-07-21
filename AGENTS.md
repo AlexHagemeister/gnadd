@@ -11,7 +11,7 @@
 ## Learned Workspace Facts
 
 - GitHub remote: `AlexHagemeister/gnadd`.
-- Seven GNADD skills live under `skills/<name>/SKILL.md`: `help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`, `start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`.
+- Eight GNADD skills live under `skills/<name>/SKILL.md`: `help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`, `start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`.
 - GNADD workflow: GitHub Issues, branches, PRs, and git history are the sole system of record.
 - `GNADD.md` is the canonical workflow guide; `README.md` covers install; skills are the executable spec.
 - Git mechanics are canonical in `bin/gnadd`; `scripts/build.sh` copies it into the operational skills as `gnadd.sh` (never edit the copies); `test/run.sh` is the zero-dependency test suite (gh stubbed at `test/stub/gh`) and fails if copies drift.

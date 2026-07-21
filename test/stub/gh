@@ -9,6 +9,8 @@
 #   GH_STUB_MERGEABLE     e.g. MERGEABLE / CONFLICTING / UNKNOWN
 #   GH_STUB_MERGED_AT     e.g. 2026-07-17T00:00:00Z     (unset = null)
 #   GH_STUB_MERGE_COMMIT  e.g. abc123
+#   GH_STUB_CHECKS        tab-separated check rows, e.g. 'test\tpass\t1s\turl'
+#                         (\n for multiple rows; unset = "no checks reported")
 #   GH_STUB_FAIL          set = every command fails
 
 set -u
@@ -53,7 +55,11 @@ case "$1" in
         esac
         ;;
       checks)
-        echo "no checks reported"
+        if [ -n "${GH_STUB_CHECKS:-}" ]; then
+          printf '%b\n' "$GH_STUB_CHECKS"
+        else
+          echo "no checks reported"
+        fi
         exit 0
         ;;
       merge)

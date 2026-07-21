@@ -8,9 +8,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd; do
+for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd; do
   cp bin/gnadd "skills/$skill/gnadd.sh"
   chmod +x "skills/$skill/gnadd.sh"
 done
 
-echo "Synced bin/gnadd into operational skills (prime-gnadd, start-issue-gnadd, commit-gnadd, resolve-issue-gnadd)"
+echo "Synced bin/gnadd into operational skills (prime-gnadd, start-issue-gnadd, commit-gnadd, resolve-issue-gnadd, quickfix-gnadd)"

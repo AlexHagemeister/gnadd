@@ -237,8 +237,8 @@ cmd_ship_push() {
     die_state ON_MAIN "never ship from $br: this would push work straight to origin/$MAIN, bypassing the PR gate"
   fi
   issue_from_branch "$br"
-  if [ -z "$ISSUE_NUM" ] && [ "$any_branch" = 0 ]; then
-    die_state NOT_ISSUE_BRANCH "'$br' is not an issue-<N>/<slug> branch; a human must confirm shipping it (then re-run with --any-branch)"
+  if [ -z "$ISSUE_NUM" ] && [[ ! "$br" =~ ^quickfix/ ]] && [ "$any_branch" = 0 ]; then
+    die_state NOT_ISSUE_BRANCH "'$br' is not an issue-<N>/<slug> or quickfix/<slug> branch; a human must confirm shipping it (then re-run with --any-branch)"
   fi
   require_clean_tree
 
@@ -363,7 +363,148 @@ cmd_cleanup() {
   fi
 }
 
-# ---------------------------------------------------------------- doctor
+# ---------------------------------------------------------------- quickfix
+#
+# The fast path THROUGH the rails for trivial changes: no issue, but always
+# branch → PR → CI → squash merge. The guard is what keeps "no issue, no
+# plan" safe: the diff must stay glanceable (size cap) and must never touch
+# the safety machinery itself (protected paths) — those changes take the
+# full loop where a spec and a plan exist.
+
+QF_MAX_FILES="${GNADD_QF_MAX_FILES:-3}"
+QF_MAX_LINES="${GNADD_QF_MAX_LINES:-30}"
+QF_CHECK="${GNADD_QF_CHECK:-test}"
+
+cmd_quickfix_start() {
+  local carry=0 args=()
+  for a in "$@"; do
+    case "$a" in
+      --carry) carry=1 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  [ ${#args[@]} -eq 1 ] || usage_die "usage: gnadd quickfix start <slug> [--carry]"
+  local slug="${args[0]}"
+  [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || usage_die "slug must be kebab-case, got: $slug"
+
+  local target="quickfix/$slug"
+  git show-ref --verify --quiet "refs/heads/$target" && \
+    die_state QF_BRANCH_EXISTS "branch '$target' already exists; pick another slug or finish/clean up that quickfix first"
+
+  if [ "$carry" = 1 ]; then
+    # Same lossless rescue as issue start: dirty tree on main, checkout -b
+    # preserves the working tree, main is never modified.
+    local br; br="$(current_branch)"
+    [ "$br" = "$MAIN" ] || die_state NOT_ON_MAIN "--carry is only for rescuing a dirty tree on $MAIN (currently on '$br')"
+    tree_dirty || note "tree is clean; --carry not strictly needed"
+    git checkout -b "$target" >/dev/null 2>&1
+    say "result=created-carry"
+    say "branch=$target"
+    note "uncommitted changes carried onto $target; $MAIN was not modified"
+    return 0
+  fi
+
+  require_clean_tree
+  git checkout "$MAIN" >/dev/null 2>&1 || usage_die "cannot check out $MAIN"
+  if fetch_origin >/dev/null; then
+    main_counts
+    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
+      say "state=DIVERGED_MAIN"
+      err "local $MAIN has commits origin lacks; refusing to build on it"
+      show_divergence
+      note "run 'gnadd doctor' for the sanctioned recovery path"
+      exit 2
+    fi
+    git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
+      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report — never merge, rebase, or reset here"
+  fi
+  git checkout -b "$target" >/dev/null 2>&1
+  say "result=created"
+  say "branch=$target"
+}
+
+cmd_quickfix_guard() {
+  # Scope: everything this quickfix would land — commits beyond origin/main
+  # plus any uncommitted changes. Binary files count toward the file cap.
+  local base="origin/$MAIN"
+  git rev-parse --verify --quiet "$base" >/dev/null || base="$MAIN"
+
+  local files
+  files="$( { git diff --name-only "$base...HEAD" 2>/dev/null; git diff --name-only HEAD 2>/dev/null; } | sort -u | sed '/^$/d' )"
+  local file_count
+  file_count="$(printf '%s' "$files" | grep -c . || true)"
+
+  local lines
+  lines="$( { git diff --numstat "$base...HEAD" 2>/dev/null; git diff --numstat HEAD 2>/dev/null; } | \
+    awk '{ if ($1 != "-") s += $1; if ($2 != "-") s += $2 } END { print s+0 }' )"
+
+  say "files=$file_count"
+  say "lines=$lines"
+
+  [ "$file_count" -gt 0 ] || die_state QF_NOTHING_TO_GUARD "no changes vs $base; nothing to quickfix"
+
+  local protected
+  protected="$(printf '%s\n' "$files" | grep -E '^(bin/|scripts/|\.github/)|(^|/)gnadd\.sh$' || true)"
+  if [ -n "$protected" ]; then
+    say "state=PROTECTED_PATH"
+    err "quickfix must never modify the safety machinery it depends on; these paths take the full loop:"
+    printf '%s\n' "$protected" | sed 's/^/  /'
+    exit 2
+  fi
+
+  if [ "$file_count" -gt "$QF_MAX_FILES" ] || [ "$lines" -gt "$QF_MAX_LINES" ]; then
+    say "state=TOO_BIG"
+    err "change exceeds the quickfix budget (${file_count} files / ${lines} lines vs max ${QF_MAX_FILES}/${QF_MAX_LINES}); use the full loop (new-issue → start-issue)"
+    exit 2
+  fi
+
+  say "guard=ok"
+}
+
+cmd_quickfix_ship() {
+  local br; br="$(current_branch)"
+  [ -n "$br" ] || die_state DETACHED_HEAD "cannot ship from detached HEAD"
+  [[ "$br" =~ ^quickfix/ ]] || die_state NOT_QUICKFIX_BRANCH "'$br' is not a quickfix/<slug> branch"
+  require_clean_tree
+  cmd_quickfix_guard
+  cmd_ship_push --any-branch
+}
+
+cmd_quickfix_merge() {
+  # Squash-merge only when the PR is OPEN, MERGEABLE, and the CI check has
+  # passed. This is the "merges only after CI passes" guarantee, enforced at
+  # merge time regardless of what the caller watched or skipped.
+  local pr="" check="$QF_CHECK" no_check=0 prev=""
+  for a in "$@"; do
+    case "$a" in
+      --no-check) no_check=1 ;;
+      --check) ;;
+      *) if [ "$prev" = "--check" ]; then check="$a"; else pr="$a"; fi ;;
+    esac
+    prev="$a"
+  done
+  [ -n "$pr" ] || usage_die "usage: gnadd quickfix merge <pr-number> [--check <name>] [--no-check]"
+
+  if [ "$no_check" = 1 ]; then
+    note "CI gate explicitly skipped (--no-check); the human owns this decision"
+  else
+    local checks row status
+    checks="$("$GH" pr checks "$pr" 2>/dev/null || true)"
+    if [ -z "$checks" ] || printf '%s' "$checks" | grep -qi '^no checks'; then
+      die_state QF_NO_CHECKS "no CI checks reported for PR #$pr; nothing automated verified it — a human must decide (re-run with --no-check to accept that)"
+    fi
+    row="$(printf '%s\n' "$checks" | awk -F'\t' -v c="$check" '$1 == c { print; exit }')"
+    [ -n "$row" ] || die_state QF_CHECK_NOT_FOUND "check '$check' not found on PR #$pr; available checks are informational — pick one with --check <name> or use --no-check deliberately"
+    status="$(printf '%s\n' "$row" | awk -F'\t' '{ print $2 }')"
+    case "$status" in
+      pass) say "check=$check"; say "check_status=pass" ;;
+      pending) die_state QF_CHECKS_PENDING "check '$check' is still running on PR #$pr; wait (gh pr checks $pr --watch) and re-run" ;;
+      *) die_state QF_CHECK_FAILED "check '$check' reports '$status' on PR #$pr; a failing CI gate is a stop, not a wave-past" ;;
+    esac
+  fi
+
+  cmd_ship_merge "$pr"
+}
 
 cmd_doctor() {
   local rescue_name=""
@@ -425,7 +566,7 @@ cmd_doctor() {
       say "finding=STALE_ISSUE_BRANCH"
       note "'$ib' has no commits beyond $MAIN; if its PR merged, clean up with: gnadd cleanup <pr> $ib"
     fi
-  done < <(git branch --list 'issue-*' --format='%(refname:short)')
+  done < <(git branch --list 'issue-*' 'quickfix/*' --format='%(refname:short)')
 
   if [ "$findings" = 0 ]; then
     say "findings=0"
@@ -612,6 +753,15 @@ main() {
         merge)  cmd_ship_merge "$@" ;;
         *) usage_die "usage: gnadd ship {push|status|merge} ..." ;;
       esac ;;
+    quickfix)
+      local qsub="${1:-}"; shift || true
+      case "$qsub" in
+        start) cmd_quickfix_start "$@" ;;
+        guard) cmd_quickfix_guard "$@" ;;
+        ship)  cmd_quickfix_ship "$@" ;;
+        merge) cmd_quickfix_merge "$@" ;;
+        *) usage_die "usage: gnadd quickfix {start|guard|ship|merge} ..." ;;
+      esac ;;
     sync-main)    cmd_sync_main "$@" ;;
     cleanup)      cmd_cleanup "$@" ;;
     doctor)       cmd_doctor "$@" ;;
@@ -628,6 +778,11 @@ gnadd — deterministic mechanics for the GNADD workflow
   ship push [--any-branch]        push branch, detect existing PR
   ship status <pr>                mergeability + checks for the merge gate
   ship merge <pr>                 squash-merge (only if OPEN and MERGEABLE)
+  quickfix start <slug> [--carry] create quickfix/<slug> off verified-synced main
+  quickfix guard                  refuse oversized or mechanics-touching diffs
+  quickfix ship                   guard + push a quickfix branch, detect existing PR
+  quickfix merge <pr> [--check <name>|--no-check]
+                                  squash-merge only after the CI check passes
   sync-main                       return to main and fast-forward it (ff-only)
   cleanup <pr> <branch>           delete branch only after GitHub confirms merge
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
