@@ -105,6 +105,43 @@ gh_json() { # gh_json <field> <gh args...> — single field via --jq
   "$GH" "$@" --json "$field" --jq ".$field"
 }
 
+# ---------------------------------------------------------------- trace
+#
+# Every subcommand leaves a receipt: one line per invocation (UTC time,
+# command, exit status, branch) appended to gnadd-trace.log inside .git/ —
+# never in the committed tree. The trace turns "did the mechanics go through
+# the rails?" from a trust question into a checkable artifact: a run that
+# improvised raw git has gaps here. `gnadd trace show|reset` reads/opens it.
+
+TRACE_FILE=""
+TRACE_CMD=""
+
+trace_init() {
+  local gitdir
+  gitdir="$(git rev-parse --git-dir 2>/dev/null)" || return 0
+  TRACE_FILE="$gitdir/gnadd-trace.log"
+}
+
+trace_on_exit() {
+  local status=$?
+  [ -n "$TRACE_FILE" ] && [ -n "$TRACE_CMD" ] && \
+    printf '%s gnadd %s status=%s branch=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRACE_CMD" "$status" "$(current_branch)" \
+      >> "$TRACE_FILE" 2>/dev/null || true
+}
+
+cmd_trace() {
+  [ -n "$TRACE_FILE" ] || usage_die "not inside a git repository"
+  case "${1:-show}" in
+    show)
+      if [ -s "$TRACE_FILE" ]; then cat "$TRACE_FILE"; else say "trace=empty"; fi ;;
+    reset)
+      : > "$TRACE_FILE"
+      say "trace=reset" ;;
+    *) usage_die "usage: gnadd trace [show|reset]" ;;
+  esac
+}
+
 # ---------------------------------------------------------------- state
 
 cmd_state() {
@@ -741,6 +778,11 @@ YAML
 main() {
   local cmd="${1:-}"
   shift || true
+  trace_init
+  case "$cmd" in
+    trace|version|--version|"") ;;  # meta commands leave no trace lines
+    *) TRACE_CMD="$cmd${*:+ $*}"; trap trace_on_exit EXIT ;;
+  esac
   case "$cmd" in
     state)        cmd_state "$@" ;;
     start)        cmd_start "$@" ;;
@@ -767,6 +809,7 @@ main() {
     doctor)       cmd_doctor "$@" ;;
     test)         cmd_test "$@" ;;
     init)         cmd_init "$@" ;;
+    trace)        cmd_trace "$@" ;;
     version|--version) say "gnadd $VERSION" ;;
     *)
       cat <<'USAGE'
@@ -788,6 +831,7 @@ gnadd — deterministic mechanics for the GNADD workflow
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
+  trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
   version
 
 Exit codes: 0 ok · 1 usage/unexpected · 2 named state needing a human (state=NAME on stdout)

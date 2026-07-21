@@ -19,11 +19,12 @@ skills.
 
 - GitHub is the system of record: issues capture intent, branches hold work, PRs
   record what shipped, and git history is the audit trail.
-- The six operational skills drive the loop: `prime-gnadd`, `new-issue-gnadd`,
-  `start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, and
-  `quickfix-gnadd` (the no-issue fast path for trivial changes). Their git
-  mechanics run through a bundled deterministic script (`gnadd.sh`), not
-  improvised commands.
+- The seven operational skills drive the loop: `prime-gnadd`, `new-issue-gnadd`,
+  `start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`,
+  `quickfix-gnadd` (the no-issue fast path for trivial changes), and
+  `yolo-gnadd` (autonomous full-loop on a decided unit; explicit invocation
+  only). Their git mechanics run through a bundled deterministic script
+  (`gnadd.sh`), not improvised commands.
 - Enforcement is layered, lowest layer that can hold each invariant: GitHub
   server rules (`gnadd init` — squash-only merges, PR-required main), the
   script (ff-only syncs, divergence halts, gated cleanup), the skills
@@ -53,6 +54,8 @@ not exist.
 - Save progress on an issue branch: use `/commit-gnadd`.
 - Verify, PR, merge, and clean up: use `/resolve-issue-gnadd`.
 - Land one trivial fix (typo, doc line) without an issue: use `/quickfix-gnadd`.
+- Run a decided issue or quickfix end-to-end without mid-loop gates: use
+  `/yolo-gnadd <N or description>` (never auto-invoked).
 - Diagnose or recover from a bad git state (diverged main, stashes,
   leftovers): run `gnadd.sh doctor` from the `prime-gnadd` skill's directory.
 - Set up server-side rails on a new repo: `gnadd.sh init` (squash-only

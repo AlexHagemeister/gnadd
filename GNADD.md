@@ -42,8 +42,8 @@ questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
 with the GNADD skills installed (`help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`,
-`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`), the GitHub CLI
-(`gh`) installed and authenticated, and a GitHub account.
+`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`, `yolo-gnadd`),
+the GitHub CLI (`gh`) installed and authenticated, and a GitHub account.
 
 **Install skills:** see [README.md](README.md).
 
@@ -327,7 +327,7 @@ the states it can encounter.
 ### The skills
 
 All seven are global skills when installed with `-g` (available in every repo). The
-six operational skills drive the loop — their git mechanics run through the
+seven operational skills drive the loop — their git mechanics run through the
 bundled `gnadd.sh` script, not improvised commands; `help-gnadd` provides
 lightweight workflow orientation; `audit-gnadd` reviews alignment when adopting
 or realigning a repo. Operational skills are invoked explicitly except `commit-gnadd`,
@@ -343,6 +343,7 @@ which can also trigger on "commit this" or similar.
 | `commit-gnadd` | `/commit-gnadd` or "commit this" | `skills/commit-gnadd/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main |
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | `skills/resolve-issue-gnadd/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
 | `quickfix-gnadd` | `/quickfix-gnadd` | `skills/quickfix-gnadd/SKILL.md` | Land one trivial change via a CI-gated squash-merged PR, no issue; guard refuses large or mechanics-touching diffs |
+| `yolo-gnadd` | `/yolo-gnadd <N or description>` (explicit only) | `skills/yolo-gnadd/SKILL.md` | Run one decided issue or quickfix through the whole loop autonomously: gates auto-approved, independent review pass, CI-gated merge, trace-backed report |
 
 ### The core principles
 
@@ -603,6 +604,30 @@ stashes, and open PRs.
 pushes and blind to local main being behind. `fetch --prune` updates remote-tracking
 refs only; it touches no working files or branches, so it honors prime-gnadd's read-only
 contract.
+
+### YOLO mode trades the pre-merge human review — deliberately (2026-07)
+**Decision:** `yolo-gnadd` runs one already-decided issue or quickfix through the
+entire loop with the mid-loop gates (plan approval, staging confirmation,
+PR-draft approval, merge confirmation) auto-approved. What substitutes for the
+human's pre-merge diff review: the pre-approved spec as the contract, an
+independent fresh-context review pass recorded in the PR (every finding marked
+addressed or dismissed-with-reason), the script-enforced CI gate, and post-merge
+revertability via the squash commit. Three hard boundaries: every `state=` halt,
+guard refusal, and CI failure remains a stop (with a 2-round self-repair budget
+before escalating); a diff touching `bin/`, `scripts/`, `.github/`, or a
+`gnadd.sh` copy is never merged autonomously — the run stops at the merge gate;
+and YOLO never chooses its own work — explicit invocation on a decided unit is
+the consent.
+**Why:** Once the spec is human-approved, the mid-loop gates mostly rubber-stamp
+what the spec already authorized, while each round-trip costs a session
+interruption. The rails that made this safe to trade were built first — server-side
+PR requirement, script-owned merge path, one-command revert. The review moves,
+it doesn't disappear: post-merge skim-and-revert, armed by a closing report.
+**Enforcement is structural, not promised:** yolo contains no loop mechanics of
+its own — each phase is executed by loading the sibling skill — and every
+`gnadd.sh` invocation leaves a receipt line in `.git/gnadd-trace.log` (`gnadd
+trace show`). The closing report must include the trace and call out any gaps;
+a freewheeled run is visible, not deniable.
 
 ### Skills deferred (not built speculatively)
 - **`update-issue`** (mid-work issue sync: check off completed acceptance criteria,
