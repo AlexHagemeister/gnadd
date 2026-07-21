@@ -485,8 +485,31 @@ run quickfix merge 50 --check ci-build
 expect_status 0 "$ST"
 expect_contains "merged=true"
 
+# ---------------------------------------------------------------- trace
+
+t trace_records_each_invocation; setup_repo
+run state
+run guard-commit
+run trace show
+expect_status 0 "$ST"
+expect_contains "gnadd state status=0"
+expect_contains "gnadd guard-commit status=2"
+
+t trace_reset_and_meta_commands_leave_no_lines; setup_repo
+run state
+run trace reset
+run version
+run trace show
+expect_status 0 "$ST"
+expect_contains "trace=empty"
+
+t trace_stays_out_of_working_tree; setup_repo
+run state
+[ -z "$(git status --porcelain)" ] && ok || fail "trace log dirtied the working tree"
+[ -f .git/gnadd-trace.log ] && ok || fail "trace log not written to .git/"
+
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
-for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd; do
+for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd; do
   if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
     fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
   elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then
