@@ -1,0 +1,16 @@
+name: Question or idea
+description: Ask about the workflow, or propose a change (please discuss before opening a PR)
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or idea
+      description: What are you trying to do, or what would you like to see changed and why?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Anything that helps — your agent, repo setup, or what you've already read/tried.
