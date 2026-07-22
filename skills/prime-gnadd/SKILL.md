@@ -27,7 +27,7 @@ If this skill was auto-selected from context rather than explicitly invoked with
 
 ## Mechanics
 
-Git state classification runs through the bundled script — `gnadd.sh` in this skill's directory (the directory containing this SKILL.md). If the script is missing, stop and tell the user to reinstall the GNADD skills (`npx skills update -g -y`); do not reconstruct its logic from raw git commands.
+Git state classification runs through the bundled script — `gnadd.sh` in this skill's directory (the directory containing this SKILL.md). If the script is missing, stop and tell the user to reinstall the GNADD skills per help-gnadd's Install & Update guidance (`npx skills update -y` in the scope used at install, or `scripts/sync.sh` for local-checkout installs); do not reconstruct its logic from raw git commands.
 
 ## Commands
 

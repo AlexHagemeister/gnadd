@@ -19,7 +19,7 @@ skill wins** and this doc should be corrected.
 |---|---|---|---|
 | **Script** | `bin/gnadd` (canonical); bundled into skills as `gnadd.sh` by `scripts/build.sh` | The git mechanics themselves — every sequence, guard, and halt, enforced in code | Claude; verified by `test/run.sh` |
 | **Skills** | `skills/<name>/SKILL.md` in this repo | Judgment and conversation: the gates, questions, and interpretation around the script | Claude |
-| **Skills (installed)** | Agent skills dir via `npx skills add` | Runtime copy your agent loads (script travels inside each skill) | Install once; `npx skills update` to refresh |
+| **Skills (installed)** | Agent skills dir via `npx skills add` | Runtime copy your agent loads (script travels inside each skill) | Install once; refresh per install path — GitHub installs: `npx skills update` in the matching scope; local-checkout installs: `scripts/sync.sh` (see help-gnadd's Install & Update) |
 | **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
 | **Instructions** | Claude Desktop settings (a pointer to this doc) | Telling Claude this doc exists | You (once) |
 
