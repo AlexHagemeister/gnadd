@@ -63,8 +63,10 @@ report — never present such a run as clean.
   and follow it with its PR-approval gate auto-approved (that gate already
   authorizes the merge), creating its PR as a **draft**. Guard refusals and
   all `state=` halts remain hard stops. Before its merge step, run the CI
-  gate (phase 5) and independent review (phase 6) against that PR, finalize
-  the body and mark it ready (phase 7), then close with the report (phase 8).
+  gate (phase 5) and independent review (phase 6) against that PR; finalize
+  the body (review record only — a quickfix has no acceptance criteria) and
+  mark it ready per phase 7, then return to `quickfix-gnadd`'s own CI-gated
+  merge step and close with the report (phase 8).
 - Anything else (closed issue, ambiguous description, work that needs a spec)
   → stop; route to `/new-issue-gnadd`. YOLO never invents scope.
 
@@ -93,18 +95,19 @@ hard stop, as that skill specifies.
 
 **Phase 5 — CI gate.** Cheap signals before expensive ones: wait for the
 draft PR's checks. Green → phase 6. Red → fix within the self-repair budget:
-fix, re-run the project tests, re-push through the same railed push phase 4
-used (it handles an existing PR), and wait for CI again. Never spend review
-effort on a head CI has not validated.
+fix, re-run the project tests, re-push through the railed push this run's
+shipping phase already used (it handles an existing PR), and wait for CI
+again. Never spend review effort on a head CI has not validated.
 
 **Phase 6 — Independent review.** Runs only against the CI-green head: give
-a **fresh-context reviewer** only the issue spec and the diff (`gh pr diff`),
+a **fresh-context reviewer** only the spec (the issue body, or in quickfix
+mode the stated trivial-change description) and the diff (`gh pr diff`),
 never this session's reasoning. Use a subagent where the platform supports
 one; otherwise perform a deliberate self-review pass restricted to spec +
 diff, and say which mode ran. Triage findings: worthwhile → fix, re-test,
-re-push through the same railed push, and CI must return green (same
-budget); dismissed → record why. Every finding and its disposition goes into
-phase 7's body write under **## Autonomous review**.
+re-push through the same railed push as phase 5, and CI must return green
+(same budget); dismissed → record why. Every finding and its disposition
+goes into phase 7's body write under **## Autonomous review**.
 
 **Phase 7 — Finalize and merge.** In one write, update the PR body with the
 acceptance-criteria table and the **## Autonomous review** record, then mark
@@ -114,8 +117,9 @@ with the merge confirmation auto-approved — **except**:
 - If the diff touches `bin/`, `scripts/`, `.github/`, or any `gnadd.sh` copy,
   stop at the merge gate and hand the merge to the human. Autonomy must not
   self-modify its own rails; everything through PR + review still runs.
-- Failing CI, `CONFLICTING`, and every other `state=` halt: hard stop, as
-  that skill already specifies.
+- CI newly red at this gate: back to phase 5 if self-repair budget remains,
+  otherwise hard stop. `CONFLICTING` and every other `state=` halt: hard
+  stop, as that skill already specifies.
 
 After merge, complete that skill's record sync and cleanup.
 
