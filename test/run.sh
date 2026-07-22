@@ -360,7 +360,7 @@ run test
 expect_status 0 "$ST"
 expect_contains "state=NO_TESTS"
 
-t release_drafts_notes_when_entry_missing; CURRENT=release_drafts_notes_when_entry_missing
+t release_drafts_notes_when_entry_missing
 # The changelog gate must draft grouped notes from merged-PR history when the
 # entry is missing, and still block the release. Runs against the real repo
 # read-only: the gate exits before any stamping for a version with no entry.
@@ -370,7 +370,11 @@ TREE_AFTER="$(git -C "$ROOT" status --porcelain)"
 expect_status 1 "$ST"
 expect_contains 'no "## [9.9.9]" entry'
 expect_contains "## [9.9.9]"
-expect_contains "- "
+# Bullets only exist when the range has commits — at a freshly tagged HEAD
+# the range is empty and a header-only draft is correct.
+REL_LAST_TAG="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null || true)"
+REL_COUNT="$(git -C "$ROOT" rev-list --count "${REL_LAST_TAG:+$REL_LAST_TAG..}HEAD" 2>/dev/null || echo 0)"
+if [ "$REL_COUNT" -gt 0 ]; then expect_contains "- "; else ok; fi
 [ "$TREE_BEFORE" = "$TREE_AFTER" ] && ok || fail "drafting modified the repo working tree"
 
 t version_reports_channel_baseline; setup_repo

@@ -26,16 +26,16 @@ if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
   RANGE="${LAST_TAG:+$LAST_TAG..}HEAD"
   {
     echo "CHANGELOG.md has no \"## [$VERSION]\" entry."
-    echo "Draft below covers every commit on main since ${LAST_TAG:-the first commit} — curate it into CHANGELOG.md, then re-run."
+    echo "Draft below covers every commit reachable from HEAD since ${LAST_TAG:-the first commit} — curate it into CHANGELOG.md, then re-run."
   } >&2
   echo
   echo "## [$VERSION] — $(date +%Y-%m-%d)"
   draft_group() { # <Keep-a-Changelog heading> <subject regex>
     local heading="$1" re="$2" subjects
     subjects="$(git log "$RANGE" --no-merges --pretty='%s' \
-      | grep -E "$re" \
+      | { grep -E "$re" || true; } \
       | sed -E 's/^(feat|fix|chore|docs|refactor|test|style|perf)(\([^)]*\))?!?: *//' \
-      | sed 's/^/- /' || true)"
+      | sed 's/^/- /')"
     [ -n "$subjects" ] || return 0
     printf '\n### %s\n\n%s\n' "$heading" "$subjects"
   }
@@ -45,8 +45,8 @@ if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
   # Catch-all: anything the three groups above did not claim, so the draft
   # provably covers every commit in the range.
   OTHER="$(git log "$RANGE" --no-merges --pretty='%s' \
-    | grep -vE '^(feat|fix|chore|docs|refactor|test|style|perf)(\(|!|:)' \
-    | sed 's/^/- /' || true)"
+    | { grep -vE '^(feat|fix|chore|docs|refactor|test|style|perf)(\(|!|:)' || true; } \
+    | sed 's/^/- /')"
   [ -z "$OTHER" ] || printf '\n### Other\n\n%s\n' "$OTHER"
   exit 1
 fi
