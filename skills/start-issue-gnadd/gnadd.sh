@@ -124,10 +124,18 @@ trace_init() {
 
 trace_on_exit() {
   local status=$?
-  [ -n "$TRACE_FILE" ] && [ -n "$TRACE_CMD" ] && \
-    printf '%s gnadd %s status=%s branch=%s\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRACE_CMD" "$status" "$(current_branch)" \
-      >> "$TRACE_FILE" 2>/dev/null || true
+  trap - EXIT
+  # When a run is killed mid-pipe (SIGPIPE), bash 3.2 keeps the stdout it
+  # failed to write and flushes that stale buffer into the next redirection
+  # or command substitution — i.e. straight into the trace line (issue #38).
+  # Drain it to /dev/null first, then build and append the line whole.
+  printf '\n' >/dev/null 2>&1 || true
+  { [ -n "$TRACE_FILE" ] && [ -n "$TRACE_CMD" ]; } || return 0
+  local ts br
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" || ts=""
+  br="$(current_branch)"
+  printf '%s gnadd %s status=%s branch=%s\n' \
+    "$ts" "$TRACE_CMD" "$status" "$br" >> "$TRACE_FILE" 2>/dev/null || true
 }
 
 cmd_trace() {

@@ -503,6 +503,21 @@ run trace show
 expect_status 0 "$ST"
 expect_contains "trace=empty"
 
+t trace_survives_midpipe_kill; setup_repo
+# Killing a run mid-pipe (reader closes early → SIGPIPE) must not garble the
+# trace: bash 3.2 flushes the stdout it failed to write into the trace line
+# (issue #38). Each killed run must leave at most one well-formed line.
+for i in 1 2 3 4 5; do
+  "$GNADD" state --no-fetch 2>/dev/null | head -1 >/dev/null
+done
+TRACE_LINES="$(wc -l < .git/gnadd-trace.log | tr -d ' ')"
+[ "$TRACE_LINES" -le 5 ] && ok || fail "expected at most 5 trace lines, got $TRACE_LINES: $(cat .git/gnadd-trace.log)"
+if grep -Evq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z gnadd state --no-fetch status=[0-9]+ branch=main$' .git/gnadd-trace.log; then
+  fail "malformed trace line after mid-pipe kill: $(cat .git/gnadd-trace.log)"
+else
+  ok
+fi
+
 t trace_stays_out_of_working_tree; setup_repo
 run state
 [ -z "$(git status --porcelain)" ] && ok || fail "trace log dirtied the working tree"
