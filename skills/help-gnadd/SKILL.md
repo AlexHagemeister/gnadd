@@ -93,7 +93,7 @@ update questions with the path that matches, and never assume a scope.
 For startup guidance, file-hygiene questions, rationale, or edge cases not
 covered here, fetch the canonical guide from this pinned URL:
 
-https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.3.0/GNADD.md
+https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.4.0/GNADD.md
 
 This URL is pinned to a commit, not `main`, so installed skills do not drift with
 unreleased guide changes. The pin is rewritten by `scripts/release.sh` at release
