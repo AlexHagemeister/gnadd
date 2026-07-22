@@ -846,7 +846,7 @@ gnadd — deterministic mechanics for the GNADD workflow
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
   trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
-  version
+  version                         release baseline + distribution channel
 
 Exit codes: 0 ok · 1 usage/unexpected · 2 named state needing a human (state=NAME on stdout)
 USAGE
