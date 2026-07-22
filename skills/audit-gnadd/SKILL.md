@@ -129,6 +129,9 @@ minimal install recommendation:
 npx skills add AlexHagemeister/gnadd -g -a <agent> --copy -y
 ```
 
+(`-g` installs globally — omit it for a project-local install, and update
+later in whichever scope was chosen; see help-gnadd's Install & Update.)
+
 The file and git audit still runs regardless.
 
 ### 4. Shallow Git / Workflow Alignment

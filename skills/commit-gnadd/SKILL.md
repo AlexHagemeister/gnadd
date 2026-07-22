@@ -19,7 +19,7 @@ Do not stage files, amend, push, stash, or clean up without user approval where 
 
 ## 1. Branch Guard (before anything else)
 
-Run the guard from the bundled script (`gnadd.sh` in this skill's directory; if missing, stop and have the user reinstall the GNADD skills):
+Run the guard from the bundled script (`gnadd.sh` in this skill's directory; if missing, stop and have the user reinstall the GNADD skills per help-gnadd's Install & Update guidance — `npx skills update -y` in the scope used at install, or `scripts/sync.sh` for local-checkout installs):
 
 ```bash
 bash "<skill-dir>/gnadd.sh" guard-commit

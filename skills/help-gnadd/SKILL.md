@@ -72,9 +72,10 @@ The right refresh command depends on how the skills were installed — answer
 update questions with the path that matches, and never assume a scope.
 
 - **Installed from GitHub** (`npx skills add AlexHagemeister/gnadd ...`):
-  refresh with `npx skills update -y` **in the same scope as the install** —
-  `-g` if global, project scope otherwise. Updating the wrong scope leaves
-  the active copies stale without any warning.
+  refresh **in the same scope as the install** — `npx skills update -g -y`
+  for a global install, `npx skills update -p -y` for a project-local one.
+  Updating the wrong scope leaves the active copies stale without any
+  warning.
 - **Installed from a local checkout** (`npx skills add . --copy`, e.g. the
   repo's `scripts/sync.sh` while developing): `skills update` cannot track
   local-path installs and skips them silently — re-run `scripts/sync.sh`
