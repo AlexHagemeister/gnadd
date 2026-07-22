@@ -360,6 +360,13 @@ run test
 expect_status 0 "$ST"
 expect_contains "state=NO_TESTS"
 
+t version_reports_channel_baseline; setup_repo
+run version
+expect_status 0 "$ST"
+expect_contains "gnadd "
+expect_contains "channel=main"
+expect_contains "release baseline"
+
 # ---------------------------------------------------------------- quickfix
 
 t quickfix_start_creates_branch; setup_repo
