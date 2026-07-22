@@ -360,6 +360,19 @@ run test
 expect_status 0 "$ST"
 expect_contains "state=NO_TESTS"
 
+t release_drafts_notes_when_entry_missing; CURRENT=release_drafts_notes_when_entry_missing
+# The changelog gate must draft grouped notes from merged-PR history when the
+# entry is missing, and still block the release. Runs against the real repo
+# read-only: the gate exits before any stamping for a version with no entry.
+TREE_BEFORE="$(git -C "$ROOT" status --porcelain)"
+OUT="$(bash "$ROOT/scripts/release.sh" v9.9.9 2>&1)"; ST=$?
+TREE_AFTER="$(git -C "$ROOT" status --porcelain)"
+expect_status 1 "$ST"
+expect_contains 'no "## [9.9.9]" entry'
+expect_contains "## [9.9.9]"
+expect_contains "- "
+[ "$TREE_BEFORE" = "$TREE_AFTER" ] && ok || fail "drafting modified the repo working tree"
+
 t version_reports_channel_baseline; setup_repo
 run version
 expect_status 0 "$ST"
