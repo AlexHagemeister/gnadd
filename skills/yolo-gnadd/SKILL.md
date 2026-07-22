@@ -58,12 +58,13 @@ report — never present such a run as clean.
 
 ## Mode Selection
 
-- **Open issue number** → issue loop (phases 1–6).
+- **Open issue number** → issue loop (phases 1–8).
 - **Trivial-change description** → quickfix flow: load `../quickfix-gnadd/SKILL.md`
-  and follow it end-to-end with its PR-approval gate auto-approved (that gate
-  already authorizes the merge). Guard refusals and all `state=` halts remain
-  hard stops. Then skip to the review phase (4) before its merge step, and
-  close with the report (6).
+  and follow it with its PR-approval gate auto-approved (that gate already
+  authorizes the merge), creating its PR as a **draft**. Guard refusals and
+  all `state=` halts remain hard stops. Before its merge step, run the CI
+  gate (phase 5) and independent review (phase 6) against that PR, finalize
+  the body and mark it ready (phase 7), then close with the report (phase 8).
 - Anything else (closed issue, ambiguous description, work that needs a spec)
   → stop; route to `/new-issue-gnadd`. YOLO never invents scope.
 
@@ -82,17 +83,33 @@ and escalate — do not improvise scope autonomously.
 Auto-approved gate: staging confirmation (stage what the plan produced;
 flagged-file warnings — credentials, logs, scratch files — remain hard stops).
 
-**Phase 4 — Independent review.** After the PR exists (phase 5 creates it —
-run this phase against the diff first): give a **fresh-context reviewer** only
-the issue spec and the diff (`git diff origin/main...HEAD` or `gh pr diff`),
+**Phase 4 — Ship as draft.** Load and follow `../resolve-issue-gnadd/SKILL.md`
+through its verification, test, push, and PR-creation steps, stopping before
+its merge gate. Auto-approved gate: PR-draft approval. One overlay: create
+the PR as a **draft** — verification is not finished yet, and draft status
+makes a premature merge impossible. The creation body is a working summary;
+the complete record lands in phase 7's single write. Any `state=` halt is a
+hard stop, as that skill specifies.
+
+**Phase 5 — CI gate.** Cheap signals before expensive ones: wait for the
+draft PR's checks. Green → phase 6. Red → fix within the self-repair budget:
+fix, re-run the project tests, re-push through the same railed push phase 4
+used (it handles an existing PR), and wait for CI again. Never spend review
+effort on a head CI has not validated.
+
+**Phase 6 — Independent review.** Runs only against the CI-green head: give
+a **fresh-context reviewer** only the issue spec and the diff (`gh pr diff`),
 never this session's reasoning. Use a subagent where the platform supports
 one; otherwise perform a deliberate self-review pass restricted to spec +
 diff, and say which mode ran. Triage findings: worthwhile → fix, re-test,
-re-push; dismissed → record why. Every finding and its disposition goes in
-the PR body under **## Autonomous review**.
+re-push through the same railed push, and CI must return green (same
+budget); dismissed → record why. Every finding and its disposition goes into
+phase 7's body write under **## Autonomous review**.
 
-**Phase 5 — Resolve.** Load and follow `../resolve-issue-gnadd/SKILL.md`.
-Auto-approved gates: PR-draft approval and the merge confirmation — **except**:
+**Phase 7 — Finalize and merge.** In one write, update the PR body with the
+acceptance-criteria table and the **## Autonomous review** record, then mark
+the draft ready. Resume `../resolve-issue-gnadd/SKILL.md` at its merge gate
+with the merge confirmation auto-approved — **except**:
 
 - If the diff touches `bin/`, `scripts/`, `.github/`, or any `gnadd.sh` copy,
   stop at the merge gate and hand the merge to the human. Autonomy must not
@@ -100,7 +117,9 @@ Auto-approved gates: PR-draft approval and the merge confirmation — **except**
 - Failing CI, `CONFLICTING`, and every other `state=` halt: hard stop, as
   that skill already specifies.
 
-**Phase 6 — Report.** After merge + record sync + cleanup, report:
+After merge, complete that skill's record sync and cleanup.
+
+**Phase 8 — Report.** After merge + record sync + cleanup, report:
 
 - Merged PR URL and merge-commit hash (`git revert <hash>` = whole-change undo)
 - Review summary: findings, dispositions, and which review mode ran
@@ -108,10 +127,11 @@ Auto-approved gates: PR-draft approval and the merge confirmation — **except**
 
 ## Self-Repair Budget
 
-CI failures and worthwhile review findings get at most **2** fix → re-verify →
-re-push rounds across the whole run. After that, escalate with: what failed,
-what was tried each round, and current branch/PR state. Unbounded retry loops
-are how autonomous runs drift; the budget is the leash.
+CI failures (phase 5) and worthwhile review findings (phase 6) share at most
+**2** fix → re-verify → re-push rounds across the whole run. After that,
+escalate with: what failed, what was tried each round, and current branch/PR
+state. Unbounded retry loops are how autonomous runs drift; the budget is the
+leash.
 
 ## Escalation
 
