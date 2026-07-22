@@ -23,6 +23,12 @@ skill wins** and this doc should be corrected.
 | **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
 | **Instructions** | Claude Desktop settings (a pointer to this doc) | Telling Claude this doc exists | You (once) |
 
+**Distribution channel:** `main` is the channel — the skills CLI installs from
+the default branch and cannot pin tags, so the loop keeps `main`
+always-releasable and tags mark tested snapshots. `gnadd version` therefore
+reports a release *baseline*, not an exact release: an installed copy may
+include changes merged after the stamped version.
+
 The script carries the mechanics; the skills carry the judgment around them. This
 doc deliberately does **not** restate either — that would create copies that drift
 apart. It concentrates on the things code can't hold: the model, the human's role,

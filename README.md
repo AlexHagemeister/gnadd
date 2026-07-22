@@ -29,7 +29,9 @@ npx skills update -p -y    # project
 
 Use the same scope (`-g` or project) you used at install — updating the wrong scope leaves the active copies stale without warning. Note: `skills update` only tracks GitHub-source installs; if you installed from a local checkout (e.g. `scripts/sync.sh` while developing), re-run that instead. Flag details and interactive options are in the [skills CLI docs](https://github.com/vercel-labs/skills) — no need to track them here.
 
-**Versioning:** releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Pre-1.0, minor versions may change skill names or behavior — read the release notes before updating. To be notified of releases: **Watch → Custom → Releases** on the repo. Note: the skills CLI installs from the default branch and does not support pinning to a tag, so `npx skills update` always pulls the latest `main`; tagged releases mark the tested snapshots and document what changed between updates.
+**Versioning:** releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Pre-1.0, minor versions may change skill names or behavior — read the release notes before updating. To be notified of releases: **Watch → Custom → Releases** on the repo.
+
+**Distribution channel:** `main` is the channel. The skills CLI installs from the default branch and cannot pin a tag, so every install and update pulls the latest `main` — which this workflow keeps always-releasable (nothing lands without a PR, green CI, and review). Tagged releases mark the tested snapshots and document what changed between updates. Consequently `gnadd version` reports the *release baseline*: the installed copy is that release plus any changes merged since, and says so.
 
 | Skill | Invocation |
 |---|---|

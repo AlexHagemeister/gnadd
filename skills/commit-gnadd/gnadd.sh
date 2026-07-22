@@ -818,7 +818,13 @@ main() {
     test)         cmd_test "$@" ;;
     init)         cmd_init "$@" ;;
     trace)        cmd_trace "$@" ;;
-    version|--version) say "gnadd $VERSION" ;;
+    version|--version)
+      # VERSION is stamped by scripts/release.sh at release time, but installs
+      # track the default branch — so a copy may carry post-release changes.
+      # Report the baseline honestly rather than implying an exact release.
+      say "gnadd $VERSION"
+      say "channel=main"
+      note "$VERSION is the release baseline; installed copies track main and may include post-release changes (see the repo's releases page)" ;;
     *)
       cat <<'USAGE'
 gnadd — deterministic mechanics for the GNADD workflow
@@ -840,7 +846,7 @@ gnadd — deterministic mechanics for the GNADD workflow
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
   trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
-  version
+  version                         release baseline + distribution channel
 
 Exit codes: 0 ok · 1 usage/unexpected · 2 named state needing a human (state=NAME on stdout)
 USAGE

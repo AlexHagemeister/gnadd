@@ -83,8 +83,10 @@ update questions with the path that matches, and never assume a scope.
 - **Caveats for any update:** the skills CLI installs from the repo's
   default branch, so an update pulls the latest `main`, not the last tagged
   release. Pre-1.0, read the release notes (repo Releases page) before
-  updating. Updated skill *content* applies from the next invocation;
-  newly added or renamed skills may need an agent restart to appear.
+  updating. `gnadd version` reports the release *baseline* — the installed
+  copy may include changes merged after that release. Updated skill
+  *content* applies from the next invocation; newly added or renamed
+  skills may need an agent restart to appear.
 
 ## Deep Reference
 
