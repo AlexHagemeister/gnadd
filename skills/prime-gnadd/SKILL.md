@@ -57,14 +57,16 @@ gh auth status
 
 **If `gh` is unavailable or unauthenticated:** do not abort. Report the local snapshot anyway — it contains the safety-relevant signals (divergence, stashes, dirty tree) — and note that issue/PR context was skipped; suggest `gh auth login`.
 
-When auth is confirmed, capture the authenticated login (authorship baseline
-for everything below), then list with authors included:
+When auth is confirmed, print the authenticated login (the authorship
+baseline referenced by Interpretation below — it must be visible output,
+not a shell variable, since shell state does not persist between commands),
+then list with authors included:
 
 ```bash
-GH_SELF="$(gh api user --jq .login)"
-gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.number)\t\(.author.login)\t\(.title)\t\([.labels[].name] | join(","))"'
-gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login)\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
-gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login)\t\(.title)"'
+gh api user --jq .login
+gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))"'
+gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
+gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
 ```
 
 If `state` reported an active issue N (`issue=<N>`), also run:
@@ -95,8 +97,9 @@ From the `state` output, report:
 
 ### Authorship
 
-Compare each listed item's author against `GH_SELF`. Items authored by
-someone else — including bots — are **external submissions**: annotate them
+Compare each listed item's author against the authenticated login printed
+in the commands step. Items authored by anyone else — including bots and
+`ghost` (deleted accounts) — are **external submissions**: annotate them
 inline (`— by @<login>`) wherever they appear in the summary, and if any
 exist, say so up front in the relevant section ("2 of 5 open issues are
 external"). When every item is self-authored — the common solo case — add no
