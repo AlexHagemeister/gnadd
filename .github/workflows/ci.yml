@@ -19,3 +19,24 @@ jobs:
         run: bash test/run.sh
       - name: Shellcheck
         run: shellcheck -S warning bin/gnadd scripts/*.sh
+
+  # macOS default bash (3.2.57) is the primary environment where installed
+  # skills actually run, and it has real behavioral differences (issue #38's
+  # stale-buffer trace garble was invisible on modern bash). The PATH prepend
+  # makes `env bash` — i.e. bin/gnadd's shebang — resolve to /bin/bash; the
+  # version guard fails loudly if that stops yielding 3.2 (prepend regressed,
+  # or Apple ships a newer system bash).
+  test-macos-bash32:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test suite under macOS system bash 3.2
+        run: |
+          export PATH="/bin:/usr/bin:$PATH"
+          ver="$(env bash -c 'printf %s "$BASH_VERSION"')"
+          case "$ver" in
+            3.2*) echo "suite will run gnadd under bash $ver" ;;
+            *) echo "expected env bash to resolve to macOS bash 3.2, got $ver" >&2; exit 1 ;;
+          esac
+          /bin/bash test/run.sh
