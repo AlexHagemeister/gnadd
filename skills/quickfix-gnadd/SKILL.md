@@ -43,8 +43,9 @@ Proceed only after confirmation.
 All git mechanics run through the bundled script — `gnadd.sh` in this skill's
 directory. When it exits with `state=<NAME>`, that is a human decision point —
 have the conversation, never work around it with raw git. If the script is
-missing, stop and tell the user to reinstall the GNADD skills
-(`npx skills update -g -y`).
+missing, stop and tell the user to reinstall the GNADD skills per
+help-gnadd's Install & Update guidance (`npx skills update -y` in the
+scope used at install, or `scripts/sync.sh` for local-checkout installs).
 
 ## The Stated Gates (tell the user up front)
 

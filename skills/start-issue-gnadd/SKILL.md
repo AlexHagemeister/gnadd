@@ -28,7 +28,7 @@ If this skill was auto-selected from context rather than explicitly invoked with
 
 ## Mechanics
 
-All branch mechanics run through the bundled script — `gnadd.sh` in this skill's directory. It enforces the invariants deterministically: working-tree protection before any checkout, fast-forward-only syncs onto `main`, and a hard stop on the dangerous divergence direction. When it exits with `state=<NAME>`, that is a **human decision point** — have the conversation below, never work around the script with raw git. If the script is missing, stop and tell the user to reinstall the GNADD skills (`npx skills update -g -y`).
+All branch mechanics run through the bundled script — `gnadd.sh` in this skill's directory. It enforces the invariants deterministically: working-tree protection before any checkout, fast-forward-only syncs onto `main`, and a hard stop on the dangerous divergence direction. When it exits with `state=<NAME>`, that is a **human decision point** — have the conversation below, never work around the script with raw git. If the script is missing, stop and tell the user to reinstall the GNADD skills per help-gnadd's Install & Update guidance (`npx skills update -y` in the scope used at install, or `scripts/sync.sh` for local-checkout installs).
 
 ## 1. Identify The Issue
 

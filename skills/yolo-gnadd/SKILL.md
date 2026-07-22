@@ -37,8 +37,9 @@ Each phase below is executed by loading the named sibling skill — installed
 alongside this one (e.g. `../start-issue-gnadd/SKILL.md` relative to this
 skill's directory) — and following it faithfully, with only the specific gates
 listed below auto-approved. If a phase skill is missing, stop: tell the user to
-reinstall the GNADD skills (`npx skills update -g -y`). Do not reconstruct a
-phase from memory — an improvised loop is exactly what this design exists to
+reinstall the GNADD skills per help-gnadd's Install & Update guidance
+(`npx skills update -y` in the scope used at install, or `scripts/sync.sh`
+for local-checkout installs). Do not reconstruct a phase from memory — an improvised loop is exactly what this design exists to
 prevent, and the trace (below) will show the gap.
 
 ## The Receipt

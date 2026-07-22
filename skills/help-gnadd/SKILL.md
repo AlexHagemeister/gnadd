@@ -4,7 +4,8 @@ description: >-
   GNADD workflow orientation: GitHub issues as backlog, describe-vs-track file
   rule, and which GNADD skill handles each workflow step. Use when the user asks
   about GNADD, agent-driven development workflow, project context files, tasks.md
-  versus issues, startup guidance, or how to set up work. Do not use for routine
+  versus issues, startup guidance, how to set up work, or how to install,
+  update, or refresh the GNADD skills themselves. Do not use for routine
   coding unless the question is workflow-shaped.
 disable-model-invocation: false
 ---
@@ -62,6 +63,27 @@ not exist.
   merges, branch ruleset on main; `--ci` adds a test workflow stub).
 - If a git operation seems needed and no skill covers it, ask for a
   skill-shaped path before improvising raw git commands.
+- Update, refresh, or reinstall the skills themselves: see **Install &
+  Update** below.
+
+## Install & Update
+
+The right refresh command depends on how the skills were installed — answer
+update questions with the path that matches, and never assume a scope.
+
+- **Installed from GitHub** (`npx skills add AlexHagemeister/gnadd ...`):
+  refresh with `npx skills update -y` **in the same scope as the install** —
+  `-g` if global, project scope otherwise. Updating the wrong scope leaves
+  the active copies stale without any warning.
+- **Installed from a local checkout** (`npx skills add . --copy`, e.g. the
+  repo's `scripts/sync.sh` while developing): `skills update` cannot track
+  local-path installs and skips them silently — re-run `scripts/sync.sh`
+  from the checkout instead.
+- **Caveats for any update:** the skills CLI installs from the repo's
+  default branch, so an update pulls the latest `main`, not the last tagged
+  release. Pre-1.0, read the release notes (repo Releases page) before
+  updating. Updated skill *content* applies from the next invocation;
+  newly added or renamed skills may need an agent restart to appear.
 
 ## Deep Reference
 
