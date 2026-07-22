@@ -57,12 +57,14 @@ gh auth status
 
 **If `gh` is unavailable or unauthenticated:** do not abort. Report the local snapshot anyway — it contains the safety-relevant signals (divergence, stashes, dirty tree) — and note that issue/PR context was skipped; suggest `gh auth login`.
 
-When auth is confirmed:
+When auth is confirmed, capture the authenticated login (authorship baseline
+for everything below), then list with authors included:
 
 ```bash
-gh issue list --state open
-gh pr list --state open
-gh pr list --state merged --limit 10
+GH_SELF="$(gh api user --jq .login)"
+gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.number)\t\(.author.login)\t\(.title)\t\([.labels[].name] | join(","))"'
+gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login)\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
+gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login)\t\(.title)"'
 ```
 
 If `state` reported an active issue N (`issue=<N>`), also run:
@@ -91,17 +93,30 @@ From the `state` output, report:
 - **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks. **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 
+### Authorship
+
+Compare each listed item's author against `GH_SELF`. Items authored by
+someone else — including bots — are **external submissions**: annotate them
+inline (`— by @<login>`) wherever they appear in the summary, and if any
+exist, say so up front in the relevant section ("2 of 5 open issues are
+external"). When every item is self-authored — the common solo case — add no
+annotations and no authorship commentary at all; the snapshot stays exactly
+as uncluttered as before.
+
 ### Open Issues
 
-Summarize pending work from `gh issue list`. Group by label when present; keep issue titles and numbers visible.
+Summarize pending work from the issue listing. Group by label when present;
+keep issue titles and numbers visible. Apply the authorship rule — external
+issues are input from other people and usually deserve a triage look before
+new self-directed work.
 
 ### Open PRs
 
-Surface work in flight. Flag PRs awaiting review — a PR sitting open is either waiting on you to review/merge or waiting on feedback.
+Surface work in flight. Flag PRs awaiting review — a PR sitting open is either waiting on you to review/merge or waiting on feedback. Apply the authorship rule: an external open PR is someone waiting on the maintainer, and outranks self-authored work in the "what needs attention" ordering.
 
 ### Recent Completions
 
-Summarize the last ~10 merged PRs. Highlight momentum, not every detail.
+Summarize the last ~10 merged PRs. Highlight momentum, not every detail. Apply the authorship rule to reveal whether recent shipping was solo or included external contributions.
 
 ### Active Issue
 
@@ -120,13 +135,13 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 <what the last ~15 commits suggest>
 
 ## Open Work
-<open issues grouped by label if useful>
+<open issues grouped by label if useful; external ones annotated "— by @login">
 
 ## In Flight
-<open PRs, flagging any awaiting review>
+<open PRs, flagging any awaiting review; external ones annotated "— by @login">
 
 ## Recently Shipped
-<last ~10 merged PRs>
+<last ~10 merged PRs; external ones annotated "— by @login">
 
 ## Active Issue
 <only if on issue branch>
