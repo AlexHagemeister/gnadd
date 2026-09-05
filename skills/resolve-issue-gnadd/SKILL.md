@@ -145,7 +145,7 @@ EOF
 )"
 ```
 
-Report the PR URL. `<PR>` below means this captured PR number.
+Report the PR URL and, on its own line, the direct link to the diff: `https://github.com/<owner>/<repo>/pull/<PR>/files`. The user should be able to click straight into the changes, not be told to go look. `<PR>` below means this captured PR number.
 
 ## 6. Merge Only If Confirmed
 
@@ -160,7 +160,7 @@ bash "<skill-dir>/gnadd.sh" ship status <PR>
 - **`mergeable=UNKNOWN`** — GitHub is still computing; wait briefly and re-run.
 - **Checks:** if failing, say so explicitly and require the user to acknowledge before merging anyway. If none are configured, note that nothing automated verified this PR beyond the local test run.
 
-> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive. If the user hasn't looked at the diff, offer it (`gh pr diff <PR>`).
+> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive. Give the files-changed link again at this gate (`.../pull/<PR>/files`) so reading the diff is one click, never an instruction.
 
 If — and only if — the user confirms:
 
