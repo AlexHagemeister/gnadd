@@ -69,7 +69,8 @@ setup_repo() {
   export GNADD_GH="$STUB" GH_STUB_LOG="$SANDBOX/gh.log"
   unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
-        GH_STUB_CHECKS GH_STUB_FAIL 2>/dev/null || true
+        GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
+        GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -546,6 +547,91 @@ t trace_stays_out_of_working_tree; setup_repo
 run state
 [ -z "$(git status --porcelain)" ] && ok || fail "trace log dirtied the working tree"
 [ -f .git/gnadd-trace.log ] && ok || fail "trace log not written to .git/"
+
+# ---------------------------------------------------------------- round
+
+t round_post_first_round; setup_repo
+run start 5 rounds
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice one"
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "first slice" --feedback "looks good, make the button bluer"
+expect_status 0 "$ST"
+expect_contains "issue=5"
+expect_contains "round=1"
+expect_contains "posted=true"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "<!-- gnadd:round -->"
+expect_contains "## Round 1"
+expect_contains "**Changed:** first slice"
+expect_contains "transcribed by the agent from chat"
+expect_contains "> looks good, make the button bluer"
+grep -q "gh issue comment 5 --body-file" "$GH_STUB_LOG" && ok || fail "comment not posted via gh issue comment"
+
+t round_post_numbers_from_record; setup_repo
+run start 6 rounds
+export GH_STUB_ROUND_COUNT=2 GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "third slice" --feedback "ok"
+expect_status 0 "$ST"
+expect_contains "round=3"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "## Round 3"
+
+t round_post_feedback_file_verbatim; setup_repo
+run start 7 rounds
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+printf 'teh spacing is off\nand also the font\n' > "$SANDBOX/fb.txt"
+run round post --changed "spacing" --feedback-file "$SANDBOX/fb.txt"
+expect_status 0 "$ST"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "> teh spacing is off"
+expect_contains "> and also the font"
+
+t round_post_no_feedback_is_explicit; setup_repo
+run start 8 rounds
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "scaffold" --no-feedback "first slice, nothing to try yet"
+expect_status 0 "$ST"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "**Feedback:** none this round (first slice, nothing to try yet)."
+expect_not_contains "transcribed"
+
+t round_post_refuses_empty_feedback; setup_repo
+run start 9 rounds
+run round post --changed "x"
+expect_status 1 "$ST"
+expect_contains "never inferred"
+run round post --changed "x" --feedback ""
+expect_status 1 "$ST"
+expect_contains "feedback text is empty"
+run round post --changed "x" --feedback "a" --no-feedback "b"
+expect_status 1 "$ST"
+grep -q "issue comment" "$GH_STUB_LOG" && fail "posted despite refusal" || ok
+
+t round_post_refuses_non_issue_branch; setup_repo
+run round post --changed "x" --feedback "y"
+expect_status 2 "$ST"
+expect_contains "state=NOT_ISSUE_BRANCH"
+git_q checkout -b quickfix/typo
+run round post --changed "x" --feedback "y"
+expect_status 2 "$ST"
+expect_contains "state=NOT_ISSUE_BRANCH"
+grep -q "issue comment" "$GH_STUB_LOG" && fail "posted off an issue branch" || ok
+
+t round_list_in_order; setup_repo
+run start 10 rounds
+export GH_STUB_ROUND_COUNT=2
+export GH_STUB_ROUND_BODIES='<!-- gnadd:round -->\n## Round 1\n\n**Changed:** a\n<!-- gnadd:round -->\n## Round 2\n\n**Changed:** b'
+run round list
+expect_status 0 "$ST"
+expect_contains "issue=10"
+expect_contains "rounds=2"
+expect_not_contains "gnadd:round"
+case "$OUT" in *"Round 1"*"Round 2"*) ok ;; *) fail "rounds out of order: $OUT" ;; esac
+
+t round_list_none; setup_repo
+run round list 11
+expect_status 0 "$ST"
+expect_contains "rounds=0"
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd; do

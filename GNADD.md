@@ -257,7 +257,8 @@ lose. If you already started editing files before remembering to run this
 These are save points; they're cheap, and you can have many per issue. The skill
 shows you what changed, flags anything suspicious (credentials, logs, scratch
 files), drafts a message, and waits for your approval. You can also just say
-"commit this" mid-conversation.
+"commit this" mid-conversation. On an issue branch each commit also posts a
+round comment on the issue (see "Mid-work issue updates" below).
 
 ### 5. `/resolve-issue-gnadd` — when the work feels done
 
@@ -285,23 +286,25 @@ Two more habits at this gate:
 After your go-ahead it merges, syncs the issue checkboxes, cleans up the branch,
 and reports back. Then `/prime-gnadd` next session, and the loop continues.
 
-### Mid-work issue updates (provisional — still under evaluation)
+### Mid-work issue updates: the round comment
 
-In practice it often feels natural to tell the agent, mid-work, to check off
-completed acceptance criteria on the issue or add a note for something descoped
-or pivoted away from. This is **allowed and principled** — the issue is exactly
-where that state belongs, and capturing a descope decision the moment it happens
-beats reconstructing it at resolve time. Two conditions keep it sound:
+Every checkpoint commit on an issue branch leaves one comment on the issue:
+which round it closes, what changed, and the feedback from you that drove it,
+in your words as typed. `/commit-gnadd` posts it through the script, which
+numbers the round from the comments already on the issue, never from memory.
+Three things follow:
 
-- **Keep it opportunistic, never ritual.** Update when it feels natural. The moment
-  it becomes a required step after every change, you've recreated the bookkeeping
-  chore this workflow exists to kill. The guaranteed sync point is `resolve-issue-gnadd`.
-- **A checked box is a claim, not a fact.** Work done after you check it can break
-  it. `resolve-issue-gnadd` re-verifies every criterion against the actual diff regardless
-  of checkbox state — that re-verification is what makes mid-work checking safe.
-
-Whether this practice earns a dedicated skill is an open question — see
-`update-issue` in Part 5's deferred-skills list for the trigger that would decide it.
+- **The trail survives the squash.** Main keeps only the PR body, so the
+  commit messages vanish at merge. The comments stay on the issue, readable on
+  GitHub, and a session resuming the branch reads them to pick up the loop.
+- **Feedback is transcribed, and says so.** Only the agent can see the chat,
+  so the comment labels the feedback block as transcribed by the agent. The
+  script refuses an empty feedback text: a round with nothing from you is
+  recorded as "none this round" with a reason, never left blank or invented.
+- **Append only.** The issue body is never edited during work. Checking off
+  acceptance criteria mid-work is not a thing anymore. `resolve-issue-gnadd`
+  verifies every criterion against the actual diff at the end and ticks the
+  boxes then.
 
 ---
 
@@ -714,14 +717,34 @@ not carrying its weight), if Core turns out to need changing often (the
 admission test is too loose), or once the open question on Core routing (issue
 and PR, or direct commit) has been answered by practice.
 
+### Round comments are the mid-work record (2026-09)
+
+**Decision:** every checkpoint commit on an issue branch posts one append-only
+comment on the issue (`gnadd round post`), numbered from the comments already
+there. The comment carries what changed and the user's feedback for that
+round, transcribed from chat and labeled as such. The issue body is never
+edited mid-work.
+
+**Why:** squash-merge keeps only the PR body, so the story of how a feature
+was built round by round had no home and a branch spanning sessions could not
+resume from the record. A GitHub comment survives the squash, is readable
+without the chat transcript, and is what the next session reads. The
+feedback label and the empty-text refusal exist because only the agent can
+see the chat: the record states its own provenance rather than presenting an
+agent transcription as a first-hand quote.
+
+**Hypothesis, and what would revise it:** the transcription rule is prose, not
+mechanism, so it can slip. If a round comment is ever found paraphrasing or
+inventing feedback, the fix is structural (the user types feedback on the
+issue, or a confirm step before posting), not a stronger sentence in the
+skill. Revisit also if the comment-per-commit cadence becomes noise on issues
+with many small checkpoints (a `--quiet` for mechanical commits would be the
+first thing to try).
+
 ### Skills deferred (not built speculatively)
-- **`update-issue`** (mid-work issue sync: check off completed acceptance criteria,
-  add descope/pivot notes): currently done ad hoc by instructing the agent, which
-  works. Build when ad hoc starts failing — a mangled issue body (`gh issue edit
-  --body` replaces the *whole* body, so a casual edit can drop sections or clobber
-  a collaborator's web-UI change) or visibly inconsistent note formats. The skill's
-  value is encoding "fetch the body fresh, minimal edit, preserve everything else
-  verbatim" plus one consistent descope-note shape.
+- **`update-issue`**: superseded (2026-09) by the round comment above. The
+  mid-work record is append-only comments, so the body-editing practice this
+  skill was reserved for is retired.
 - **`update-pr`** (respond to PR review feedback): build when a collaborator first
   requests changes and the real shape is known. A separate need from `update-issue`.
   (The narrower "merge the PR I left open yesterday" case is already covered:

@@ -781,6 +781,94 @@ YAML
   fi
 }
 
+# ---------------------------------------------------------------- round
+#
+# A round is one build/try/feedback cycle on an issue branch. Each checkpoint
+# posts one append-only comment on the issue: which round, what changed, and
+# the user's feedback that drove it. The trail survives the squash merge and
+# is what a later session reads to resume. The round number comes from the
+# record (existing round comments on the issue), never from memory.
+
+ROUND_MARKER="<!-- gnadd:round -->"
+
+round_issue_or_die() { # sets ISSUE_NUM from the branch; halts elsewhere
+  local br; br="$(current_branch)"
+  [ -n "$br" ] || die_state DETACHED_HEAD "round comments belong to an issue branch; detached HEAD has none"
+  issue_from_branch "$br"
+  [ -n "$ISSUE_NUM" ] || die_state NOT_ISSUE_BRANCH "round comments are posted only from issue-<N>/* branches (on: $br)"
+  ROUND_BRANCH="$br"
+}
+
+round_count() { # round_count <issue>: number of existing round comments
+  "$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
+    --jq "[.[] | select(.body | contains(\"$ROUND_MARKER\"))] | length" 2>/dev/null \
+    | awk '{s+=$1} END {print s+0}'
+}
+
+cmd_round_post() {
+  local changed="" feedback="" feedback_file="" no_feedback="" have_fb=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --changed)       changed="${2:-}"; shift ;;
+      --feedback)      feedback="${2:-}"; have_fb=$((have_fb+1)); shift ;;
+      --feedback-file) feedback_file="${2:-}"; have_fb=$((have_fb+1)); shift ;;
+      --no-feedback)   no_feedback="${2:-}"; have_fb=$((have_fb+1)); shift ;;
+      *) usage_die "usage: gnadd round post --changed <text> (--feedback <text> | --feedback-file <path> | --no-feedback <reason>)" ;;
+    esac
+    shift
+  done
+  round_issue_or_die
+  [ -n "$changed" ] || usage_die "round post needs --changed <text>: what this checkpoint changed, in one or two lines"
+  [ "$have_fb" -eq 1 ] || usage_die "round post needs exactly one of --feedback, --feedback-file, or --no-feedback <reason>; feedback is never inferred"
+  if [ -n "$feedback_file" ]; then
+    [ -s "$feedback_file" ] || usage_die "feedback file is missing or empty: $feedback_file (use --no-feedback <reason> when the user said nothing this round)"
+    feedback="$(cat "$feedback_file")"
+  fi
+  if [ -z "$no_feedback" ] && [ -z "$feedback" ]; then
+    usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
+  fi
+
+  local n; n="$(round_count "$ISSUE_NUM")"
+  local round=$((n+1))
+  local sha; sha="$(git rev-parse --short HEAD)"
+  local body; body="$(mktemp)"
+  {
+    printf '%s\n' "$ROUND_MARKER"
+    printf '## Round %s\n\n' "$round"
+    printf 'Commit: `%s` on `%s`\n\n' "$sha" "$ROUND_BRANCH"
+    printf '**Changed:** %s\n\n' "$changed"
+    if [ -n "$no_feedback" ]; then
+      printf '**Feedback:** none this round (%s).\n' "$no_feedback"
+    else
+      printf '**Feedback** (transcribed by the agent from chat, the user'"'"'s words as typed):\n\n'
+      printf '%s\n' "$feedback" | sed 's/^/> /'
+    fi
+  } > "$body"
+  if ! "$GH" issue comment "$ISSUE_NUM" --body-file "$body" >/dev/null; then
+    rm -f "$body"
+    die_state COMMENT_FAILED "could not post the round comment on issue #$ISSUE_NUM (network? auth?); the commit is safe, re-run round post"
+  fi
+  rm -f "$body"
+  say "issue=$ISSUE_NUM"
+  say "round=$round"
+  say "posted=true"
+}
+
+cmd_round_list() {
+  local issue="${1:-}"
+  if [ -z "$issue" ]; then
+    round_issue_or_die
+    issue="$ISSUE_NUM"
+  fi
+  local n; n="$(round_count "$issue")"
+  say "issue=$issue"
+  say "rounds=$n"
+  [ "$n" -gt 0 ] || return 0
+  "$GH" api "repos/{owner}/{repo}/issues/$issue/comments" --paginate \
+    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\")) | .body" \
+    | grep -v -F "$ROUND_MARKER" | sed 's/^/  /'
+}
+
 # ---------------------------------------------------------------- dispatch
 
 main() {
@@ -812,6 +900,13 @@ main() {
         merge) cmd_quickfix_merge "$@" ;;
         *) usage_die "usage: gnadd quickfix {start|guard|ship|merge} ..." ;;
       esac ;;
+    round)
+      local rsub="${1:-}"; shift || true
+      case "$rsub" in
+        post) cmd_round_post "$@" ;;
+        list) cmd_round_list "$@" ;;
+        *) usage_die "usage: gnadd round {post|list} ..." ;;
+      esac ;;
     sync-main)    cmd_sync_main "$@" ;;
     cleanup)      cmd_cleanup "$@" ;;
     doctor)       cmd_doctor "$@" ;;
@@ -840,6 +935,9 @@ gnadd — deterministic mechanics for the GNADD workflow
   quickfix ship                   guard + push a quickfix branch, detect existing PR
   quickfix merge <pr> [--check <name>|--no-check]
                                   squash-merge only after the CI check passes
+  round post --changed <text> (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
+                                  post this checkpoint's round comment on the issue
+  round list [N]                  print the issue's round comments in order
   sync-main                       return to main and fast-forward it (ff-only)
   cleanup <pr> <branch>           delete branch only after GitHub confirms merge
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
