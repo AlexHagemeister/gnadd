@@ -73,11 +73,11 @@ problem. Applied to the usual kit:
 |---|---|---|
 | Task list (`tasks.md`, `TODO.md`) | **Gone, fully** | The GitHub issue list *is* the task list. Adding a task is `/new-issue-gnadd`; seeing the list is `/prime-gnadd`; "in progress" is a branch existing; "done" is a merged PR. Task state is a side effect of doing the work, not a separate bookkeeping chore. |
 | Progress / session-state file | **Gone, fully** | Git itself. Commits are save points, the branch tells you what's mid-flight, and `/prime-gnadd` reconstructs "where was I" from reality instead of from a note that may or may not reflect it. |
-| Decisions file (`decisions.md`, ADRs) | **Mostly gone, relocated** | Decisions made *while implementing* go in the PR body for that work — permanently attached to the exact change they explain. Scope decisions ("we're deliberately not doing X") go in the issue's Constraints/Non-goals section. The rare cross-cutting decision no single PR owns can live in the README. |
-| Spec / PRD | **Keep a thin one, demoted** | A short README: vision (what this is, for whom) plus a **"What done looks like"** section holding the project-level acceptance criteria as *statements*. It is *not* the thing the agent decomposes, checks progress against, or updates as it goes. Satisfaction *state* is never stored here — it's derived from the issue/PR record. See "Where the higher-order requirements live" below. |
+| Decisions file (`decisions.md`, ADRs) | **Mostly gone, relocated** | Decisions made *while implementing* go in the PR body for that work, permanently attached to the exact change they explain. Scope decisions ("we're deliberately not doing X") go in the issue's Constraints/Non-goals section. The rare cross-cutting decision no single PR owns can live in VISION.md's Core, if it is an invariant, or in the README otherwise. |
+| Spec / PRD / implementation plan | **Replaced by `VISION.md`** | Project-level intent lives in one document: what is true no matter what gets built, what the project could become, and where the open tensions are, each marked by how committed you are to it. It is describe-content in the strict sense: nothing in it has a status or an order, so nothing in it goes stale as a side effect of work, and it never records which parts are satisfied. The README shrinks to run instructions and a pointer to it. See "The intent document" below. |
 
-A project-conventions file (`AGENTS.md`, agent rules) is also fine to keep — it's
-read-only orientation, not state.
+A project-conventions file (`AGENTS.md`, `CLAUDE.md`, agent rules) is also fine to
+keep. It's read-only orientation, not state.
 
 And when you're unsure about any file:
 
@@ -86,49 +86,103 @@ And when you're unsure about any file:
 
 ### What about the design phase?
 
-If a project needs real upfront thinking — architecture, tradeoffs, shape — do
-that thinking **in conversation** with the agent. If the ideation phase naturally
-produces a `requirements.md` (or it's needed as input to a formal design process),
-that's fine: a requirements doc is a legitimate **phase artifact with an expiry**,
-not a violation of the rule. Its lifecycle:
+Do the upfront thinking in conversation with the agent, and let its output be
+VISION.md, not a requirements document or an implementation plan.
 
-1. **Created** during ideation — high-level objectives, desired end state, even
-   with details unknown.
-2. **Consumed** by the design phase as input.
-3. **Distilled** when development starts: stable conclusions into the README's
-   "What done looks like" section, actionable specifics into the first issues'
-   Context sections.
-4. **Archived** — dated ("requirements as of project start") or deleted. It must
-   never linger as a half-authoritative document agents read after reality has
-   diverged from it, and it is never the live spec the loop runs against. Issues
-   are that.
+The reason is what plans do to agents. A spec, a PRD, or a plan written ahead of
+the code bakes in design and implementation calls that need to be made later,
+against the real codebase. The failure is always the same: partway through, a
+package does not fit or does not do what it seemed to, and the agent builds
+elaborate workarounds to keep the plan intact instead of concluding the tool is
+wrong. Once the pivot happens, everything downstream of it in the plan is invalid.
+The fix is not "no plans." It is to implement from intent, with iteration,
+feedback, and testing at every stage, and to fix in writing only what a surprise
+cannot falsify. That is what VISION.md holds.
 
-What stays forbidden is the *maintained* design document — one the agent is
-expected to keep current as the project evolves. That's a tracking file in
-disguise.
+A requirements.md is no longer a sanctioned phase artifact. If ideation produces
+one, distill it: what survives the admission test below goes into VISION.md, the
+first actionable slices go into issues, and the file is deleted. What stays
+forbidden is the *maintained* design document, one the agent is expected to keep
+current as the project evolves. That's a tracking file in disguise.
+
+### The intent document: `VISION.md`
+
+One file at the repo root holds the project-level intent. Agents read it at
+orientation, issues cite its invariants, and an implementation that fights one
+stops rather than working around it.
+
+**The admission test for a line.** A sentence belongs in VISION.md if no
+plausible implementation surprise would make you rewrite it. This is the
+describe-versus-track rule applied at the sentence level.
+
+**The shape.** Three sections, in this order:
+
+- **Core.** What is true no matter what gets built. The experience at the
+  center, the invariants numbered with their reasons attached, the non-goals,
+  and the constraints reality imposes that the vision bears on. Core stays
+  short.
+- **Possibility space.** Everything else from the brain dump: directions it
+  could go, alternatives, things that might be great. It can be long, loose,
+  and contradictory. Its header states that nothing in it is a commitment and
+  that a thread is pulled into an issue when it is time. The modality lives in
+  the verbs ("could", "one direction", "alternatively"). Pulling a thread into
+  an issue is the act of commitment, so this section is never a backlog.
+- **Open tensions.** Places where possibilities fight each other, or where you
+  do not know yet. Named, not resolved, so an agent stops there instead of
+  picking a side.
+
+There is no rule against describing features. The line between "a feature" and
+"part of the experience" does not exist cleanly, so write in whatever shape is
+natural and let the section, not the sentence type, carry the commitment level.
+
+**What stays out.** The decided how: library choices, file layout,
+architecture. And anything that carries a status, an order, or a plan. Those
+have homes in the loop (PR bodies, issues, milestones) and rot here.
+
+**The operating clause.** The file says this in its own words, and agents
+follow it: when an implementation choice fights an invariant, stop and surface
+it rather than working around it. When a tool turns out not to fit, drop the
+tool, not the invariant.
+
+**Language.** Declarative present tense. Never "should" or "will." Invariants
+numbered so issues can cite them ("serves invariant 3"). Plain words for a
+reader with zero context.
+
+**Authorship.** The agent writes and revises VISION.md through conversation and
+interview with you. The words are yours, confirmed by you, whoever types them.
+Nothing enters Core that you have not confirmed as true no matter what gets
+built.
+
+**How the loop uses it.** `/prime-gnadd` reports that VISION.md is present and
+summarizes Core. `/new-issue-gnadd` offers to cite the invariant an issue
+serves. Neither is required: a project without VISION.md works exactly as
+before.
+
+**Open: how Core changes.** Whether an edit to Core routes through an issue and
+PR (so the rationale lands in the record) or is made in conversation and
+committed directly is undecided. Until it is, pick per change and say which you
+did.
 
 ### Where the higher-order requirements live
 
 Project-level requirements feel like one thing but are two, and the traditional
 PRD rots because it fuses them:
 
-- **The statements** ("the project succeeds when users can do X") are
-  describe-content: they change rarely, by deliberate human decision. They live in
-  the README's **"What done looks like"** section, written with the same discipline
-  as issue criteria — observable, behavioral — just at higher altitude.
-- **The satisfaction state** (which statements are true yet) is track-content: it
-  changes constantly as a side effect of work. It is **never stored in a file** —
-  it's derived from the issue and PR record. For a finer-grained view, GitHub
-  **milestones** are the native middle layer: map a project-level criterion to a
-  milestone, attach issues to it, and completion computes itself from issue state.
-  Optional at small scale; useful once many open issues serve several distinct
-  goals.
+- **The statements** are describe-content: they change rarely, by deliberate
+  human decision. The invariants live in VISION.md's Core. Phase-level
+  done-criteria ("this phase ends when you have used it and ruled") do not
+  belong in VISION.md, because they carry a status. They belong in the system
+  of record: GitHub **milestones** are the native layer for that, a named bucket
+  with a description that issues attach to. Optional at small scale.
+- **The satisfaction state** (which statements are true yet) is track-content:
+  it changes constantly as a side effect of work. It is **never stored in a
+  file**. It's derived from the issue and PR record, and from milestone state
+  when milestones are in use.
 
-When a project-level requirement itself changes — a pivot, a descope — **route the
-change through the loop**: make it an issue ("Revise project scope: drop offline
-support"), whose observable outcome is the updated README and whose PR body
-carries the rationale. The README only ever states current truth; the history of
-how the truth changed lives where all decision history lives — in merged PRs.
+When an invariant itself changes (a pivot, a descope) the change is a
+deliberate human act, and how it is recorded is the open question named above.
+VISION.md only ever states current truth; the history of how the truth changed
+lives where all decision history lives: in merged PRs and closed issues.
 
 ### The startup sequence
 
@@ -142,9 +196,10 @@ how the truth changed lives where all decision history lives — in merged PRs.
    ruleset on `main` requires a PR and blocks force pushes and deletion. After
    this, the worst case for most mistakes is an error message, not lost work.
    (Default keeps an admin bypass as a solo escape hatch; `--strict` removes it.)
-3. **Write the thin README.** A few paragraphs of vision, plus a "What done looks
-   like" section with the project-level criteria as statements. Resist making it a
-   PRD — no checkboxes, no status, no plan.
+3. **Write `VISION.md` in conversation.** Brain-dump the idea to the agent and
+   let it write the document in the shape above, in your words, confirmed by
+   you. The README is run instructions and a pointer to VISION.md. Resist
+   putting anything with a status, an order, or a plan in either.
 4. **Capture the first few issues with `/new-issue-gnadd`** — and here's the habit change
    that will feel most wrong at first: *don't* front-load the whole backlog the way
    you'd write a full `tasks.md`. Write the first three or four vertical slices and
@@ -162,7 +217,6 @@ context files and workflow alignment, then proposes minimal fixes to capture as
 issues before you enter the loop.
 
 ---
-
 ## Part 2 — The Development Loop
 
 Every piece of work moves through the same five commands.
@@ -634,6 +688,31 @@ its own — each phase is executed by loading the sibling skill — and every
 `gnadd.sh` invocation leaves a receipt line in `.git/gnadd-trace.log` (`gnadd
 trace show`). The closing report must include the trace and call out any gaps;
 a freewheeled run is visible, not deniable.
+
+### VISION.md is the intent document (2026-09)
+
+**Decision:** project-level intent lives in `VISION.md` (Core, Possibility
+space, Open tensions, with an operating clause), written by the agent in
+conversation and confirmed by the user. It replaces the thin README's "What
+done looks like" section and the requirements.md phase artifact.
+
+**Why:** the old shape fused two things. "What done looks like" was project-level
+acceptance criteria, which carry a status and so belong in the system of record
+(issues, and milestones as the phase layer). The README's vision paragraph had
+no place for the uncommitted half of an idea, so the possibility space either
+leaked into a plan (and went stale) or was lost. Marking commitment level per
+section, rather than excluding the uncommitted, keeps the creative material
+without letting an agent mistake a maybe for a commitment. The admission test
+(no plausible implementation surprise would rewrite the line) is the
+describe-versus-track rule at sentence grain, and it is what keeps the file
+from rotting.
+
+**Hypothesis, and what would revise it:** this shape has been written for one
+project in conversation and not yet lived with through a pivot. Revisit if the
+possibility space starts being treated as a backlog (that means the header is
+not carrying its weight), if Core turns out to need changing often (the
+admission test is too loose), or once the open question on Core routing (issue
+and PR, or direct commit) has been answered by practice.
 
 ### Skills deferred (not built speculatively)
 - **`update-issue`** (mid-work issue sync: check off completed acceptance criteria,

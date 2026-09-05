@@ -41,7 +41,7 @@ skills.
 Files that describe stable truth are fine. Files that track mutable state should
 not exist.
 
-- Keep: README vision, project conventions, stable reference docs.
+- Keep: `VISION.md` (intent, marked by commitment level), README run instructions, project conventions, stable reference docs.
 - Avoid: task lists, progress files, maintained plans, status checklists.
 - Test: would the agent need to keep this file up to date? If yes, that state
   belongs in GitHub issues, PRs, branches, or commits instead.

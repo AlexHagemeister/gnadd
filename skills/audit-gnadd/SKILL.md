@@ -69,10 +69,10 @@ Extract the operational taxonomy:
 | Category | Examples | Default severity |
 |---|---|---|
 | Tracking files | `tasks.md`, `TODO.md`, progress/session-state files, maintained plans, status checklists | Violation |
-| Expired phase artifacts | `requirements.md`, standalone PRD/spec not distilled into README + issues | Warning |
+| Expired phase artifacts | `requirements.md`, standalone PRD/spec/plan not distilled into `VISION.md` + issues | Warning |
 | Misplaced decisions | `decisions.md`, ADR folders used as live tracking | Warning |
-| Describe-only (OK) | README vision, `AGENTS.md`, agent rules, archived/dated requirements | OK |
-| Missing describe content | README without project-level "What done looks like" on a GNADD-shaped project | Warning |
+| Describe-only (OK) | `VISION.md` (Core, Possibility space, Open tensions, no status or order), README run instructions, `AGENTS.md`, agent rules, archived/dated requirements | OK |
+| Missing describe content | No `VISION.md` on a GNADD-shaped project (a README "What done looks like" section is the pre-VISION.md shape and reads as a Warning to migrate) | Warning |
 
 Apply the tiebreaker from GNADD Part 1:
 
@@ -96,17 +96,18 @@ find . -maxdepth 4 -type f \( \
   -not -path '*/.venv/*' -not -path '*/coverage/*' -not -path '*/target/*' 2>/dev/null
 ```
 
-Always read `README.md` at the repo root if it exists.
+Always read `README.md` and `VISION.md` at the repo root if they exist.
 
-For each discovered file (and `README.md`):
+For each discovered file (and `README.md`, `VISION.md`):
 
 - Read enough to classify — usually the first ~50 lines suffices.
 - Look for **tracking signals:** `- [ ]` / `- [x]` checkboxes, "Status:",
   "In Progress", sprint/progress sections, satisfaction tracking, maintained
   task lists, "current focus" notes the agent would need to update.
 - Look for **safe signals:** archive headers, "as of DATE", explicit notes that
-  content was distilled into issues/README, pure vision/convention text with no
-  mutable state.
+  content was distilled into issues/VISION.md, pure vision/convention text with no
+  mutable state. In `VISION.md` specifically, a checkbox, a status, an ordered
+  plan, or a library choice is a tracking signal.
 
 Classify each file as **Violation**, **Warning**, or **OK** with a one-line
 rationale. When filename and content conflict, content wins.
@@ -189,10 +190,14 @@ Examples:
 
 - `tasks.md` exists → "Migrate open items to GitHub issues, then delete the
   file."
-- Stale `requirements.md` → "Archive with a date header or delete after
-  distilling stable conclusions into README and actionable items into issues."
-- Standalone PRD with tracking content → "Collapse vision into README 'What
-  done looks like'; move actionable specifics to issues."
+- Stale `requirements.md` → "Delete after distilling what passes the admission
+  test into VISION.md and actionable items into issues."
+- Standalone PRD with tracking content → "Move intent into VISION.md (Core for
+  invariants, Possibility space for the rest); move actionable specifics to
+  issues."
+- README with a "What done looks like" section → "Migrate: invariants to
+  VISION.md Core, phase done-criteria to a milestone; leave run instructions
+  and a pointer."
 - GNADD skills not detected → "Install GNADD skills globally per README."
 - Diverged local `main` → "Resolve main divergence before starting new issue
   work — the sanctioned path is `gnadd.sh doctor --rescue-main <name>` (bundled
@@ -214,7 +219,7 @@ undermines GNADD (task lists, progress files, diverged `main` with local-only
 commits).
 
 **Warning** — Likely misalignment needing human judgment (expired
-`requirements.md`, fat PRD, orphaned branch, missing README criteria section).
+`requirements.md`, fat PRD, orphaned branch, missing `VISION.md`).
 
 **OK** — Describe-only content correctly structured (vision docs, `AGENTS.md`,
 archived phase artifacts clearly marked).
