@@ -49,6 +49,14 @@ git branch --list
 
 If `tree` is not installed, use `find . -maxdepth 2 -type d -not -path './.git*' -not -path './node_modules*'` instead.
 
+Then check for the intent document:
+
+```bash
+test -f VISION.md && sed -n '/^## Core/,/^## /p' VISION.md | head -40
+```
+
+If `VISION.md` is absent, note nothing (a project without one works as before). If present, read only the Core section shown; do not read the rest of the file unless the user asks.
+
 Then check GitHub CLI auth:
 
 ```bash
@@ -80,6 +88,10 @@ gh issue view <N>
 ### Project Shape
 
 Use the tree output to identify the top-level layout: where source, config, tests, docs, and scripts appear to live. Keep this shallow. Do not inspect files unless the user asks.
+
+### Vision
+
+Only when `VISION.md` exists: report that it is present and summarize its Core section in two or three lines (the experience at the center and the numbered invariants by name). Do not summarize the possibility space or open tensions, and do not restate anything as a task. When it is absent, omit the section entirely.
 
 ### Recent Git History
 
@@ -130,6 +142,9 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 ```markdown
 ## Project Shape
 <1-2 sentences about top-level layout>
+
+## Vision
+<only if VISION.md exists: two or three lines on Core, invariants named>
 
 ## Current State
 <active branch, working tree status, local branches; flag if main is behind origin or stashes exist>

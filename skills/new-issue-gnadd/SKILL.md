@@ -60,6 +60,8 @@ Before drafting, have enough to write every required section confidently:
 
 Optional **Context** can be inferred from the repo or conversation; do not interview for it unless ambiguity would block a good issue.
 
+If `VISION.md` exists at the repo root, read its Core section and offer to cite the numbered invariant the issue serves ("Serves invariant 3: ...") in the Context section. One question, the user's call, never required. If the issue would fight an invariant, say so before drafting rather than after.
+
 ### Interview rules
 
 - **One question at a time.** Do not batch questions.
@@ -122,7 +124,7 @@ Extract or infer:
 - **Acceptance Criteria:** A checkable list of observable conditions that define "done." See the rules below. Include by default; omit only for genuinely single-action fixes (e.g. a typo) where the title already says everything.
 - **Subtasks:** Include only when the work naturally decomposes into distinct behavioral slices.
 - **Constraints / Non-goals:** Optional. Include only when there is a real boundary worth recording — a hard limit that is part of "what done means," or something explicitly out of scope. Omit when there is nothing meaningful to say.
-- **Context:** Include only when non-obvious conversation or repo context would help a future session. Reference existing artifacts by path, issue number, or URL instead of duplicating them.
+- **Context:** Include only when non-obvious conversation or repo context would help a future session. Reference existing artifacts by path, issue number, or URL instead of duplicating them. When the user accepted an invariant citation, it goes here as one line naming the invariant by number and its short text.
 
 ### Acceptance Criteria rules
 
