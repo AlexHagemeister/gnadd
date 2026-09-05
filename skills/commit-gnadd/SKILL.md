@@ -102,6 +102,32 @@ Report the short hash and summary:
 git log -1 --format="%h %s"
 ```
 
+## 6. Post The Round Comment (issue branches only)
+
+When the guard reported `issue=<N>`, every commit closes a round of the
+build/try/feedback loop, and the record of that round lives on the issue, not
+in chat. Post it through the script, which numbers the round from the comments
+already on the issue:
+
+```bash
+bash "<skill-dir>/gnadd.sh" round post --changed "<what this checkpoint changed, one or two lines>" --feedback-file <path>
+```
+
+Rules for the feedback:
+
+- **The user's words, as typed.** Write what the user said about the previous
+  round into the feedback file exactly as they said it, typos included. Never
+  tidy, summarize, or reorder. The comment labels the block as transcribed by
+  the agent, so the reader knows its provenance.
+- **Nothing means nothing.** If the user gave no feedback this round (first
+  slice, a mechanical checkpoint), pass `--no-feedback "<reason>"` instead of a
+  file. The script refuses empty feedback text; do not fill it with anything.
+- **Short inline feedback** may use `--feedback "<text>"` instead of a file.
+
+Skip this step entirely when not on an issue branch (`issue=none`). On
+`state=COMMENT_FAILED` the commit is safe; report it and re-run `round post`
+when the user says so.
+
 ## Closing Guidance
 
 Offer a brief next-step nudge only after the commit succeeds and the hash is reported — not when the branch guard stopped the flow or there were no changes.

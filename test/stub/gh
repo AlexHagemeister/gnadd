@@ -12,6 +12,9 @@
 #   GH_STUB_CHECKS        tab-separated check rows, e.g. 'test\tpass\t1s\turl'
 #                         (\n for multiple rows; unset = "no checks reported")
 #   GH_STUB_FAIL          set = every command fails
+#   GH_STUB_ROUND_COUNT   existing round comments on an issue (unset = 0)
+#   GH_STUB_ROUND_BODIES  bodies for `round list` (\n-separated, printf %b)
+#   GH_STUB_COMMENT_FILE  where `issue comment --body-file` copies its body
 
 set -u
 
@@ -76,8 +79,29 @@ case "$1" in
     esac
     ;;
   api)
+    # Issue comments: a count when the jq asks for length, bodies otherwise.
+    case "$2" in
+      */issues/*/comments)
+        case "$jq_expr" in
+          *length*) printf '%s\n' "${GH_STUB_ROUND_COUNT:-0}" ;;
+          *)        [ -n "${GH_STUB_ROUND_BODIES:-}" ] && printf '%b\n' "$GH_STUB_ROUND_BODIES" ;;
+        esac
+        exit 0 ;;
+    esac
     # Ruleset list returns empty; ruleset create succeeds.
     exit 0
+    ;;
+  issue)
+    case "$2" in
+      comment)
+        prev=""
+        for a in "$@"; do
+          [ "$prev" = "--body-file" ] && [ -n "${GH_STUB_COMMENT_FILE:-}" ] && cp "$a" "$GH_STUB_COMMENT_FILE"
+          prev="$a"
+        done
+        exit 0 ;;
+      *) exit 0 ;;
+    esac
     ;;
   *)
     exit 0
