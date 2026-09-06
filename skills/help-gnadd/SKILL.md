@@ -20,7 +20,7 @@ skills.
 
 - GitHub is the system of record: issues capture intent, branches hold work, PRs
   record what shipped, and git history is the audit trail.
-- The eight operational skills drive the loop: `init-gnadd` (once per repo:
+- The operational skills drive the loop: `init-gnadd` (once per repo:
   rails and the conventions file), `prime-gnadd`, `new-issue-gnadd`,
   `start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`,
   `quickfix-gnadd` (the no-issue fast path for trivial changes), and

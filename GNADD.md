@@ -47,9 +47,7 @@ whenever a decision matters. Your job is to describe work well, answer the skill
 questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
-with the GNADD skills installed (`help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`,
-`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`, `yolo-gnadd`,
-`init-gnadd`, `vision-gnadd`),
+with the GNADD skills installed (the README's skills table is the list),
 the GitHub CLI (`gh`) installed and authenticated, and a GitHub account.
 
 **Install skills:** see [README.md](README.md).
@@ -411,27 +409,16 @@ the states it can encounter.
 
 ### The skills
 
-Eleven skills, all global when installed with `-g` (available in every repo).
-Eight operational skills drive the loop, and their git mechanics run through the
-bundled `gnadd.sh` script, not improvised commands. `vision-gnadd` sits before
-the loop and touches no git. `help-gnadd` provides lightweight workflow
-orientation, and `audit-gnadd` reviews alignment when adopting or realigning a
-repo. Operational skills are invoked explicitly except `commit-gnadd`, which can
-also trigger on "commit this" or similar.
-
-| Skill | Invocation | Source | Does |
-|---|---|---|---|
-| `help-gnadd` | Auto when workflow-shaped; `/help-gnadd` | `skills/help-gnadd/SKILL.md` | Orient agents on the GNADD model, describe-vs-track file rule, skill routing, and pinned canonical guide |
-| `audit-gnadd` | `/audit-gnadd` | `skills/audit-gnadd/SKILL.md` | Read-only alignment audit: scrutinize context files, shallow git/workflow check, report minimal fixes |
-| `prime-gnadd` | `/prime-gnadd` | `skills/prime-gnadd/SKILL.md` | Orient a new session: fetches remote, reports project shape, VISION.md's Core when present, branch state, whether main is behind or diverged, stashes, the open phase, open issues, open + merged PRs |
-| `new-issue-gnadd` | `/new-issue-gnadd` | `skills/new-issue-gnadd/SKILL.md` | Draft a behavioral issue (with acceptance criteria), offer the invariant it serves and the open phase, and create it after review |
-| `start-issue-gnadd` | `/start-issue-gnadd <N>` | `skills/start-issue-gnadd/SKILL.md` | Protect in-progress work, branch off main, load the spec, propose a plan, wait for approval, then run the build, try, feedback rounds (resuming from the round comments on a returning branch) |
-| `commit-gnadd` | `/commit-gnadd` or "commit this" | `skills/commit-gnadd/SKILL.md` | Stage and commit with a conventional message; references the issue with `Re #N`; guards main; posts the round comment on the issue |
-| `resolve-issue-gnadd` | `/resolve-issue-gnadd` | `skills/resolve-issue-gnadd/SKILL.md` | Verify against criteria, run tests, commit, PR, check mergeability + CI, merge, clean up, and ask whether the phase is done when the merge empties it |
-| `quickfix-gnadd` | `/quickfix-gnadd` | `skills/quickfix-gnadd/SKILL.md` | Land one trivial change via a CI-gated squash-merged PR, no issue; guard refuses large or mechanics-touching diffs |
-| `yolo-gnadd` | `/yolo-gnadd <N or description>` (explicit only) | `skills/yolo-gnadd/SKILL.md` | Run one decided issue or quickfix through the whole loop autonomously: gates auto-approved, independent review pass, CI-gated merge, trace-backed report |
-| `init-gnadd` | `/init-gnadd` | `skills/init-gnadd/SKILL.md` | Once per repo: turn on the server-side rails and write the conventions file (`AGENTS.md`) with the preview launch line; safe to rerun |
-| `vision-gnadd` | `/vision-gnadd` | `skills/vision-gnadd/SKILL.md` | Write or revise `VISION.md` through an interview, in the user's confirmed words; offers to open the first phase and capture the first issue; touches no git |
+The skills table in [README.md](README.md) is the one list: every skill, how
+it is invoked, and what it does. Each skill's source is `skills/<name>/SKILL.md`.
+What the table does not say: the operational skills (the ones that touch git)
+run their mechanics through the bundled `gnadd.sh` script, never improvised
+commands. `vision-gnadd` sits before the loop and touches no git. `help-gnadd`
+provides lightweight workflow orientation, and `audit-gnadd` reviews alignment
+when adopting or realigning a repo. Skills are invoked explicitly except
+`commit-gnadd`, which can also trigger on "commit this" or similar, and
+`help-gnadd`, which can trigger on a workflow-shaped question. All are global
+when installed with `-g`.
 
 ### The core principles
 
