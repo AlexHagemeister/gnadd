@@ -48,7 +48,8 @@ questions deliberately, and read diffs before merging.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
 with the GNADD skills installed (`help-gnadd`, `audit-gnadd`, `prime-gnadd`, `new-issue-gnadd`,
-`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`, `yolo-gnadd`),
+`start-issue-gnadd`, `commit-gnadd`, `resolve-issue-gnadd`, `quickfix-gnadd`, `yolo-gnadd`,
+`init-gnadd`),
 the GitHub CLI (`gh`) installed and authenticated, and a GitHub account.
 
 **Install skills:** see [README.md](README.md).
@@ -193,14 +194,18 @@ lives where all decision history lives: in merged PRs and closed issues.
 
 1. **Create the repo on GitHub first.** Remote, `main` branch, `gh` authenticated.
    The workflow assumes GitHub exists from minute one — there's no offline phase.
-2. **Turn on the server-side rails.** Run `gnadd.sh init` once (the script is
-   bundled with the operational skills; add `--ci` to also drop in a minimal test
-   workflow). It configures the repo so the two most important invariants are
-   enforced by GitHub itself, not by anyone's discipline: merges are squash-only
-   with the PR body as the commit message, merged branches auto-delete, and a
-   ruleset on `main` requires a PR and blocks force pushes and deletion. After
-   this, the worst case for most mistakes is an error message, not lost work.
-   (Default keeps an admin bypass as a solo escape hatch; `--strict` removes it.)
+2. **Run `/init-gnadd`.** It turns on the server-side rails and writes the
+   conventions file. The rails (`gnadd.sh init` underneath; add `--ci` for a
+   minimal test workflow) make GitHub itself enforce the two most important
+   invariants, not anyone's discipline: merges are squash-only with the PR body
+   as the commit message, merged branches auto-delete, and a ruleset on `main`
+   requires a PR and blocks force pushes and deletion. After this, the worst
+   case for most mistakes is an error message, not lost work. (Default keeps an
+   admin bypass as a solo escape hatch; `--strict` removes it.) The conventions
+   file (`AGENTS.md`) tells every agent the repo runs GNADD, to start with
+   prime, and how to launch a preview (`Preview launch: <command or URL>`, the
+   one fact the round loop needs). It is a pointer, never task state, and the
+   skill is safe to rerun.
 3. **Write `VISION.md` in conversation.** Brain-dump the idea to the agent and
    let it write the document in the shape above, in your words, confirmed by
    you. The README is run instructions and a pointer to VISION.md. Resist
@@ -421,6 +426,7 @@ which can also trigger on "commit this" or similar.
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | `skills/resolve-issue-gnadd/SKILL.md` | Verify against criteria, commit, PR, check mergeability + CI, merge, clean up |
 | `quickfix-gnadd` | `/quickfix-gnadd` | `skills/quickfix-gnadd/SKILL.md` | Land one trivial change via a CI-gated squash-merged PR, no issue; guard refuses large or mechanics-touching diffs |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` (explicit only) | `skills/yolo-gnadd/SKILL.md` | Run one decided issue or quickfix through the whole loop autonomously: gates auto-approved, independent review pass, CI-gated merge, trace-backed report |
+| `init-gnadd` | `/init-gnadd` | `skills/init-gnadd/SKILL.md` | Once per repo: turn on the server-side rails and write the conventions file (`AGENTS.md`) with the preview launch line; safe to rerun |
 
 ### The core principles
 

@@ -19,6 +19,7 @@
 #                         (\n for multiple rows; unset = none open)
 #   GH_STUB_PHASE_DESC    raw description returned for a single milestone GET
 #   GH_STUB_API_INPUT     where `api --input -` writes the request body it read
+#   GH_STUB_RULESETS      existing ruleset names, one per line (unset = none)
 
 set -u
 
@@ -118,7 +119,10 @@ case "$1" in
         esac
         exit 0 ;;
     esac
-    # Ruleset list returns empty; ruleset create succeeds.
+    # Rulesets: list returns GH_STUB_RULESETS names; create succeeds.
+    case "$path" in
+      */rulesets) [ "$method" = GET ] && [ -n "${GH_STUB_RULESETS:-}" ] && printf '%b\n' "$GH_STUB_RULESETS"; exit 0 ;;
+    esac
     exit 0
     ;;
   issue)

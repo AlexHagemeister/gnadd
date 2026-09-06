@@ -697,17 +697,18 @@ cmd_init() {
 
   # Merge policy: squash-only, PR body becomes the squash commit message
   # (the decision record lands in git history itself), branches auto-delete.
+  # gh has no --squash-merge-commit-title flag; pr-title-description sets
+  # the pair (title = PR title, message = PR body) in one go.
   if "$GH" repo edit \
       --enable-squash-merge \
       --enable-merge-commit=false \
       --enable-rebase-merge=false \
       --delete-branch-on-merge \
-      --squash-merge-commit-title PR_TITLE \
-      --squash-merge-commit-message PR_BODY >/dev/null 2>&1; then
+      --squash-merge-commit-message pr-title-description >/dev/null 2>&1; then
     say "merge_policy=squash-only"
   else
     say "merge_policy=failed"
-    note "gh repo edit failed (older gh version?); set squash-only + delete-branch-on-merge + squash message PR_TITLE/PR_BODY in repo Settings"
+    note "gh repo edit failed; set squash-only + delete-branch-on-merge + squash message 'pull request title and description' in repo Settings > General > Pull Requests"
   fi
 
   # Ruleset on main: require a PR, block force pushes and deletion.
@@ -971,6 +972,71 @@ JSON
   say "closed=true"
 }
 
+# ---------------------------------------------------------------- conventions
+#
+# The conventions file (AGENTS.md, agent-agnostic) is the one file an agent
+# loads at session start. It points at GNADD and carries the single project
+# fact the round loop needs: the preview launch line. It holds no task state
+# and nothing an agent must keep updated. Writes are idempotent: rerunning
+# changes only a preview line that actually differs, and never touches text
+# outside the marked block.
+
+CONV_FILE="AGENTS.md"
+CONV_START="<!-- gnadd:conventions -->"
+CONV_END="<!-- /gnadd:conventions -->"
+CONV_PLACEHOLDER="(none yet: put the command or URL that starts a dev preview here)"
+
+conventions_block() { # conventions_block <preview>
+  cat <<BLOCK
+$CONV_START
+## GNADD
+
+This repo runs GNADD (Git-Native Agent-Driven Development): GitHub issues,
+branches, PRs, and git history are the sole system of record. No task files,
+no progress notes. Start every session with \`/prime-gnadd\`. Every change
+lands through an issue, a branch, and a PR, or through \`/quickfix-gnadd\` for
+a trivial one. Project intent lives in \`VISION.md\` when present.
+
+Preview launch: ${1:-$CONV_PLACEHOLDER}
+$CONV_END
+BLOCK
+}
+
+cmd_conventions() {
+  local preview=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --preview) preview="${2:-}"; shift ;;
+      *) usage_die "usage: gnadd conventions [--preview <command or URL>]" ;;
+    esac
+    shift
+  done
+  git rev-parse --show-toplevel >/dev/null 2>&1 || die_state NO_REPO "not inside a git repository"
+  local f; f="$(git rev-parse --show-toplevel)/$CONV_FILE"
+  if [ ! -f "$f" ]; then
+    conventions_block "$preview" > "$f"
+    say "conventions=created"
+  elif ! grep -qF "$CONV_START" "$f"; then
+    { printf '\n'; conventions_block "$preview"; } >> "$f"
+    say "conventions=updated"
+    note "GNADD block appended to the existing $CONV_FILE; nothing else in it was touched"
+  else
+    local current
+    current="$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
+    if [ -n "$preview" ] && [ "$current" != "$preview" ]; then
+      local tmp; tmp="$(mktemp)"
+      awk -v p="$preview" 'BEGIN{done=0} /^Preview launch: / && !done {print "Preview launch: " p; done=1; next} {print}' "$f" > "$tmp"
+      mv "$tmp" "$f"
+      say "conventions=updated"
+      note "preview launch line changed from '$current'"
+    else
+      say "conventions=unchanged"
+    fi
+  fi
+  say "file=$CONV_FILE"
+  say "preview=$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
+}
+
 # ---------------------------------------------------------------- dispatch
 
 main() {
@@ -1022,6 +1088,7 @@ main() {
     doctor)       cmd_doctor "$@" ;;
     test)         cmd_test "$@" ;;
     init)         cmd_init "$@" ;;
+    conventions)  cmd_conventions "$@" ;;
     trace)        cmd_trace "$@" ;;
     version|--version)
       # VERSION is stamped by scripts/release.sh at release time, but installs
@@ -1058,6 +1125,7 @@ gnadd — deterministic mechanics for the GNADD workflow
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
+  conventions [--preview <cmd>]   write or update the GNADD block in AGENTS.md (idempotent)
   trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
   version                         release baseline + distribution channel
 
