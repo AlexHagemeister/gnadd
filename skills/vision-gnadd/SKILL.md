@@ -62,53 +62,104 @@ do not ask what matters most. One prompt, then listen.
 
 If the user gives a sentence or two, ask once for more ("Keep going: what
 could it become, what would make it great, what are you unsure about?") and
-then work with what you have. A thin VISION.md that is all the user's is
-better than a full one padded by the agent.
+then work with what you have. The grill in step 3 draws out what the dump
+lacks. A thin VISION.md that is all the user's is better than a full one
+padded by the agent.
 
-## 3. Sort By Commitment
+## 3. The Grill
 
-Take the dump apart into claims, keeping each in the user's phrasing. For each
-claim there is one sorting question, and it is the only question the interview
-asks per item:
+The interview borrows its mechanics from Matt Pocock's `grilling` skill and
+narrows its aim. Grilling sharpens a plan until the user can commit. This
+grill sharpens only Core, and it treats "I don't know" as an answer that
+closes a branch rather than a gap to keep digging at. The possibility space
+is never grilled.
 
-> Is this true no matter what gets built?
+**Rounds and the frontier.** Model the material as a tree of decisions. The
+frontier is every question whose prerequisites are settled: the questions
+that can be asked now without guessing at answers not yet heard. Ask the whole
+frontier in one round, numbered, each with a recommended answer. Then wait.
+Each round's answers push the frontier outward. A question that depends on
+another question still open belongs to a later round.
 
-- **Yes** goes to Core. Ask for the reason it holds ("why is this
-  non-negotiable?") and attach it. Number the invariants in the order the user
-  confirms them.
-- **Anything else** stays in the possibility space. No follow-up question. Do
-  not ask whether it is likely, important, or first. Those questions
-  manufacture an order the file is not allowed to hold.
-- **Two claims that fight**, or a claim the user says they do not know about
-  yet, go to Open tensions. Name the tension in a sentence. Do not ask the
-  user to resolve it.
+Format a round like so:
 
-Conduct the sort as a reflection, not a quiz. Read a claim back in the user's
-words with your proposed home ("Core: 'it works offline'. True no matter
-what?") and let them confirm, move it, or reword it. Batch the possibility
-space into a few short reads rather than one item at a time. Core items get
-confirmed one by one.
+```
+1. **<question>**
+   Recommended: <answer, drawn from the user's words where they exist>
 
-Rules for the sort:
+2. **<question>**
+   Recommended: <answer>
+```
 
-- **The user's words.** When a claim needs a verb changed to fit its section
-  (a "will" or "should" in the possibility space becomes "could", "one
-  direction is", "alternatively"), show the changed sentence and ask. Never
-  change wording without reading the change back.
+**Recommended answers.** Where the dump already holds the answer, the
+recommendation is the user's own sentence, quoted. Where it does not, the
+recommendation is marked as the agent's proposal ("my proposal:"). A proposal
+never enters the file as written. The user's confirmation or rewording does.
+
+**Facts are the agent's job.** When a question turns on a fact (what the
+repo holds, what a tool can do, what the user said in an earlier session
+when a connector to their notes is present), look it up. Ask the user only
+for decisions.
+
+### The frontier seeds
+
+The shape in `GNADD.md` says what the file needs. These are the questions
+that fill it, in the order their prerequisites settle.
+
+**Round 1: the center, and what is Core.**
+
+- What is the experience at the center? One or two sentences, the user's.
+- For each claim in the dump, the one sorting question: is this true no
+  matter what gets built? Recommended home given for each. Yes goes to Core.
+  Anything else stays in the possibility space with no further question. Two
+  claims that fight, or a claim the user is unsure of, go to Open tensions.
+
+**Round 2: unlocked by the confirmed invariants.**
+
+- For each invariant: why does it hold? The reason gets attached, and the
+  invariants are numbered in the order confirmed.
+- What is this deliberately not? Non-goals, in the user's words.
+- What does reality impose that the vision bears on? A platform gate, a
+  physical limit, a legal line. Only what the vision must respect, never the
+  how.
+
+**Round 3: tensions.**
+
+- Where do two possibilities fight? Name each in a sentence and stop. Never
+  ask the user to pick a side.
+- What do you not know yet? Each "I don't know" is recorded as a tension and
+  closes its branch.
+
+The grill is done when the frontier is empty: every claim has a home, every
+invariant has a reason, and nothing has been assumed silently.
+
+### Rules that hold across every round
+
+- **The user's words.** Read a claim back in their phrasing with the proposed
+  home. When a verb must change to fit its section (a "will" or "should" in
+  the possibility space becomes "could", "one direction is", "alternatively"),
+  show the changed sentence and ask. Never change wording without reading the
+  change back.
 - **Do not prune.** Every claim from the dump lands somewhere. Loose,
-  contradictory, or half-formed is fine in the possibility space. That
-  section holds the creative material and the interview does not impose
-  structure on it beyond light grouping by theme, in the user's phrasing.
-- **Do not add.** The agent proposes homes and verb changes. It does not
-  propose claims. If the user asks what is missing, answer with a question,
-  not a sentence for the file.
+  contradictory, or half-formed is fine in the possibility space. Group it
+  lightly by theme in the user's phrasing and impose nothing more.
+- **Do not add.** The agent proposes homes, verb changes, and recommended
+  answers. It does not author claims. If the user asks what is missing, answer
+  with a question from the seeds, not a sentence for the file.
+- **Do not rank.** Never ask whether something is likely, important, or
+  first. Those questions manufacture an order the file is not allowed to hold.
 - **Catch the how.** A library, a file layout, an architecture, or a step
   sequence in the dump is not a vision claim. Say so and ask what it is for.
   The reason it serves usually is a claim, and that goes in. The how stays
   out.
-- **Catch status.** "First", "next", "phase two", "done when" describe order
-  or state. Point them at the phase and the issues, and leave them out.
-- **Stop when the dump is sorted.** Do not go looking for more material.
+- **Catch status.** "First", "next", "phase two", "stretch goal", "TBD",
+  "done when" describe order or state. Point them at the phase and the
+  issues, and leave them out. The content underneath a "TBD" is usually a
+  tension, and that goes in.
+- **Passivity is a failure.** A round of nothing but "yes" to the agent's
+  proposals produces a file the agent wrote. When the user has only agreed
+  for a whole round, say so and ask whether the recommendations are their
+  view or the path of least resistance.
 
 ## 4. Write The File
 
