@@ -171,13 +171,18 @@ PRD rots because it fuses them:
 - **The statements** are describe-content: they change rarely, by deliberate
   human decision. The invariants live in VISION.md's Core. Phase-level
   done-criteria ("this phase ends when you have used it and ruled") do not
-  belong in VISION.md, because they carry a status. They belong in the system
-  of record: GitHub **milestones** are the native layer for that, a named bucket
-  with a description that issues attach to. Optional at small scale.
+  belong in VISION.md, because they carry a status. They live in the
+  **phase**: one open GitHub milestone whose description says what the phase
+  is trying to find out and what ends it. Issues attach to it. `/prime-gnadd`
+  reports it, `/new-issue-gnadd` defaults new issues into it, and
+  `/resolve-issue-gnadd` notices when it empties and asks whether the phase
+  is done. You close it, with a verdict, and open the next one after. No due
+  dates: a phase ends on your ruling, not on a date. Phases are opt-in; a
+  project with no milestones works exactly as before.
 - **The satisfaction state** (which statements are true yet) is track-content:
   it changes constantly as a side effect of work. It is **never stored in a
-  file**. It's derived from the issue and PR record, and from milestone state
-  when milestones are in use.
+  file**. It's derived from the issue and PR record, and from the phase's
+  open and closed counts when one is in use.
 
 When an invariant itself changes (a pivot, a descope) the change is a
 deliberate human act, and how it is recorded is the open question named above.
@@ -224,8 +229,9 @@ Every piece of work moves through the same five commands.
 ### 1. `/prime-gnadd` — start every session here
 
 Read-only and always safe. It fetches the latest from GitHub and reports: what the
-project looks like, what branch you're on, open issues, PRs in flight, what
-recently shipped. Three things in its output deserve attention:
+project looks like, what branch you're on, the open phase if there is one, open
+issues, PRs in flight, what recently shipped. Three things in its output deserve
+attention:
 
 - A **"main has diverged"** warning — stop and sort that out before anything else.
 - A **stash warning** — you have invisible saved work; deal with it or it will be
@@ -724,6 +730,33 @@ possibility space starts being treated as a backlog (that means the header is
 not carrying its weight), if Core turns out to need changing often (the
 admission test is too loose), or once the open question on Core routing (issue
 and PR, or direct commit) has been answered by practice.
+
+### Milestones as phases (2026-09)
+
+**Decision:** a project's current development phase is one open GitHub
+milestone. Its description states what the phase is trying to find out and
+what ends it. One open at a time. No due dates. The next phase is created
+only when the current one closes. Closing is the human's act, with a verdict
+that lands in the milestone's description; the agent may propose it and never
+performs it unasked. `gnadd phase status|open|close` carries the mechanics.
+
+**Why:** an agent needs to know roughly where the project is in its life,
+and nothing else holds that. Git history is backward-looking, VISION.md
+deliberately has no status, and a status file would go stale. A milestone is
+state, but it passes the rules this workflow lives by: it lives in the system
+of record, it changes only by the human's act, and it closes rather than
+being edited. The description is the one edit at close time, because
+milestones have no other place for text; if that ever feels wrong in use, the
+verdict moves to a closing issue comment. `phase status` reports rather than
+halts when several milestones are open, so a repo adopting GNADD with
+milestones already in use still primes on day one; the one-open rule is
+enforced where it matters, at `phase open`.
+
+**Hypothesis, and what would revise it:** the first phase (this repo's
+"Idea to first version") was opened by hand before the mechanism existed and
+closes through it. Revisit if phases start being opened ahead of time (that
+means the "only after close" rule is fighting how work actually arrives), or
+if the verdict-in-description edit reads as tracking rather than record.
 
 ### Round comments are the mid-work record (2026-09)
 

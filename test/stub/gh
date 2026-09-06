@@ -15,6 +15,10 @@
 #   GH_STUB_ROUND_COUNT   existing round comments on an issue (unset = 0)
 #   GH_STUB_ROUND_BODIES  bodies for `round list` (\n-separated, printf %b)
 #   GH_STUB_COMMENT_FILE  where `issue comment --body-file` copies its body
+#   GH_STUB_PHASES        open milestones as tab rows 'num\ttitle\topen\tclosed\tdesc'
+#                         (\n for multiple rows; unset = none open)
+#   GH_STUB_PHASE_DESC    raw description returned for a single milestone GET
+#   GH_STUB_API_INPUT     where `api --input -` writes the request body it read
 
 set -u
 
@@ -79,6 +83,32 @@ case "$1" in
     esac
     ;;
   api)
+    # Any api call with --input - records its request body for assertions.
+    has_input=0
+    for a in "$@"; do [ "$a" = "--input" ] && has_input=1; done
+    if [ "$has_input" = 1 ]; then
+      if [ -n "${GH_STUB_API_INPUT:-}" ]; then cat > "$GH_STUB_API_INPUT"; else cat >/dev/null; fi
+    fi
+    # Milestones: list (count or rows), single GET (description), create (number + url).
+    method=GET
+    prev=""
+    for a in "$@"; do [ "$prev" = "-X" ] && method="$a"; prev="$a"; done
+    path=""
+    for a in "$@"; do case "$a" in repos/*) path="$a" ;; esac; done
+    case "$path" in
+      */milestones\?*)
+        case "$jq_expr" in
+          length) n=0; [ -n "${GH_STUB_PHASES:-}" ] && n=$(printf '%b\n' "$GH_STUB_PHASES" | grep -c .); printf '%s\n' "$n" ;;
+          *)      [ -n "${GH_STUB_PHASES:-}" ] && printf '%b\n' "$GH_STUB_PHASES" ;;
+        esac
+        exit 0 ;;
+      */milestones)
+        [ "$method" = POST ] && printf '42\thttps://github.com/stub-owner/stub-repo/milestone/42\n'
+        exit 0 ;;
+      */milestones/*)
+        [ "$method" = GET ] && printf '%b\n' "${GH_STUB_PHASE_DESC:-}"
+        exit 0 ;;
+    esac
     # Issue comments: a count when the jq asks for length, bodies otherwise.
     case "$2" in
       */issues/*/comments)

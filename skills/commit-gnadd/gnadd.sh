@@ -869,6 +869,108 @@ cmd_round_list() {
     | grep -v -F "$ROUND_MARKER" | sed 's/^/  /'
 }
 
+# ---------------------------------------------------------------- phase
+#
+# A phase is the project's current development stage, held as one open
+# GitHub milestone. Its description says what the phase is trying to find
+# out and what ends it. Issues attach to it. Phase state lives in the system
+# of record, changes only by the human's act (open, close with a verdict),
+# and never carries a due date. The agent may propose closing; it never does.
+
+json_str() { # json_str <text>: JSON string literal (quotes, backslashes, newlines)
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'BEGIN{ORS=""} NR>1{printf "\\n"} {print}'
+}
+
+phase_rows() { # tab rows: number, title, open_issues, closed_issues, description (flattened)
+  "$GH" api "repos/{owner}/{repo}/milestones?state=open&per_page=100" \
+    --jq '.[] | "\(.number)\t\(.title)\t\(.open_issues)\t\(.closed_issues)\t\(.description // "" | gsub("\n"; " "))"' 2>/dev/null || true
+}
+
+phase_count() {
+  "$GH" api "repos/{owner}/{repo}/milestones?state=open&per_page=100" --jq 'length' 2>/dev/null | awk '{s+=$1} END {print s+0}'
+}
+
+cmd_phase_status() {
+  local n; n="$(phase_count)"
+  if [ "$n" -eq 0 ]; then
+    say "phase=none"
+    return 0
+  fi
+  phase_rows | while IFS="$(printf '\t')" read -r num title oi ci desc; do
+    say "phase=$title"
+    say "phase_number=$num"
+    say "open_issues=$oi"
+    say "closed_issues=$ci"
+    say "description=$desc"
+  done
+  if [ "$n" -gt 1 ]; then
+    note "$n milestones are open; the phase rule wants exactly one (close the others with a verdict, or treat the first as the phase)"
+  fi
+  return 0
+}
+
+cmd_phase_open() {
+  local title="" desc="" desc_file=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --description)      desc="${2:-}"; shift ;;
+      --description-file) desc_file="${2:-}"; shift ;;
+      -*) usage_die "usage: gnadd phase open <title> (--description <text> | --description-file <path>)" ;;
+      *)  [ -z "$title" ] && title="$1" || usage_die "phase open takes one title" ;;
+    esac
+    shift
+  done
+  [ -n "$title" ] || usage_die "phase open needs a title"
+  [ -n "$desc_file" ] && desc="$(cat "$desc_file")"
+  [ -n "$desc" ] || usage_die "phase open needs --description: what this phase is trying to find out, and what ends it"
+  local n; n="$(phase_count)"
+  if [ "$n" -gt 0 ]; then
+    say "state=PHASE_OPEN"
+    err "a phase is already open; one open phase at a time, close it with a verdict first:"
+    phase_rows | cut -f2 | sed 's/^/  /'
+    exit 2
+  fi
+  local out
+  out="$("$GH" api -X POST "repos/{owner}/{repo}/milestones" --input - \
+          --jq '"\(.number)\t\(.html_url)"' <<JSON
+{"title": "$(json_str "$title")", "description": "$(json_str "$desc")", "state": "open"}
+JSON
+  )" || die_state PHASE_CREATE_FAILED "could not create milestone '$title' (network? auth? permissions?)"
+  say "phase=$title"
+  say "phase_number=$(printf '%s' "$out" | cut -f1)"
+  say "url=$(printf '%s' "$out" | cut -f2)"
+  say "opened=true"
+}
+
+cmd_phase_close() {
+  local title="" verdict="" verdict_file=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --verdict)      verdict="${2:-}"; shift ;;
+      --verdict-file) verdict_file="${2:-}"; shift ;;
+      -*) usage_die "usage: gnadd phase close <title> (--verdict <text> | --verdict-file <path>)" ;;
+      *)  [ -z "$title" ] && title="$1" || usage_die "phase close takes one title" ;;
+    esac
+    shift
+  done
+  [ -n "$title" ] || usage_die "phase close needs the open phase's title"
+  [ -n "$verdict_file" ] && verdict="$(cat "$verdict_file")"
+  [ -n "$verdict" ] || usage_die "phase close needs --verdict: what this phase found out, in the user's words; closing is the human's act"
+  local num
+  num="$(phase_rows | awk -F'\t' -v t="$title" '$2 == t {print $1; exit}')"
+  [ -n "$num" ] || die_state PHASE_NOT_FOUND "no open milestone titled '$title' (gnadd phase status lists the open ones)"
+  local desc
+  desc="$("$GH" api "repos/{owner}/{repo}/milestones/$num" --jq '.description // ""' 2>/dev/null || true)"
+  local newdesc
+  newdesc="$(printf '%s\n\n## Verdict\n\n%s' "$desc" "$verdict")"
+  "$GH" api -X PATCH "repos/{owner}/{repo}/milestones/$num" --input - >/dev/null <<JSON || die_state PHASE_CLOSE_FAILED "could not close milestone '$title'"
+{"state": "closed", "description": "$(json_str "$newdesc")"}
+JSON
+  say "phase=$title"
+  say "phase_number=$num"
+  say "closed=true"
+}
+
 # ---------------------------------------------------------------- dispatch
 
 main() {
@@ -907,6 +1009,14 @@ main() {
         list) cmd_round_list "$@" ;;
         *) usage_die "usage: gnadd round {post|list} ..." ;;
       esac ;;
+    phase)
+      local psub="${1:-}"; shift || true
+      case "$psub" in
+        status) cmd_phase_status "$@" ;;
+        open)   cmd_phase_open "$@" ;;
+        close)  cmd_phase_close "$@" ;;
+        *) usage_die "usage: gnadd phase {status|open|close} ..." ;;
+      esac ;;
     sync-main)    cmd_sync_main "$@" ;;
     cleanup)      cmd_cleanup "$@" ;;
     doctor)       cmd_doctor "$@" ;;
@@ -938,6 +1048,11 @@ gnadd — deterministic mechanics for the GNADD workflow
   round post --changed <text> (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
                                   post this checkpoint's round comment on the issue
   round list [N]                  print the issue's round comments in order
+  phase status                    the open milestone (title, counts, description) or none
+  phase open <title> --description <text>
+                                  open the next phase; refuses while one is open
+  phase close <title> --verdict <text>
+                                  close the phase; the verdict lands in its description
   sync-main                       return to main and fast-forward it (ff-only)
   cleanup <pr> <branch>           delete branch only after GitHub confirms merge
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
