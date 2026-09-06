@@ -71,7 +71,7 @@ setup_repo() {
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
         GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE GH_STUB_PHASES \
-        GH_STUB_PHASE_DESC GH_STUB_API_INPUT 2>/dev/null || true
+        GH_STUB_PHASE_DESC GH_STUB_API_INPUT GH_STUB_RULESETS 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -712,8 +712,81 @@ run phase close "Nope" --verdict "v"
 expect_status 2 "$ST"
 expect_contains "state=PHASE_NOT_FOUND"
 
+# ---------------------------------------------------------------- init
+
+t init_turns_on_rails; setup_repo
+export GH_STUB_API_INPUT="$SANDBOX/api.json"
+run init
+expect_status 0 "$ST"
+expect_contains "repo=stub-owner/stub-repo"
+expect_contains "merge_policy=squash-only"
+expect_contains "ruleset=created"
+grep -q -- "--squash-merge-commit-message pr-title-description" "$GH_STUB_LOG" && ok || fail "squash message not set to pr-title-description"
+grep -q -- "--squash-merge-commit-title" "$GH_STUB_LOG" && fail "uses a flag gh does not have" || ok
+OUT="$(cat "$SANDBOX/api.json")"
+expect_contains '"name": "gnadd-main"'
+expect_contains '"type": "pull_request"'
+
+t init_rerun_reports_existing_ruleset; setup_repo
+export GH_STUB_RULESETS='gnadd-main'
+run init
+expect_status 0 "$ST"
+expect_contains "ruleset=exists"
+grep -q "POST" "$GH_STUB_LOG" && fail "created a second ruleset" || ok
+
+# ---------------------------------------------------------------- conventions
+
+t conventions_creates; setup_repo
+run conventions --preview "npm run dev"
+expect_status 0 "$ST"
+expect_contains "conventions=created"
+expect_contains "preview=npm run dev"
+OUT="$(cat AGENTS.md)"
+expect_contains "<!-- gnadd:conventions -->"
+expect_contains "/prime-gnadd"
+expect_contains "Preview launch: npm run dev"
+
+t conventions_appends_preserving_existing; setup_repo
+printf '# My rules\n\nkeep me\n' > AGENTS.md
+run conventions --preview "make run"
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+OUT="$(cat AGENTS.md)"
+expect_contains "keep me"
+expect_contains "Preview launch: make run"
+case "$OUT" in "# My rules"*) ok ;; *) fail "existing content not preserved at top" ;; esac
+
+t conventions_rerun_unchanged; setup_repo
+run conventions --preview "npm run dev"
+run conventions --preview "npm run dev"
+expect_status 0 "$ST"
+expect_contains "conventions=unchanged"
+[ "$(grep -c 'gnadd:conventions -->' AGENTS.md)" = "2" ] && ok || fail "block duplicated on rerun"
+run conventions
+expect_contains "conventions=unchanged"
+expect_contains "preview=npm run dev"
+
+t conventions_updates_only_preview; setup_repo
+printf '# My rules\n\nkeep me\n' > AGENTS.md
+run conventions --preview "npm run dev"
+run conventions --preview "http://localhost:3000"
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+OUT="$(cat AGENTS.md)"
+expect_contains "keep me"
+expect_contains "Preview launch: http://localhost:3000"
+expect_not_contains "npm run dev"
+[ "$(grep -c '^<!-- gnadd:conventions -->' AGENTS.md)" = "1" ] && ok || fail "block count wrong"
+
+t conventions_placeholder_without_preview; setup_repo
+run conventions
+expect_status 0 "$ST"
+expect_contains "conventions=created"
+OUT="$(cat AGENTS.md)"
+expect_contains "Preview launch: (none yet"
+
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
-for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd; do
+for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd init-gnadd; do
   if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
     fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
   elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then

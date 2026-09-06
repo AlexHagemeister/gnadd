@@ -1,6 +1,6 @@
 # GNADD
 
-Git-Native Agent-Driven Development — a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Seven operational [Agent Skills](https://agentskills.io) drive the loop — from issue capture through gated resolution, plus a no-issue quickfix path and an autonomous YOLO mode — backed by a tested, deterministic script (`gnadd.sh`, bundled inside the skills) that enforces the git invariants in code. Help and audit skills orient and align agents on the workflow.
+Git-Native Agent-Driven Development: a workflow where GitHub Issues, branches, PRs, and git history are the sole system of record. Eight operational [Agent Skills](https://agentskills.io) drive the loop, from issue capture through gated resolution, plus a no-issue quickfix path and an autonomous YOLO mode, backed by a tested, deterministic script (`gnadd.sh`, bundled inside the skills) that enforces the git invariants in code. Help and audit skills orient and align agents on the workflow.
 
 Works with any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and others).
 
@@ -44,16 +44,17 @@ Use the same scope (`-g` or project) you used at install — updating the wrong 
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` |
 | `quickfix-gnadd` | `/quickfix-gnadd` |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` |
+| `init-gnadd` | `/init-gnadd` |
 
 ## Per-project setup (recommended)
 
-Once per repo, turn on the server-side rails:
+Once per repo, run `/init-gnadd`. It turns on the server-side rails and writes the conventions file (`AGENTS.md`) that points agents at GNADD and carries the preview launch line. Safe to rerun. The rails alone, without the skill:
 
 ```bash
 bash <path-to-installed-prime-skill>/gnadd.sh init        # add --ci for a test workflow stub
 ```
 
-This makes GitHub itself enforce the workflow's core invariants: squash-only merges (with the PR body as the commit message), auto-deleted merged branches, and a ruleset on `main` requiring PRs and blocking force pushes. See GNADD.md Part 4 ("The enforcement layers").
+The rails make GitHub itself enforce the workflow's core invariants: squash-only merges (with the PR body as the commit message), auto-deleted merged branches, and a ruleset on `main` requiring PRs and blocking force pushes. See GNADD.md Part 4 ("The enforcement layers").
 
 ## Repo layout
 
