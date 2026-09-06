@@ -222,6 +222,20 @@ The script confirms via GitHub that the PR actually merged (`state=MERGED` with 
 
 Report what was cleaned up, and give the user the merge commit hash — their one-command undo for the whole feature (`git revert <hash>`).
 
+## 9. Notice When The Phase Empties
+
+```bash
+bash "<skill-dir>/gnadd.sh" phase status
+```
+
+If a phase is open and `open_issues=0`, say so: the phase has no open issues left, and ask whether it is done. Closing is the user's act. Never run `phase close` on your own initiative. When the user says it is done and gives their verdict (what the phase found out, in their words), run it on their word:
+
+```bash
+bash "<skill-dir>/gnadd.sh" phase close "<title>" --verdict "<the user's verdict, as typed>"
+```
+
+The next phase is opened only after this one closes, and only when the user asks for it (`phase open <title> --description <what it is trying to find out, and what ends it>`). If `phase=none`, skip this step silently.
+
 ## Closing Guidance
 
 Offer a brief next-step nudge only at natural completion — not at intermediate gates (wrong branch, unmet criteria discussion, commit/PR approval waits, merge conflicts, failing tests or CI, or main divergence during cleanup).

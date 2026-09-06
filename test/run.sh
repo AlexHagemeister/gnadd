@@ -70,7 +70,8 @@ setup_repo() {
   unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
-        GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE 2>/dev/null || true
+        GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE GH_STUB_PHASES \
+        GH_STUB_PHASE_DESC GH_STUB_API_INPUT 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -632,6 +633,84 @@ t round_list_none; setup_repo
 run round list 11
 expect_status 0 "$ST"
 expect_contains "rounds=0"
+
+# ---------------------------------------------------------------- phase
+
+t phase_status_none; setup_repo
+run phase status
+expect_status 0 "$ST"
+expect_contains "phase=none"
+
+t phase_status_open; setup_repo
+export GH_STUB_PHASES='1\tIdea to first version\t3\t2\tfind out whether X'
+run phase status
+expect_status 0 "$ST"
+expect_contains "phase=Idea to first version"
+expect_contains "phase_number=1"
+expect_contains "open_issues=3"
+expect_contains "closed_issues=2"
+expect_contains "description=find out whether X"
+expect_not_contains "wants exactly one"
+
+t phase_status_multiple_reports_all; setup_repo
+export GH_STUB_PHASES='1\tPhase A\t1\t0\ta\n2\tPhase B\t0\t0\tb'
+run phase status
+expect_status 0 "$ST"
+expect_contains "phase=Phase A"
+expect_contains "phase=Phase B"
+expect_contains "wants exactly one"
+
+t phase_open_creates; setup_repo
+export GH_STUB_API_INPUT="$SANDBOX/api.json"
+run phase open "Second phase" --description "try it on a real project; ends when Alex has ruled"
+expect_status 0 "$ST"
+expect_contains "opened=true"
+expect_contains "phase_number=42"
+expect_contains "url=https://github.com/stub-owner/stub-repo/milestone/42"
+OUT="$(cat "$SANDBOX/api.json")"
+expect_contains '"title": "Second phase"'
+expect_contains 'ends when Alex has ruled'
+expect_not_contains 'due_on'
+
+t phase_open_refuses_while_one_open; setup_repo
+export GH_STUB_PHASES='1\tIdea to first version\t3\t2\tx'
+run phase open "Second phase" --description "y"
+expect_status 2 "$ST"
+expect_contains "state=PHASE_OPEN"
+expect_contains "Idea to first version"
+grep -q "POST" "$GH_STUB_LOG" && fail "created a milestone despite an open phase" || ok
+
+t phase_open_requires_description; setup_repo
+run phase open "Second phase"
+expect_status 1 "$ST"
+expect_contains "needs --description"
+
+t phase_close_with_verdict; setup_repo
+export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tfind out whether X'
+export GH_STUB_PHASE_DESC='find out whether X.\nEnds when Alex has ruled.'
+export GH_STUB_API_INPUT="$SANDBOX/api.json"
+printf 'It works. Rounds felt right, "preview" needs a script.\n' > "$SANDBOX/verdict.txt"
+run phase close "Idea to first version" --verdict-file "$SANDBOX/verdict.txt"
+expect_status 0 "$ST"
+expect_contains "closed=true"
+expect_contains "phase_number=7"
+grep -q "PATCH repos/{owner}/{repo}/milestones/7" "$GH_STUB_LOG" && ok || fail "no PATCH on milestone 7"
+OUT="$(cat "$SANDBOX/api.json")"
+expect_contains '"state": "closed"'
+expect_contains 'find out whether X.\nEnds when Alex has ruled.\n\n## Verdict\n\nIt works. Rounds felt right, \"preview\" needs a script.'
+
+t phase_close_requires_verdict; setup_repo
+export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
+run phase close "Idea to first version"
+expect_status 1 "$ST"
+expect_contains "needs --verdict"
+grep -q "PATCH" "$GH_STUB_LOG" && fail "closed without a verdict" || ok
+
+t phase_close_unknown_title; setup_repo
+export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
+run phase close "Nope" --verdict "v"
+expect_status 2 "$ST"
+expect_contains "state=PHASE_NOT_FOUND"
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd; do

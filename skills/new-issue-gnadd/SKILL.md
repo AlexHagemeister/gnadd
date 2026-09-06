@@ -188,9 +188,13 @@ After approval and creation confirmation, create the issue via `gh`.
    gh label list --search "<label>" --json name --jq '.[].name' | grep -qx "<label>" \
      || gh label create "<label>"
   ```
-2. Create the issue:
+2. Check for an open phase and offer to attach the issue to it (one question, attaching is the default; skip the question when `phase=none`):
   ```bash
-   gh issue create --title "<title>" --body "<body>" --label "<label>"
+   bash "<skill-dir>/gnadd.sh" phase status
+  ```
+3. Create the issue, with `--milestone "<phase title>"` when the user accepted the attach:
+  ```bash
+   gh issue create --title "<title>" --body "<body>" --label "<label>" [--milestone "<phase title>"]
   ```
 
 Use the current repository unless the user specifies another repo.

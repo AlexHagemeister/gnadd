@@ -75,6 +75,7 @@ gh api user --jq .login
 gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))"'
 gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
 gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
+bash "<skill-dir>/gnadd.sh" phase status
 ```
 
 If `state` reported an active issue N (`issue=<N>`), also run:
@@ -118,6 +119,10 @@ external"). When every item is self-authored — the common solo case — add no
 annotations and no authorship commentary at all; the snapshot stays exactly
 as uncluttered as before.
 
+### Phase
+
+From `phase status`: when a milestone is open, report its title, its description (what the phase is trying to find out and what ends it), and the open and closed issue counts. When it reports `phase=none`, say plainly that no phase is open. If more than one milestone is open, report them all and repeat the script's note: the phase rule wants exactly one. Never open or close a phase from this skill.
+
 ### Open Issues
 
 Summarize pending work from the issue listing. Group by label when present;
@@ -151,6 +156,9 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 
 ## Recent Activity
 <what the last ~15 commits suggest>
+
+## Phase
+<open milestone: title, what it is trying to find out and what ends it, open/closed counts; or "no open phase">
 
 ## Open Work
 <open issues grouped by label if useful; external ones annotated "— by @login">
