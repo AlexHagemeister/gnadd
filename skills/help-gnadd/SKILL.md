@@ -26,7 +26,8 @@ skills.
   `quickfix-gnadd` (the no-issue fast path for trivial changes), and
   `yolo-gnadd` (autonomous full-loop on a decided unit; explicit invocation
   only). Their git mechanics run through a bundled deterministic script
-  (`gnadd.sh`), not improvised commands.
+  (`gnadd.sh`), not improvised commands. `vision-gnadd` sits before the
+  loop: it interviews the user into `VISION.md` and touches no git.
 - Enforcement is layered, lowest layer that can hold each invariant: GitHub
   server rules (`gnadd init` — squash-only merges, PR-required main), the
   script (ff-only syncs, divergence halts, gated cleanup), the skills
@@ -51,6 +52,7 @@ not exist.
 
 - Adopt or realign a repo: use `/audit-gnadd`.
 - Start a session or inspect state: use `/prime-gnadd`.
+- Write or revise `VISION.md` in conversation: use `/vision-gnadd`.
 - Capture new work: use `/new-issue-gnadd`.
 - Begin or resume issue work: use `/start-issue-gnadd <N>`.
 - Save progress on an issue branch: use `/commit-gnadd`.
