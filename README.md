@@ -20,6 +20,26 @@ Working with a coding agent tends to produce three kinds of mess. GNADD is built
 
 The one thing no layer can catch: merging without reading the diff. That part stays yours.
 
+## Where it sits among git workflows
+
+GNADD is [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow), compacted and packaged as agent skills. GitHub's own description of the flow is six steps: create a branch, make changes, open a pull request, address review, merge, delete the branch. That is the GNADD loop. One `main` that is always releasable, one short-lived branch per change, and a pull request as the only way back in.
+
+GitHub Flow leaves most choices open. GNADD closes them, and the closed choices are what distinguish it:
+
+- **The issue comes first and is the spec.** A branch exists only because an issue does. One issue, one branch, one PR.
+- **Squash-only merges.** Each merged PR is one commit on `main`, with the PR body as its message. Reverting a feature is reverting one commit.
+- **No local rebase, and never a reset on `main`.** Syncs are fast-forward only. Anything else halts and asks.
+- **Merged branches are deleted**, by GitHub, at merge.
+- **GitHub is the only record.** No task file, no progress note, no maintained plan.
+- **Deploy is outside the model.** GNADD ends at the merge. What happens to `main` after that is the project's business.
+
+Two other common models, for contrast:
+
+| Model | Long-lived branches | How change lands | Where GNADD differs |
+|---|---|---|---|
+| [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/) (Driessen, 2010) | `master` and `develop`, plus release and hotfix branches | Merge commits with `--no-ff`, so every branch's history stays in the graph | One branch, no release or hotfix branches, and the history of a feature lives in the PR rather than in the graph |
+| [Trunk-based development](https://trunkbaseddevelopment.com/) | One trunk | Commits straight to trunk, or branches that live a day or less, with feature flags for longer work | Same short-lived branches, but every change passes through a PR that a human reads before it lands |
+
 ## What a session looks like
 
 **Starting a project.** Create the repo on GitHub, then run `/init-gnadd`. It turns on the server-side rules and writes a small conventions file (`AGENTS.md`) that tells any agent the repo runs GNADD and how to launch a preview of the app. Then run `/vision-gnadd`: talk through the idea and the agent writes `VISION.md` in your words, confirmed by you. It then offers to open the first phase, a GitHub milestone whose description says what this stretch of work is trying to find out and what ends it. Capture the first three or four issues with `/new-issue-gnadd`, and stop there. Issues are cheap to add later.
