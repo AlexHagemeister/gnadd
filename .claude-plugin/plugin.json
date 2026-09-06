@@ -1,0 +1,10 @@
+{
+  "name": "gnadd",
+  "description": "GNADD: an agent-driven development loop on GitHub issues, branches, and PRs. Eleven skills plus the tested gnadd script that carries every git mechanic.",
+  "version": "0.4.0",
+  "author": { "name": "Alex Hagemeister" },
+  "homepage": "https://github.com/AlexHagemeister/gnadd",
+  "repository": "https://github.com/AlexHagemeister/gnadd",
+  "license": "MIT",
+  "keywords": ["workflow", "github", "issues", "git", "agent-driven-development"]
+}
