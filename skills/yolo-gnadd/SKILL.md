@@ -80,7 +80,10 @@ stops — those need a human.
 
 **Phase 2 — Implement.** Do the work per that plan and the issue's acceptance
 criteria. If evidence emerges that the spec is wrong or the scope moved, stop
-and escalate — do not improvise scope autonomously.
+and escalate. Do not improvise scope autonomously. YOLO runs without rounds:
+there is no one to try a preview or give feedback, so start-issue's round loop
+(step 7) collapses to one pass, and each checkpoint's round comment is posted
+with `--no-feedback "yolo run"`.
 
 **Phase 3 — Commit.** Load and follow `../commit-gnadd/SKILL.md`.
 Auto-approved gate: staging confirmation (stage what the plan produced;

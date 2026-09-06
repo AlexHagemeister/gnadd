@@ -126,14 +126,15 @@ Translate the vertical slice into a systematic path — ordered steps derived fr
 
 **Fresh start:** an ordered implementation plan mapping acceptance criteria to sequential work steps.
 
-**Resume:** a lighter plan. Reconcile progress from shallow branch signals:
+**Resume:** a lighter plan. First read the round record on the issue, then shallow branch signals:
 
 ```bash
+bash "<skill-dir>/gnadd.sh" round list
 git log --oneline main..HEAD
 git diff --stat main...HEAD
 ```
 
-Summarize what appears done, which acceptance criteria remain open, and proposed next steps. No commit-by-commit archaeology.
+Report the last round from the record, not from memory: what changed, what the user said (their words, as the comment has them), and what is still open. Then summarize which acceptance criteria remain and propose the next round. If `rounds=0`, say so: the branch has code but no round trail, so the resume is from git alone. No commit-by-commit archaeology.
 
 ## 6. Wait For Approval
 
@@ -147,13 +148,23 @@ Explicitly ask whether:
 
 Tone is invitational ("Does this plan look right?"), not prescriptive. Honor corrections and revise the plan before proceeding. Implementation begins only after an explicit go-ahead ("go", "looks good", "proceed"). The issue is the contract; the plan is the agreed path.
 
-## 7. After Approval
+## 7. After Approval: The Round Loop
 
-Implement the issue on the current issue branch.
+Work on the issue branch proceeds in rounds, not in a straight line to the PR. A round is: implement a slice, checkpoint it, hand the user something to try, and wait for what they say. Tests going green ends a slice, never the issue.
 
-- Stay aligned with the approved plan and issue acceptance criteria.
-- Pause for user direction if new evidence changes the scope or approach.
-- Commit coherent checkpoints when a behavioral slice is complete, tests pass for that slice, or before risky follow-on work — using the `commit-gnadd` skill's conventions (`Re #<N>` in the body).
-- Report whether the issue work is complete, partial, or blocked. Include what changed, what was verified, and any remaining gaps.
+Each round:
 
-When work appears complete and the working tree is clean, nudge to `/resolve-issue-gnadd` as the next operational step. `resolve-issue-gnadd` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.
+1. **Implement one slice** of the approved plan. Stay aligned with the plan and the acceptance criteria. Pause for direction if new evidence changes scope or approach.
+2. **Checkpoint it** with the `commit-gnadd` skill's conventions (`Re #<N>` in the body). Its round-comment step records what changed and the user's feedback from the previous round on the issue, so nothing lives only in chat.
+3. **Present a preview, not a diff.** Find the project's preview launch line, one line in the conventions file (`CLAUDE.md` or `AGENTS.md` at the repo root) of the form `Preview launch: <command or URL>`:
+
+   ```bash
+   grep -h '^Preview launch:' CLAUDE.md AGENTS.md 2>/dev/null | head -1
+   ```
+
+   If present, run it (or open it), confirm it is actually serving, and give the user the clickable URL or the exact thing to run. If absent, say plainly that the project has no preview path and ask how they want to try the change. Do not substitute a diff summary for a preview.
+4. **Ask for feedback**, then ask: another round, or resolve? Wait. The user's answer drives the next round's slice, and their words go into the next checkpoint's round comment as typed.
+
+Never start `resolve-issue-gnadd` on your own. Enter it only when the user says the work is done. Report at each round whether the issue looks complete, partial, or blocked, with what was verified and what remains, so the user can decide.
+
+`resolve-issue-gnadd` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.

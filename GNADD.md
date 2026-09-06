@@ -252,6 +252,14 @@ to** — a commit is visible and recoverable; a stash is invisible and easy to
 lose. If you already started editing files before remembering to run this
 (everyone does), don't worry: it carries your changes onto the new branch safely.
 
+After "go", the work runs in rounds, not in a straight line to a PR. The agent
+implements a slice, checkpoints it, and hands you a running preview to try (the
+project's `Preview launch:` line in its conventions file tells it how). You try
+it and say what you think, and that drives the next slice. The agent asks
+whether to run another round or resolve, and enters resolve only when you say
+the work is done. A branch that spans sessions picks up at the last round, read
+from the round comments on the issue. The procedure lives in the skill.
+
 ### 4. `/commit-gnadd` — early and often while working
 
 These are save points; they're cheap, and you can have many per issue. The skill
