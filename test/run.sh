@@ -796,6 +796,21 @@ for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quic
   fi
 done
 
+t docs_name_every_skill; CURRENT=docs_name_every_skill
+# The README's skills table is the one list of skills (GNADD.md points at it).
+# Every skill on disk must be in it, and no doc may name a skill that is not on disk.
+for dir in "$ROOT"/skills/*/; do
+  name="$(basename "$dir")"
+  if grep -q "^| \`$name\`" "$ROOT/README.md"; then ok
+  else fail "skills/$name is missing from the README skills table"; fi
+done
+for doc in README.md GNADD.md; do
+  for name in $(grep -oE '[a-z]+(-[a-z]+)*-gnadd' "$ROOT/$doc" | sort -u); do
+    if [ -d "$ROOT/skills/$name" ]; then ok
+    else fail "$doc names '$name' but skills/$name does not exist"; fi
+  done
+done
+
 # ---------------------------------------------------------------- summary
 
 echo
