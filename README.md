@@ -45,6 +45,7 @@ Use the same scope (`-g` or project) you used at install — updating the wrong 
 | `quickfix-gnadd` | `/quickfix-gnadd` |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` |
 | `init-gnadd` | `/init-gnadd` |
+| `vision-gnadd` | `/vision-gnadd` |
 
 ## Per-project setup (recommended)
 

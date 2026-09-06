@@ -154,7 +154,8 @@ interview with you. The words are yours, confirmed by you, whoever types them.
 Nothing enters Core that you have not confirmed as true no matter what gets
 built.
 
-**How the loop uses it.** `/prime-gnadd` reports that VISION.md is present and
+**How the loop uses it.** `/vision-gnadd` writes and revises the file through
+the interview. `/prime-gnadd` reports that VISION.md is present and
 summarizes Core. `/new-issue-gnadd` offers to cite the invariant an issue
 serves. Neither is required: a project without VISION.md works exactly as
 before.
@@ -206,9 +207,9 @@ lives where all decision history lives: in merged PRs and closed issues.
    prime, and how to launch a preview (`Preview launch: <command or URL>`, the
    one fact the round loop needs). It is a pointer, never task state, and the
    skill is safe to rerun.
-3. **Write `VISION.md` in conversation.** Brain-dump the idea to the agent and
-   let it write the document in the shape above, in your words, confirmed by
-   you. The README is run instructions and a pointer to VISION.md. Resist
+3. **Write `VISION.md` in conversation with `/vision-gnadd`.** Brain-dump the
+   idea to the agent and let it write the document in the shape above, in your
+   words, confirmed by you. The README is run instructions and a pointer to VISION.md. Resist
    putting anything with a status, an order, or a plan in either.
 4. **Capture the first few issues with `/new-issue-gnadd`** — and here's the habit change
    that will feel most wrong at first: *don't* front-load the whole backlog the way
