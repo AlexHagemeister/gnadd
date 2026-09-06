@@ -24,6 +24,23 @@ The one thing no layer can catch: merging without reading the diff. That part st
 
 GNADD is [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow), compacted and packaged as agent skills. GitHub's own description of the flow is six steps: create a branch, make changes, open a pull request, address review, merge, delete the branch. That is the GNADD loop. One `main` that is always releasable, one short-lived branch per change, and a pull request as the only way back in.
 
+```mermaid
+%%{init: {'gitGraph': {'mainBranchName': 'main'}}}%%
+gitGraph LR:
+  commit id: "PR #41"
+  commit id: "PR #42"
+  branch issue-43/search
+  checkout issue-43/search
+  commit id: "round 1"
+  commit id: "round 2"
+  commit id: "round 3"
+  checkout main
+  merge issue-43/search id: "PR #43 (squash)"
+  commit id: "PR #44"
+```
+
+One branch per issue, checkpoints as rounds, and one squash commit back on `main`. The branch is deleted at merge. The merge edge above stands for that squash: `main` itself stays linear.
+
 GitHub Flow leaves most choices open. GNADD closes them, and the closed choices are what distinguish it:
 
 - **The issue comes first and is the spec.** A branch exists only because an issue does. One issue, one branch, one PR.
@@ -50,6 +67,20 @@ Two other common models, for contrast:
 2. The work runs in rounds. The agent builds a slice, checkpoints it with `/commit-gnadd`, and hands you a running preview to try. You try it and say what you think. That drives the next slice. Each checkpoint posts a comment on the issue with what changed and your feedback, so a branch that spans sessions picks up where it left off.
 3. When the work is done, `/resolve-issue-gnadd` checks the diff against the issue's acceptance criteria, runs the project's tests, opens the PR, and gives you the link.
 4. You read the diff. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
+
+```mermaid
+flowchart LR
+  I[issue] --> B[branch]
+  subgraph rounds [rounds on the branch]
+    direction LR
+    R[build] --> C[checkpoint + comment] --> T[try the preview]
+    T -->|feedback| R
+  end
+  B --> R
+  T -->|done| PR[PR: criteria, tests]
+  PR --> D[human reads the diff]
+  D --> M[one squash commit on main]
+```
 
 Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your diff read. You invoke it on purpose or not at all.
 
