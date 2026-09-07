@@ -325,13 +325,71 @@ cmd_ship_status() {
   mergeable="$(gh_json mergeable pr view "$pr" 2>/dev/null || echo UNKNOWN)"
   say "pr_state=$state"
   say "mergeable=$mergeable"
-  note "checks (informational; the human weighs them):"
+  say "checks=$(checks_summary "$pr")"
+  note "checks (ship merge refuses unless every one passes; --no-check overrides):"
   "$GH" pr checks "$pr" 2>&1 | sed 's/^/  /' || true
 }
 
+# ---------------------------------------------------------------- CI gate (full loop)
+#
+# The full loop's merge gate. quickfix has its own (one named check, below);
+# this one asks every check GitHub reports to pass. "No checks reported" is
+# ambiguous: a workflow that has not started yet looks the same as no CI at
+# all, so the presence of a workflow file decides which halt it is.
+
+has_workflow() { # any workflow file in the current tree
+  git ls-files '.github/workflows' 2>/dev/null | grep -q .
+}
+
+checks_summary() { # checks_summary <pr>: pass | pending | failed | not_started | none
+  local pr="$1" checks
+  checks="$("$GH" pr checks "$pr" 2>/dev/null || true)"
+  if [ -z "$checks" ] || printf '%s' "$checks" | grep -qi '^no checks'; then
+    if has_workflow; then echo not_started; else echo none; fi
+    return 0
+  fi
+  local statuses; statuses="$(printf '%s
+' "$checks" | awk -F'\t' 'NF >= 2 { print $2 }')"
+  if printf '%s
+' "$statuses" | grep -qx 'pending'; then echo pending; return 0; fi
+  if printf '%s
+' "$statuses" | grep -vqxE 'pass|skipping'; then echo failed; return 0; fi
+  echo pass
+}
+
+checks_gate() { # checks_gate <pr>: halt unless every reported check passed
+  local pr="$1" summary
+  summary="$(checks_summary "$pr")"
+  case "$summary" in
+    pass) say "checks=pass" ;;
+    not_started) die_state CHECKS_PENDING "PR #$pr has a workflow but no checks reported yet; wait (gh pr checks $pr --watch) and re-run" ;;
+    pending) die_state CHECKS_PENDING "checks are still running on PR #$pr; wait (gh pr checks $pr --watch) and re-run" ;;
+    failed)
+      local failing; failing="$("$GH" pr checks "$pr" 2>/dev/null | awk -F'\t' '$2 != "pass" && $2 != "skipping" { print $1 "=" $2 }' | paste -sd, -)"
+      die_state CHECK_FAILED "PR #$pr has a failing check ($failing); a red CI is a stop, not a wave-past" ;;
+    none) die_state NO_CHECKS "no CI checks reported for PR #$pr and no workflow in the tree; nothing automated verified it. A human must decide (re-run with --no-check to accept that)" ;;
+  esac
+}
+
 cmd_ship_merge() {
-  local pr="${1:-}"
-  [ -n "$pr" ] || usage_die "usage: gnadd ship merge <pr-number>"
+  local pr="" no_check=0
+  for a in "$@"; do
+    case "$a" in
+      --no-check) no_check=1 ;;
+      *) pr="$a" ;;
+    esac
+  done
+  [ -n "$pr" ] || usage_die "usage: gnadd ship merge <pr-number> [--no-check]"
+  if [ "$no_check" = 1 ]; then
+    note "CI gate explicitly skipped (--no-check); the human owns this decision"
+    squash_merge "$pr" none
+  else
+    squash_merge "$pr" full
+  fi
+}
+
+squash_merge() { # squash_merge <pr> <gate: full|none>: mergeability, then the CI gate, then the merge
+  local pr="$1" gate="${2:-full}"
   local state mergeable
   state="$(gh_json state pr view "$pr" 2>/dev/null)" || die_state PR_NOT_FOUND "no PR #$pr found"
   [ "$state" = "OPEN" ] || die_state PR_NOT_OPEN "PR #$pr is $state, not OPEN"
@@ -341,6 +399,7 @@ cmd_ship_merge() {
     CONFLICTING) die_state PR_CONFLICTING "PR #$pr conflicts with $MAIN; hand resolution to the human. Never resolve autonomously" ;;
     *) die_state MERGEABILITY_UNKNOWN "GitHub reports mergeable=$mergeable for PR #$pr; wait and re-run 'gnadd ship status $pr'" ;;
   esac
+  [ "$gate" = "none" ] || checks_gate "$pr"
   "$GH" pr merge "$pr" --squash >/dev/null 2>&1 || die_state MERGE_FAILED "gh pr merge failed for PR #$pr; report and stop"
   say "merged=true"
   say "pr_number=$pr"
@@ -562,7 +621,7 @@ cmd_quickfix_merge() {
     esac
   fi
 
-  cmd_ship_merge "$pr"
+  squash_merge "$pr" none
 }
 
 cmd_doctor() {
@@ -1119,8 +1178,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   start <N> <slug> [--carry]      resume or create issue-<N>/<slug> safely
   guard-commit                    refuse commits on main/master/detached HEAD
   ship push [--any-branch]        push branch, detect existing PR
-  ship status <pr>                mergeability + checks for the merge gate
-  ship merge <pr>                 squash-merge (only if OPEN and MERGEABLE)
+  ship status <pr>                mergeability + checks summary for the merge gate
+  ship merge <pr> [--no-check]    squash-merge only if OPEN, MERGEABLE, and every check passed
   quickfix start <slug> [--carry] create quickfix/<slug> off verified-synced main
   quickfix guard                  refuse oversized or mechanics-touching diffs
   quickfix ship                   guard + push a quickfix branch, detect existing PR

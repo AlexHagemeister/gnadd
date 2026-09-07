@@ -98,10 +98,15 @@ the complete record lands in phase 7's single write. Any `state=` halt is a
 hard stop, as that skill specifies.
 
 **Phase 5 — CI gate.** Cheap signals before expensive ones: wait for the
-draft PR's checks. Green → phase 6. Red → fix within the self-repair budget:
-fix, re-run the project tests, re-push through the railed push this run's
-shipping phase already used (it handles an existing PR), and wait for CI
-again. Never spend review effort on a head CI has not validated.
+draft PR's checks with `gh pr checks <PR> --watch`, then read
+`gnadd.sh ship status <PR>` from the resolve-issue skill's directory.
+`checks=pass` → phase 6. `checks=failed` → fix within the self-repair budget:
+fix, re-run the project tests, re-push with `gnadd.sh ship push` (it handles
+an existing PR), and wait for CI again. `checks=none` is a hard stop in YOLO:
+nothing automated verified the head, and `--no-check` is never YOLO's to add.
+The merge in phase 7 re-runs this gate inside the script (`ship merge`
+refuses unless every check passed), so a wait skipped here halts there.
+Never spend review effort on a head CI has not validated.
 
 **Phase 6 — Independent review.** Runs only against the CI-green head: give
 a **fresh-context reviewer** only the spec (the issue body, or in quickfix

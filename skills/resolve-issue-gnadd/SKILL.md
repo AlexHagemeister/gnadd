@@ -158,7 +158,10 @@ bash "<skill-dir>/gnadd.sh" ship status <PR>
 - **`mergeable=MERGEABLE`** — present the merge choice.
 - **`mergeable=CONFLICTING`** — **do not offer to merge.** `main` has moved and the PR conflicts. Hand resolution to the user: GitHub's web editor, or a deliberate local resolution they drive. The agent never resolves conflicts autonomously.
 - **`mergeable=UNKNOWN`** — GitHub is still computing; wait briefly and re-run.
-- **Checks:** if failing, say so explicitly and require the user to acknowledge before merging anyway. If none are configured, note that nothing automated verified this PR beyond the local test run.
+- **`checks=pass`** — every check GitHub reports passed. Present the merge choice.
+- **`checks=pending`** or **`checks=not_started`** — CI is running, or the workflow exists and has not reported yet. Wait for it before offering the merge: `gh pr checks <PR> --watch`. Do not read "no checks reported" as "no CI configured" when the tree has a workflow file.
+- **`checks=failed`** — say which check is red. A red CI is a stop-and-discuss. The user can override with `--no-check` at the merge below, and that decision is theirs, said out loud.
+- **`checks=none`** — no checks and no workflow in the tree, so nothing automated verified this PR beyond the local test run. Say so. Merging needs `--no-check`, which records that the human accepted that.
 
 > AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive. Give the files-changed link again at this gate (`.../pull/<PR>/files`) so reading the diff is one click, never an instruction.
 
@@ -169,7 +172,7 @@ bash "<skill-dir>/gnadd.sh" ship merge <PR>
 bash "<skill-dir>/gnadd.sh" sync-main
 ```
 
-`ship merge` squash-merges only when the PR is OPEN and MERGEABLE. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
+`ship merge` squash-merges only when the PR is OPEN, MERGEABLE, and every reported check passed. It halts with `state=CHECKS_PENDING` (wait and re-run), `state=CHECK_FAILED` (stop and discuss), or `state=NO_CHECKS` (nothing automated ran; `--no-check` is the human's explicit acceptance). Never add `--no-check` on your own. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
 
 If the user leaves the PR open: stop here. Next session, `/resolve-issue-gnadd` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
 

@@ -262,10 +262,75 @@ grep -q "pr merge" "$GH_STUB_LOG" && fail "gh pr merge was called on a conflicti
 
 t ship_merge_ok; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='test\tpass\t5s\turl'
+run ship merge 44
+expect_status 0 "$ST"
+expect_contains "checks=pass"
+expect_contains "merged=true"
+grep -q "pr merge 44 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+
+t ship_merge_waits_for_pending_checks; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='CodeRabbit\tpass\t0\turl\ntest\tpending\t0\turl'
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=CHECKS_PENDING"
+expect_contains "gh pr checks 44 --watch"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with CI still pending" || ok
+
+t ship_merge_refuses_any_failed_check; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='test\tpass\t5s\turl\ntest-macos\tfail\t9s\turl'
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=CHECK_FAILED"
+expect_contains "test-macos=fail"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged despite failing check" || ok
+
+t ship_merge_skipping_check_is_not_a_failure; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='CodeRabbit\tskipping\t0\turl\ntest\tpass\t5s\turl'
 run ship merge 44
 expect_status 0 "$ST"
 expect_contains "merged=true"
-grep -q "pr merge 44 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+
+t ship_merge_no_checks_no_workflow; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=NO_CHECKS"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with nothing verified" || ok
+run ship merge 44 --no-check
+expect_status 0 "$ST"
+expect_contains "merged=true"
+
+t ship_merge_no_checks_but_workflow_means_pending; setup_repo
+mkdir -p .github/workflows && echo "on: pull_request" > .github/workflows/ci.yml
+git_q add .github && git_q commit -m "ci"
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+run ship merge 44
+expect_status 2 "$ST"
+expect_contains "state=CHECKS_PENDING"
+expect_contains "no checks reported yet"
+grep -q "pr merge" "$GH_STUB_LOG" && fail "merged before the workflow started" || ok
+
+t ship_status_reports_checks_summary; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+run ship status 44
+expect_contains "checks=none"
+export GH_STUB_CHECKS='test\tpending\t0\turl'
+run ship status 44
+expect_contains "checks=pending"
+export GH_STUB_CHECKS='test\tpass\t5s\turl'
+run ship status 44
+expect_contains "checks=pass"
+
+t quickfix_merge_gate_is_the_named_check_only; setup_repo
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
+export GH_STUB_CHECKS='other\tpending\t0\turl\ntest\tpass\t5s\turl'
+run quickfix merge 50
+expect_status 0 "$ST"
+expect_contains "merged=true"
 
 t ship_merge_unknown_mergeability; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=UNKNOWN
