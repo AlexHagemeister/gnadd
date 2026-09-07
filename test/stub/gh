@@ -9,6 +9,8 @@
 #   GH_STUB_MERGEABLE     e.g. MERGEABLE / CONFLICTING / UNKNOWN
 #   GH_STUB_MERGED_AT     e.g. 2026-07-17T00:00:00Z     (unset = null)
 #   GH_STUB_MERGE_COMMIT  e.g. abc123
+#   GH_STUB_PR_HEAD       the PR's head branch name (headRefName)
+#   GH_STUB_PR_HEAD_OID   the PR's head commit sha (headRefOid; unset = unknown)
 #   GH_STUB_CHECKS        tab-separated check rows, e.g. 'test\tpass\t1s\turl'
 #                         (\n for multiple rows; unset = "no checks reported")
 #   GH_STUB_FAIL          set = every command fails
@@ -59,6 +61,8 @@ case "$1" in
           .mergeable)        emit_or_missing "${GH_STUB_MERGEABLE:-}" ;;
           .mergedAt)         printf '%s\n' "${GH_STUB_MERGED_AT:-null}"; exit 0 ;;
           .mergeCommit.oid)  emit_or_missing "${GH_STUB_MERGE_COMMIT:-}" ;;
+          .headRefName)      emit_or_missing "${GH_STUB_PR_HEAD:-}" ;;
+          .headRefOid)       emit_or_missing "${GH_STUB_PR_HEAD_OID:-}" ;;
           *)                 exit 0 ;;
         esac
         ;;

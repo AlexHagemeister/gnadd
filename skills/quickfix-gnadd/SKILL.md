@@ -165,6 +165,8 @@ bash "<skill-dir>/gnadd.sh" sync-main
 bash "<skill-dir>/gnadd.sh" cleanup <PR> quickfix/<slug>
 ```
 
+The script deletes only when GitHub confirms the PR merged, the branch is that PR's head, and nothing was committed after the merged head. `state=BRANCH_MISMATCH` or `state=UNMERGED_COMMITS` means nothing was deleted: stop and report which.
+
 Report the merge commit hash — the one-command undo (`git revert <hash>`).
 
 ## Closing Guidance
