@@ -104,7 +104,11 @@ Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a
 
 ## Install
 
-Requires [Node.js](https://nodejs.org/) for `npx`, the [GitHub CLI](https://cli.github.com/) (`gh`) logged in, and an agent with shell access.
+Requires the [GitHub CLI](https://cli.github.com/) (`gh`) logged in and an agent with shell access. Two channels ship the same skill files: the skills CLI for any agent, or the Claude Code plugin manager. Pick one.
+
+### Skills CLI (any agent)
+
+Requires [Node.js](https://nodejs.org/) for `npx`.
 
 **Global install (recommended)**, so the skills are available in every repo:
 
@@ -125,9 +129,29 @@ npx skills update -p -y    # project
 
 Use the same scope (`-g` or project) you used at install. Updating the other scope leaves the active copies stale without warning. `skills update` only tracks installs that came from GitHub. If you installed from a local checkout with `scripts/sync.sh`, rerun that instead. Flags and interactive options are in the [skills CLI docs](https://github.com/vercel-labs/skills).
 
+### Claude Code plugin
+
+The repo is also a Claude Code plugin with its own one-entry marketplace. Add the marketplace, then install:
+
+```bash
+claude plugin marketplace add AlexHagemeister/gnadd
+claude plugin install gnadd@gnadd
+```
+
+The same two steps work inside a session as `/plugin marketplace add AlexHagemeister/gnadd` and `/plugin install gnadd@gnadd`. Plugin skills are namespaced by plugin name, so you invoke `/gnadd:prime-gnadd`, `/gnadd:start-issue-gnadd`, and so on. Everything else is identical.
+
+**Update after a new release:**
+
+```bash
+claude plugin marketplace update gnadd
+claude plugin update gnadd@gnadd
+```
+
+The plugin manifests carry no version number on purpose: the plugin's version is the commit it was installed from, so an update pulls whatever is on `main`, the same as the skills CLI. `gnadd version` still reports the release baseline. Installing through both channels is harmless (you get `/prime-gnadd` and `/gnadd:prime-gnadd`, same skill), but one is enough.
+
 **Versioning.** Releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Before 1.0, a minor version may rename a skill or change its behavior, so read the release notes before updating. To be told about releases: **Watch, then Custom, then Releases** on the repo.
 
-**Distribution channel.** `main` is the channel. The skills CLI installs from the default branch and cannot pin a tag, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
+**Distribution channel.** `main` is the channel for both install paths. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
 
 ## Per-project setup
 
@@ -149,6 +173,7 @@ The rails make GitHub itself enforce the core rules: squash-only merges with the
 | `scripts/build.sh` | Copies `bin/gnadd` into the operational skills |
 | `test/run.sh` | Test suite (bash and git only, `gh` is stubbed) |
 | `scripts/release.sh` | Stamps the version and repins guide URLs to the release tag |
+| `.claude-plugin/` | Plugin and marketplace manifests that make the repo installable through the Claude Code plugin manager |
 | `GNADD.md` | The workflow guide and design rationale |
 
 ## Authoring (repo maintainers)
@@ -165,4 +190,4 @@ Refresh your local install after changes:
 
 It installs to Cursor and Claude Code by default. Override the agent list with a space-separated `AGENTS` variable ([supported agents](https://github.com/vercel-labs/skills#supported-agents)): `AGENTS="cursor" ./scripts/sync.sh`.
 
-Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd` and `audit-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y`, or the project scope if that is how they installed.
+Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd` and `audit-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y` (or the project scope if that is how they installed), or with `claude plugin update gnadd@gnadd` for plugin installs.

@@ -1,0 +1,15 @@
+{
+  "name": "gnadd",
+  "owner": { "name": "Alex Hagemeister" },
+  "metadata": {
+    "description": "GNADD, the agent-driven development loop, as a Claude Code plugin."
+  },
+  "plugins": [
+    {
+      "name": "gnadd",
+      "source": "./",
+      "description": "GNADD: an agent-driven development loop on GitHub issues, branches, and PRs.",
+      "category": "productivity"
+    }
+  ]
+}

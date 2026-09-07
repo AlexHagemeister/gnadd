@@ -19,12 +19,13 @@ skill wins** and this doc should be corrected.
 |---|---|---|---|
 | **Script** | `bin/gnadd` (canonical); bundled into skills as `gnadd.sh` by `scripts/build.sh` | The git mechanics themselves — every sequence, guard, and halt, enforced in code | Claude; verified by `test/run.sh` |
 | **Skills** | `skills/<name>/SKILL.md` in this repo | Judgment and conversation: the gates, questions, and interpretation around the script | Claude |
-| **Skills (installed)** | Agent skills dir via `npx skills add` | Runtime copy your agent loads (script travels inside each skill) | Install once; refresh per install path — GitHub installs: `npx skills update` in the matching scope; local-checkout installs: `scripts/sync.sh` (see help-gnadd's Install & Update) |
+| **Skills (installed)** | Agent skills dir via `npx skills add`, or the Claude Code plugin cache via `claude plugin install` | Runtime copy your agent loads (script travels inside each skill) | Install once; refresh per install path — GitHub installs: `npx skills update` in the matching scope; local-checkout installs: `scripts/sync.sh`; plugin installs: `claude plugin update` (see help-gnadd's Install & Update) |
 | **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
 | **Conventions file** | `AGENTS.md` in the project, written by `/init-gnadd` | Telling any agent the repo runs GNADD, to start with prime, and how to launch a preview | `/init-gnadd` (once per repo, safe to rerun) |
 
-**Distribution channel:** `main` is the channel — the skills CLI installs from
-the default branch and cannot pin tags, so the loop keeps `main`
+**Distribution channel:** `main` is the channel for both install paths. The
+skills CLI installs from the default branch and cannot pin tags, and the
+plugin marketplace entry points at `main` to match, so the loop keeps `main`
 always-releasable and tags mark tested snapshots. `gnadd version` therefore
 reports a release *baseline*, not an exact release: an installed copy may
 include changes merged after the stamped version.
