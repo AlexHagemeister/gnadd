@@ -1114,6 +1114,7 @@ Quickfix: no issue; this PR is the record. Landed by \`gnadd init land\`." 2>/de
 # record (existing round comments on the issue), never from memory.
 
 ROUND_MARKER="<!-- gnadd:round -->"
+FEEDBACK_MARKER="<!-- gnadd:feedback -->"
 
 round_issue_or_die() { # sets ISSUE_NUM from the branch; halts elsewhere
   local br; br="$(current_branch)"
@@ -1129,33 +1130,63 @@ round_count() { # round_count <issue>: number of existing round comments
     | awk '{s+=$1} END {print s+0}'
 }
 
-cmd_round_post() {
-  local changed="" feedback="" feedback_file="" no_feedback="" have_fb=0
+round_last_kind() { # round_last_kind <issue>: "round", "feedback", or "" (no trail)
+  # The latest marked comment tells whether the last round's feedback is on
+  # the record: a feedback comment means yes, a round comment means not yet.
+  "$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
+    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\") or contains(\"$FEEDBACK_MARKER\")) | .body | (if contains(\"$FEEDBACK_MARKER\") then \"feedback\" else \"round\" end)" 2>/dev/null \
+    | tail -n 1
+}
+
+read_feedback_args() { # read_feedback_args <args...>: sets feedback / feedback_file / no_feedback / have_fb / rest
+  rest=()
   while [ $# -gt 0 ]; do
     case "$1" in
-      --changed)       changed="${2:-}"; shift ;;
       --feedback)      feedback="${2:-}"; have_fb=$((have_fb+1)); shift ;;
       --feedback-file) feedback_file="${2:-}"; have_fb=$((have_fb+1)); shift ;;
       --no-feedback)   no_feedback="${2:-}"; have_fb=$((have_fb+1)); shift ;;
-      *) usage_die "usage: gnadd round post --changed <text> (--feedback <text> | --feedback-file <path> | --no-feedback <reason>)" ;;
+      *) rest+=("$1") ;;
+    esac
+    shift
+  done
+}
+
+cmd_round_post() {
+  local changed="" feedback="" feedback_file="" no_feedback="" have_fb=0 rest=()
+  read_feedback_args "$@"
+  set -- "${rest[@]+"${rest[@]}"}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --changed) changed="${2:-}"; shift ;;
+      *) usage_die "usage: gnadd round post --changed <text> [--feedback <text> | --feedback-file <path> | --no-feedback <reason>] (feedback flags are required unless round feedback already recorded it)" ;;
     esac
     shift
   done
   round_issue_or_die
   [ -n "$changed" ] || usage_die "round post needs --changed <text>: what this checkpoint changed, in one or two lines"
-  [ "$have_fb" -eq 1 ] || usage_die "round post needs exactly one of --feedback, --feedback-file, or --no-feedback <reason>; feedback is never inferred"
-  if [ -n "$feedback_file" ]; then
-    [ -s "$feedback_file" ] || usage_die "feedback file is missing or empty: $feedback_file (use --no-feedback <reason> when the user said nothing this round)"
-    feedback="$(cat "$feedback_file")"
-  fi
-  if [ -z "$no_feedback" ] && [ -z "$feedback" ]; then
-    usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
+
+  # Feedback for a round lives in exactly one comment. If the last round's
+  # feedback is already on the record (round feedback), this checkpoint must
+  # not carry it again; otherwise it must carry it, or say why there is none.
+  local n; n="$(round_count "$ISSUE_NUM")"
+  local recorded=0
+  [ "$n" -gt 0 ] && [ "$(round_last_kind "$ISSUE_NUM")" = "feedback" ] && recorded=1
+  if [ "$recorded" -eq 1 ]; then
+    [ "$have_fb" -eq 0 ] || usage_die "round $n's feedback is already on the record (round feedback); drop --feedback/--feedback-file/--no-feedback, it lives in one comment"
+  else
+    [ "$have_fb" -eq 1 ] || usage_die "round post needs exactly one of --feedback, --feedback-file, or --no-feedback <reason>; feedback is never inferred"
+    if [ -n "$feedback_file" ]; then
+      [ -s "$feedback_file" ] || usage_die "feedback file is missing or empty: $feedback_file (use --no-feedback <reason> when the user said nothing this round)"
+      feedback="$(cat "$feedback_file")"
+    fi
+    if [ -z "$no_feedback" ] && [ -z "$feedback" ]; then
+      usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
+    fi
   fi
 
   # The comment cites a sha, so the sha must be on GitHub before the comment is.
   cmd_push
 
-  local n; n="$(round_count "$ISSUE_NUM")"
   local round=$((n+1))
   local sha; sha="$(git rev-parse --short HEAD)"
   local body; body="$(mktemp)"
@@ -1164,7 +1195,9 @@ cmd_round_post() {
     printf '## Round %s\n\n' "$round"
     printf 'Commit: `%s` on `%s`\n\n' "$sha" "$ROUND_BRANCH"
     printf '**Changed:** %s\n\n' "$changed"
-    if [ -n "$no_feedback" ]; then
+    if [ "$recorded" -eq 1 ]; then
+      printf '**Feedback:** recorded on round %s.\n' "$n"
+    elif [ -n "$no_feedback" ]; then
       printf '**Feedback:** none this round (%s).\n' "$no_feedback"
     else
       printf '**Feedback** (transcribed by the agent from chat, the user'"'"'s words as typed):\n\n'
@@ -1181,6 +1214,45 @@ cmd_round_post() {
   say "posted=true"
 }
 
+cmd_round_feedback() {
+  # Records the user's feedback on the last round the moment it is given, with
+  # no commit. A later checkpoint cites it instead of carrying it again.
+  local feedback="" feedback_file="" no_feedback="" have_fb=0 rest=()
+  read_feedback_args "$@"
+  [ "${#rest[@]}" -eq 0 ] || usage_die "usage: gnadd round feedback (--feedback <text> | --feedback-file <path> | --no-feedback <reason>)"
+  round_issue_or_die
+  [ "$have_fb" -eq 1 ] || usage_die "round feedback needs exactly one of --feedback, --feedback-file, or --no-feedback <reason>; feedback is never inferred"
+  if [ -n "$feedback_file" ]; then
+    [ -s "$feedback_file" ] || usage_die "feedback file is missing or empty: $feedback_file"
+    feedback="$(cat "$feedback_file")"
+  fi
+  if [ -z "$no_feedback" ] && [ -z "$feedback" ]; then
+    usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
+  fi
+  local n; n="$(round_count "$ISSUE_NUM")"
+  [ "$n" -gt 0 ] || die_state NO_ROUNDS "issue #$ISSUE_NUM has no round comment yet; feedback answers a round, post one first (commit-gnadd)"
+  [ "$(round_last_kind "$ISSUE_NUM")" != "feedback" ] || die_state FEEDBACK_RECORDED "round $n's feedback is already on the record; a new round comes first, then its feedback"
+  local body; body="$(mktemp)"
+  {
+    printf '%s\n' "$FEEDBACK_MARKER"
+    printf '## Round %s feedback\n\n' "$n"
+    if [ -n "$no_feedback" ]; then
+      printf '**Feedback:** none this round (%s).\n' "$no_feedback"
+    else
+      printf '**Feedback** (transcribed by the agent from chat, the user'"'"'s words as typed):\n\n'
+      printf '%s\n' "$feedback" | sed 's/^/> /'
+    fi
+  } > "$body"
+  if ! "$GH" issue comment "$ISSUE_NUM" --body-file "$body" >/dev/null; then
+    rm -f "$body"
+    die_state COMMENT_FAILED "could not post the feedback comment on issue #$ISSUE_NUM (network? auth?); re-run round feedback"
+  fi
+  rm -f "$body"
+  say "issue=$ISSUE_NUM"
+  say "round=$n"
+  say "posted=true"
+}
+
 cmd_round_list() {
   local issue="${1:-}"
   if [ -z "$issue" ]; then
@@ -1192,8 +1264,8 @@ cmd_round_list() {
   say "rounds=$n"
   [ "$n" -gt 0 ] || return 0
   "$GH" api "repos/{owner}/{repo}/issues/$issue/comments" --paginate \
-    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\")) | .body" \
-    | grep -v -F "$ROUND_MARKER" | sed 's/^/  /'
+    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\") or contains(\"$FEEDBACK_MARKER\")) | .body" \
+    | grep -v -F -e "$ROUND_MARKER" -e "$FEEDBACK_MARKER" | sed 's/^/  /'
 }
 
 # ---------------------------------------------------------------- phase
@@ -1408,8 +1480,9 @@ main() {
       local rsub="${1:-}"; shift || true
       case "$rsub" in
         post) cmd_round_post "$@" ;;
+        feedback) cmd_round_feedback "$@" ;;
         list) cmd_round_list "$@" ;;
-        *) usage_die "usage: gnadd round {post|list} ..." ;;
+        *) usage_die "usage: gnadd round {post|feedback|list} ..." ;;
       esac ;;
     phase)
       local psub="${1:-}"; shift || true
@@ -1452,9 +1525,12 @@ gnadd: deterministic mechanics for the GNADD workflow
   quickfix ship                   guard + push a quickfix branch, detect existing PR
   quickfix merge <pr> [--check <name>|--no-check]
                                   squash-merge only after the CI check passes
-  round post --changed <text> (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
+  round post --changed <text> [--feedback <text>|--feedback-file <f>|--no-feedback <why>]
                                   push the branch, then post this checkpoint's round comment
-  round list [N]                  print the issue's round comments in order
+                                  (feedback flags required unless round feedback recorded it)
+  round feedback (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
+                                  record the last round's feedback now, no commit needed
+  round list [N]                  print the issue's round and feedback comments in order
   phase status                    the open milestone (title, counts, description) or none
   phase open <title> --description <text>
                                   open the next phase; refuses while one is open

@@ -106,7 +106,15 @@ Outcomes:
 - **`state=ON_MAIN` / `NOT_ISSUE_BRANCH` / `DIRTY_TREE` / `DETACHED_HEAD`:** return to the step 1/3 conversations.
 - **`state=PUSH_FAILED`:** report; retry after the user checks network/auth.
 
-## 5. Draft And Create The PR
+## 5. Record The Final Feedback, Then Draft And Create The PR
+
+The user's word that the work is done is the last round's feedback, and no later checkpoint will carry it. Put it on the record before the PR exists, as typed:
+
+```bash
+bash "<skill-dir>/gnadd.sh" round feedback --feedback "<the user's words that brought you here>"
+```
+
+`state=FEEDBACK_RECORDED` means it is already there (skip). `state=NO_ROUNDS` means the branch never posted a round comment; say so and move on, the PR body is the record then.
 
 Draft the PR and show it for approval **before** creating:
 

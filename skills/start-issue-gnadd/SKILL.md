@@ -144,7 +144,7 @@ git log --oneline main..HEAD
 git diff --stat main...HEAD
 ```
 
-Report the last round from the record, not from memory: what changed, what the user said (their words, as the comment has them), and what is still open. Then summarize which acceptance criteria remain and propose the next round. If `rounds=0`, say so: the branch has code but no round trail, so the resume is from git alone. No commit-by-commit archaeology.
+Report the last round from the record, not from memory: what changed, what the user said (their words, as the comment has them), and what is still open. A round's feedback is either its own "Round N feedback" comment or the feedback block of round N+1; a round with neither has no feedback yet. **When the last round has no feedback on the record**, say so and ask one direct question before proposing anything: "Round N (commit `<sha>`) is on the record with no feedback. Did you try it?" Record the answer with `round feedback` before the plan, so the resume leaves the record whole. Then summarize which acceptance criteria remain and propose the next round. If `rounds=0`, say so: the branch has code but no round trail, so the resume is from git alone. No commit-by-commit archaeology.
 
 ## 6. Wait For Approval
 
@@ -165,7 +165,7 @@ Work on the issue branch proceeds in rounds, not in a straight line to the PR. A
 Each round:
 
 1. **Implement one slice** of the approved plan. Stay aligned with the plan and the acceptance criteria. Pause for direction if new evidence changes scope or approach.
-2. **Checkpoint it** with the `commit-gnadd` skill's conventions (`Re #<N>` in the body). Its round-comment step records what changed and the user's feedback from the previous round on the issue, so nothing lives only in chat. Write any feedback file outside the repo (a temp directory), so it never shows up as an untracked file at the next status.
+2. **Checkpoint it** with the `commit-gnadd` skill's conventions (`Re #<N>` in the body). Its round-comment step records what changed on the issue, and the previous round's feedback too unless step 4 already recorded it, so nothing lives only in chat. Write any feedback file outside the repo (a temp directory), so it never shows up as an untracked file at the next status.
 3. **Present a preview, not a diff.** Find the project's preview launch line, one line in the conventions file (`CLAUDE.md` or `AGENTS.md` at the repo root) of the form `Preview launch: <command or URL>`:
 
    ```bash
@@ -173,7 +173,13 @@ Each round:
    ```
 
    If present, run it (or open it), confirm it is actually serving, and give the user the clickable URL or the exact thing to run. Start a server in the background so the session is not blocked on it, leave it running while the user tries the round, and stop it before `resolve-issue-gnadd` or when the session ends. If absent, say plainly that the project has no preview path and ask how they want to try the change. Do not substitute a diff summary for a preview.
-4. **Ask for feedback**, then ask: another round, or resolve? Wait. The user's answer drives the next round's slice, and their words go into the next checkpoint's round comment as typed.
+4. **Ask for feedback**, then ask: another round, or resolve? Wait. When the user speaks, record their words on the issue the moment they are given, as typed:
+
+   ```bash
+   bash "<skill-dir>/gnadd.sh" round feedback --feedback-file <path outside the repo>
+   ```
+
+   (`--feedback "<text>"` for a short line, `--no-feedback "<reason>"` when they gave none.) The record now holds the feedback before the next build, so a session that stops here leaves nothing only in chat. The user's answer drives the next round's slice. The next checkpoint's `round post` cites this comment instead of carrying the feedback again (the script refuses a duplicate).
 
 Never start `resolve-issue-gnadd` on your own. Enter it only when the user says the work is done. Report at each round whether the issue looks complete, partial, or blocked, with what was verified and what remains, so the user can decide.
 
