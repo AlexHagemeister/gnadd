@@ -37,12 +37,12 @@ Run the state snapshot first:
 bash "<skill-dir>/gnadd.sh" state
 ```
 
-It fetches (`git fetch --prune` — updates remote-tracking refs only, touching no working files, so it honors the read-only contract) and reports: current branch, detached HEAD, tree clean/dirty, stash count, active issue number, and the main classification (`synced` / `behind` / `diverged`, with the divergent commits listed when dangerous). If the repo has no remote it reports `remote=none` — note that and move on.
+It fetches (`git fetch --prune` — updates remote-tracking refs only, touching no working files, so it honors the read-only contract) and reports: current branch, detached HEAD, tree clean/dirty (with each dirty path listed under `dirty_files`), stash count, active issue number, and the main classification (`synced` / `behind` / `diverged`, with the divergent commits listed when dangerous). If the repo has no remote it reports `remote=none` — note that and move on.
 
 Then gather orientation context:
 
 ```bash
-tree -L 2 -I 'node_modules|__pycache__|.git|dist|build|.next|.venv|coverage|target|vendor|.pytest_cache|*.egg-info'
+tree -a -L 2 -I 'node_modules|__pycache__|.git|dist|build|.next|.venv|coverage|target|vendor|.pytest_cache|*.egg-info'
 git log --oneline -15
 git branch --list
 ```
@@ -52,7 +52,7 @@ If `tree` is not installed, use `find . -maxdepth 2 -type d -not -path './.git*'
 Then check for the intent document:
 
 ```bash
-test -f VISION.md && sed -n '/^## Core/,/^## /p' VISION.md | head -40
+test -f VISION.md && sed -n '/^## Core/,/^## /{/^## Core/p;/^## /!p;}' VISION.md | head -40
 ```
 
 If `VISION.md` is absent, note nothing (a project without one works as before). If present, read only the Core section shown; do not read the rest of the file unless the user asks.
@@ -102,10 +102,10 @@ Use `git log --oneline -15` to infer the recent trajectory — active areas, dev
 
 From the `state` output, report:
 
-- Active branch and whether the working tree is clean.
+- Active branch and whether the working tree is clean. When it is dirty, name the files from the `dirty_files` listing.
 - Other local branches that may indicate in-progress work.
 - **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`."
-- **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks. **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
+- **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks (git calls this "ahead"; in GNADD every commit reaches `main` through a PR, so a local-only commit on `main` is divergence, not progress). **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 - **Unpushed checkpoints:** on an issue branch, `upstream=none` or a nonzero `ahead_of_upstream` means commits exist only on this machine. Say so: the round trail on GitHub is behind the branch until the next `round post` or `push`.
 

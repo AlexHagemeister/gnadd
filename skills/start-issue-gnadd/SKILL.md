@@ -111,6 +111,8 @@ Read the issue title and body. Present a brief working-spec summary:
 - **Constraints / Non-goals:** Mention if present — boundaries to respect.
 - **Subtasks:** Include only if the issue has them.
 
+**When the plan refines or contradicts a criterion**, say so before asking for approval. If the user agrees, edit the issue body so the criterion says what will actually be built, and add a dated comment saying why it changed. The PR table later marks that row `Changed`. Never leave the body saying one thing while the plan builds another, and never edit it without the user's word.
+
 If the issue's **Context** section references other issues or artifacts, mention them without fetching automatically ("This references #11. Want me to pull that up?"). Keep context lean; let the user request more.
 
 ## 5. Propose A Plan
@@ -155,14 +157,14 @@ Work on the issue branch proceeds in rounds, not in a straight line to the PR. A
 Each round:
 
 1. **Implement one slice** of the approved plan. Stay aligned with the plan and the acceptance criteria. Pause for direction if new evidence changes scope or approach.
-2. **Checkpoint it** with the `commit-gnadd` skill's conventions (`Re #<N>` in the body). Its round-comment step records what changed and the user's feedback from the previous round on the issue, so nothing lives only in chat.
+2. **Checkpoint it** with the `commit-gnadd` skill's conventions (`Re #<N>` in the body). Its round-comment step records what changed and the user's feedback from the previous round on the issue, so nothing lives only in chat. Write any feedback file outside the repo (a temp directory), so it never shows up as an untracked file at the next status.
 3. **Present a preview, not a diff.** Find the project's preview launch line, one line in the conventions file (`CLAUDE.md` or `AGENTS.md` at the repo root) of the form `Preview launch: <command or URL>`:
 
    ```bash
    grep -h '^Preview launch:' CLAUDE.md AGENTS.md 2>/dev/null | head -1
    ```
 
-   If present, run it (or open it), confirm it is actually serving, and give the user the clickable URL or the exact thing to run. If absent, say plainly that the project has no preview path and ask how they want to try the change. Do not substitute a diff summary for a preview.
+   If present, run it (or open it), confirm it is actually serving, and give the user the clickable URL or the exact thing to run. Start a server in the background so the session is not blocked on it, leave it running while the user tries the round, and stop it before `resolve-issue-gnadd` or when the session ends. If absent, say plainly that the project has no preview path and ask how they want to try the change. Do not substitute a diff summary for a preview.
 4. **Ask for feedback**, then ask: another round, or resolve? Wait. The user's answer drives the next round's slice, and their words go into the next checkpoint's round comment as typed.
 
 Never start `resolve-issue-gnadd` on your own. Enter it only when the user says the work is done. Report at each round whether the issue looks complete, partial, or blocked, with what was verified and what remains, so the user can decide.

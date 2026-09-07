@@ -120,7 +120,7 @@ Draft the PR and show it for approval **before** creating:
 
 | Criterion | Status |
 |---|---|
-| <criterion text> | Met / Not verified / Descoped — <reason> |
+| <criterion text> | Met / Not verified / Descoped — <reason> / Changed — <what the user changed it to, and when> |
 
 ## Decisions & Divergences
 
@@ -185,29 +185,25 @@ After merge (or when closing the issue without merge), sync both the issue and t
 **Fetch the current body fresh immediately before editing** — never reconstruct it from memory or an earlier read; `gh issue edit --body` replaces the whole body, so a stale copy silently destroys collaborator edits:
 
 ```bash
-gh issue view <N> --json body --jq .body
+gh issue view <N> --json body --jq .body > "$TMPDIR/issue-<N>.md"
 ```
 
-Modify **only**: acceptance-criteria checkboxes (`- [x]` for met, `- [ ]` for not met / not verified) and an appended **## Resolution** section (PR link, merge commit, one line per unchecked criterion explaining why the issue still closed). Preserve everything else verbatim.
+Modify **only**: acceptance-criteria checkboxes (`- [x]` for met, `- [ ]` for not met / not verified) and an appended **## Resolution** section (PR link, merge commit, one line per unchecked criterion explaining why the issue still closed). Preserve everything else verbatim. Edit the fetched file in place (a scripted substitution, never a retyped body) and send the file back:
 
 ```bash
-gh issue edit <N> --body "$(cat <<'EOF'
-<full updated issue body>
-EOF
-)"
+gh issue edit <N> --body-file "$TMPDIR/issue-<N>.md"
 ```
+
+The merge commit is the `main_commit` that `sync-main` printed in step 6 (after a squash-merge, it is the same hash `cleanup` reports as `merge_commit` in step 8).
 
 Editing works on closed issues, so auto-close from `Closes #<N>` is not a problem.
 
 ### PR
 
-Same fetch-fresh rule (`gh pr view <PR> --json body --jq .body`), then update the step-5 structure to match what was actually verified: the acceptance-criteria table's Status column, and the Test Plan checkboxes for steps that actually ran.
+Same fetch-fresh rule (`gh pr view <PR> --json body --jq .body > "$TMPDIR/pr-<PR>.md"`), then update the step-5 structure in that file to match what was actually verified: the acceptance-criteria table's Status column, and the Test Plan checkboxes for steps that actually ran.
 
 ```bash
-gh pr edit <PR> --body "$(cat <<'EOF'
-<full updated PR body>
-EOF
-)"
+gh pr edit <PR> --body-file "$TMPDIR/pr-<PR>.md"
 ```
 
 The issue is the canonical record; the PR is the ship-time audit trail — both should agree on what was met vs deferred.

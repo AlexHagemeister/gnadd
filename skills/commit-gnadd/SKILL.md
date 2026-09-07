@@ -36,7 +36,10 @@ This guard matters because `commit-gnadd` is the one skill that can auto-trigger
 ```bash
 git status --porcelain
 git diff HEAD
+git ls-files --others --exclude-standard | xargs -I{} git diff --no-index /dev/null {}
 ```
+
+`git diff HEAD` is empty for untracked files, so the third line shows their content; without it a change made of new files gets reviewed on names alone.
 
 Summarize: staged files, modified unstaged files, untracked files, deleted or renamed files.
 
@@ -111,7 +114,7 @@ upstream on the first push, never forcing) so the sha it cites is on GitHub,
 then numbers the round from the comments already on the issue:
 
 ```bash
-bash "<skill-dir>/gnadd.sh" round post --changed "<what this checkpoint changed, one or two lines>" --feedback-file <path>
+bash "<skill-dir>/gnadd.sh" round post --changed "<what this checkpoint changed, one or two lines>" --feedback-file <path outside the repo, e.g. under $TMPDIR>
 ```
 
 Rules for the feedback:

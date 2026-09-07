@@ -135,6 +135,23 @@ expect_status 0 "$ST"
 expect_contains "main_state=diverged"
 expect_contains "main_ahead=1"
 expect_contains "stray commit on main"
+expect_not_contains "commits on origin/main that local lacks"
+
+t state_diverged_lists_both_sides; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit on main"
+advance_origin_main
+run state
+expect_contains "main_state=diverged"
+expect_contains "commits on origin/main that local lacks"
+
+t state_names_dirty_files; setup_repo
+echo y > untracked.txt
+echo changed >> README.md
+run state
+expect_contains "tree=dirty"
+expect_contains "dirty_files=2"
+expect_contains " M README.md"
+expect_contains "?? untracked.txt"
 
 t state_reports_stash; setup_repo
 echo x > s.txt && git_q add s.txt && git stash >/dev/null 2>&1
@@ -966,6 +983,21 @@ run phase close "Idea to first version"
 expect_status 1 "$ST"
 expect_contains "needs --verdict"
 expect_gh_not_called "PATCH" "closed without a verdict"
+
+t phase_close_defaults_title_when_one_open; setup_repo
+export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
+run phase close --verdict "v"
+expect_status 0 "$ST"
+expect_contains "phase=Idea to first version"
+expect_contains "closed=true"
+expect_gh_called "PATCH repos/{owner}/{repo}/milestones/7" "no PATCH on milestone 7"
+
+t phase_close_needs_title_when_several_open; setup_repo
+export GH_STUB_PHASES='7\tA\t0\t6\tx\n8\tB\t1\t0\ty'
+run phase close --verdict "v"
+expect_status 1 "$ST"
+expect_contains "2 milestones are open"
+expect_gh_not_called "PATCH" "closed one of several phases without a title"
 
 t phase_close_unknown_title; setup_repo
 export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
