@@ -1,5 +1,9 @@
 # GNADD
 
+[![Release](https://img.shields.io/github/v/release/AlexHagemeister/gnadd?style=for-the-badge)](https://github.com/AlexHagemeister/gnadd/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/V1N723QW1K)
+
 Git-Native Agent-Driven Development. A way to build software with a coding agent where GitHub is the only place project state lives. Issues say what to build. Branches are where work happens. Pull requests record what shipped. There are no task files, no progress notes, and no plan documents for the agent to keep current.
 
 GNADD ships as a set of [Agent Skills](https://agentskills.io): instruction files an agent loads when you invoke them. The skills carry the conversation. A tested shell script bundled inside them carries every git operation, so the agent never improvises a `reset` or a `force` push. GitHub's own rules (squash-only merges, a protected `main`) hold the rest.
@@ -11,6 +15,14 @@ It works with any agent the [skills CLI](https://github.com/vercel-labs/skills) 
 **In a hurry?** The [Quickstart](#quickstart) is lower on the page, with a prompt to hand your agent and the install commands for each route.
 
 Issues and pull requests from outside are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the terms.
+
+If GNADD saves you a bad `git reset` or two, a star on the repo is the cheapest way to say so, and it helps the next person find it.
+
+<p align="center">
+  <a href="https://ko-fi.com/V1N723QW1K">
+    <img src="https://storage.ko-fi.com/cdn/brandasset/v2/support_me_on_kofi_red.png" width="300" alt="Support me on Ko-fi">
+  </a>
+</p>
 
 ## The problems it removes
 
