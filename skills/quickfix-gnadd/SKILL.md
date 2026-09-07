@@ -137,6 +137,11 @@ EOF
 )"
 ```
 
+If the guard passed only because of an override, the footer must say so
+instead of "Guard-verified small diff": name the variable and the value
+(for example "Guard passed with GNADD_QF_MAX_LINES=50"). A footer that claims
+a verified small diff after an override is a false record.
+
 Capture the PR number from the output URL.
 
 ## 5. CI-Gated Merge
@@ -149,7 +154,12 @@ bash "<skill-dir>/gnadd.sh" quickfix merge <PR>
 ```
 
 The default gate is the check named `test` (override:
-`--check <name>`, or `GNADD_QF_CHECK`). Handle halts:
+`--check <name>`, or `GNADD_QF_CHECK`). The guard's budget has its own
+overrides, `GNADD_QF_MAX_FILES` (default 3) and `GNADD_QF_MAX_LINES`
+(default 30), set in the environment of the `quickfix guard` call. Use one
+only on the user's explicit say-so, and state it in the PR footer (step 4).
+A newly added `VISION.md` is exempt from the line budget without any
+override. Handle halts:
 
 - **`state=QF_CHECKS_PENDING`:** still running; wait and re-run.
 - **`state=QF_CHECK_FAILED`:** stop and discuss — never wave past a red CI.

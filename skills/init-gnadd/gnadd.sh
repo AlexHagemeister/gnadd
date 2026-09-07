@@ -609,12 +609,21 @@ cmd_quickfix_guard() {
   local file_count
   file_count="$(printf '%s' "$files" | grep -c . || true)"
 
+  # A newly added VISION.md is exempt from the line budget: it is the intent
+  # document vision-gnadd writes, touches no code, and any real one is longer
+  # than the budget. Editing an existing VISION.md stays under the budget.
+  local exempt=""
+  if { git diff --name-status "$base...HEAD" 2>/dev/null; git diff --name-status HEAD 2>/dev/null; } | grep -qE '^A[[:space:]]+VISION\.md$'; then
+    exempt="VISION.md"
+  fi
+
   local lines
   lines="$( { git diff --numstat "$base...HEAD" 2>/dev/null; git diff --numstat HEAD 2>/dev/null; } | \
-    awk '{ if ($1 != "-") s += $1; if ($2 != "-") s += $2 } END { print s+0 }' )"
+    awk -v ex="$exempt" '$3 == ex && ex != "" { next } { if ($1 != "-") s += $1; if ($2 != "-") s += $2 } END { print s+0 }' )"
 
   say "files=$file_count"
   say "lines=$lines"
+  [ -n "$exempt" ] && say "exempt=$exempt (new intent document, not counted toward the line budget)"
 
   [ "$file_count" -gt 0 ] || die_state QF_NOTHING_TO_GUARD "no changes vs $base; nothing to quickfix"
 
