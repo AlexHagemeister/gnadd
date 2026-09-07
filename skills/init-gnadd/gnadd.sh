@@ -78,8 +78,10 @@ print_main_state() {
 show_divergence() {
   note "commits on local $MAIN that origin lacks (the dangerous direction):"
   git log --oneline "origin/$MAIN..$MAIN" | sed 's/^/  /'
-  note "commits on origin/$MAIN that local lacks:"
-  git log --oneline "$MAIN..origin/$MAIN" | sed 's/^/  /'
+  if [ "$MAIN_BEHIND" != "?" ] && [ "$MAIN_BEHIND" -gt 0 ]; then
+    note "commits on origin/$MAIN that local lacks:"
+    git log --oneline "$MAIN..origin/$MAIN" | sed 's/^/  /'
+  fi
 }
 
 print_upstream_state() { # upstream= (name or none) and ahead_of_upstream= for the current branch
@@ -189,6 +191,7 @@ cmd_state() {
   if tree_dirty; then
     say "tree=dirty"
     say "dirty_files=$(git status --porcelain | wc -l | tr -d ' ')"
+    git status --porcelain | sed 's/^/  /'
   else
     say "tree=clean"
   fi
@@ -1191,12 +1194,19 @@ cmd_phase_close() {
     case "$1" in
       --verdict)      verdict="${2:-}"; shift ;;
       --verdict-file) verdict_file="${2:-}"; shift ;;
-      -*) usage_die "usage: gnadd phase close <title> (--verdict <text> | --verdict-file <path>)" ;;
+      -*) usage_die "usage: gnadd phase close [title] (--verdict <text> | --verdict-file <path>)" ;;
       *)  [ -z "$title" ] && title="$1" || usage_die "phase close takes one title" ;;
     esac
     shift
   done
-  [ -n "$title" ] || usage_die "phase close needs the open phase's title"
+  if [ -z "$title" ]; then
+    # The script knows the open phase; retyping its title is friction. With
+    # exactly one open milestone the title defaults to it. With several, the
+    # human names which one.
+    local n; n="$(phase_count)"
+    [ "$n" -eq 1 ] || usage_die "phase close needs the phase's title ($n milestones are open; gnadd phase status lists them)"
+    title="$(phase_rows | head -1 | cut -f2)"
+  fi
   [ -n "$verdict_file" ] && verdict="$(cat "$verdict_file")"
   [ -n "$verdict" ] || usage_die "phase close needs --verdict: what this phase found out, in the user's words; closing is the human's act"
   local num
@@ -1364,8 +1374,9 @@ gnadd: deterministic mechanics for the GNADD workflow
   phase status                    the open milestone (title, counts, description) or none
   phase open <title> --description <text>
                                   open the next phase; refuses while one is open
-  phase close <title> --verdict <text>
+  phase close [title] --verdict <text>
                                   close the phase; the verdict lands in its description
+                                  (title defaults to the one open milestone)
   sync-main                       return to main and fast-forward it (ff-only)
   cleanup <pr> <branch>           delete branch only after GitHub confirms the PR merged,
                                   that <branch> is its head, and nothing was committed after
