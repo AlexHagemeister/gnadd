@@ -10,6 +10,8 @@ It works with any agent the [skills CLI](https://github.com/vercel-labs/skills) 
 
 **In a hurry?** The [Quickstart](#quickstart) is lower on the page, with a prompt to hand your agent and the install commands for each route.
 
+Issues and pull requests from outside are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the terms.
+
 ## The problems it removes
 
 Working with a coding agent tends to produce three kinds of mess. GNADD is built around not creating them.
