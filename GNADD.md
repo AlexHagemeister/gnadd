@@ -795,8 +795,9 @@ first thing to try).
   is the record), with a deterministic guard (small diffs only; never `bin/`,
   `scripts/`, `.github/`, or `gnadd.sh` copies) and a CI-gated squash merge
   enforced in the script. A fast path *through* the safety rails, not around them.
-- **Hard CI gate** in `resolve-issue-gnadd`: partially landed. `resolve-issue-gnadd` runs the
-  project's test suite locally via `gnadd.sh test` before the PR, and `gnadd.sh
-  init --ci` bootstraps a GitHub Actions workflow. Make the GitHub-side check
-  *blocking* (not just reported at the merge gate) once a project's CI is stable
-  enough to trust.
+- **Hard CI gate** in `resolve-issue-gnadd`: landed. `gnadd.sh ship merge`
+  refuses unless every check GitHub reports has passed (pending, failed, and
+  not-started-yet each halt with their own state), and `--no-check` is the
+  human's explicit acceptance when a project has no CI. `gnadd.sh test` still
+  runs the suite locally before the PR, and `gnadd.sh init --ci` bootstraps
+  the workflow.
