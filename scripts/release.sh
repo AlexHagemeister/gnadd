@@ -54,12 +54,6 @@ fi
 # 1. Stamp the CLI version.
 sed -i.bak -E "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" bin/gnadd && rm bin/gnadd.bak
 
-# 1b. Stamp the plugin manifests (the repo root is also a Claude Code plugin;
-#     test/run.sh fails if these disagree with bin/gnadd).
-for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
-  sed -i.bak -E "s/^( *\"version\": *)\"[^\"]*\"/\1\"$VERSION\"/" "$f" && rm "$f.bak"
-done
-
 # 2. Repin the canonical guide URLs to the release tag (raw.githubusercontent
 #    resolves tag names directly). This is the only sanctioned way to move
 #    the pin — see help-gnadd / audit-gnadd.
@@ -75,7 +69,7 @@ bash test/run.sh
 
 echo
 echo "Release $TAG prepared. Ship it through the loop:"
-echo "  1. review the diff (changelog + version stamps in bin/gnadd and .claude-plugin + repinned URLs + skill copies)"
+echo "  1. review the diff (changelog + version stamp + repinned URLs + skill copies)"
 echo "  2. commit:   git commit -am \"chore: release $TAG\""
 echo "  3. after the PR merges to main:"
 echo "       git tag $TAG <merge-commit> && git push origin $TAG"

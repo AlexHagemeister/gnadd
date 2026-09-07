@@ -7,6 +7,15 @@ change skill names, script subcommands, or workflow behavior.
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code plugin install: the repo carries `.claude-plugin/plugin.json`
+  and a one-entry marketplace, so `claude plugin marketplace add
+  AlexHagemeister/gnadd` then `claude plugin install gnadd@gnadd` installs
+  all eleven skills as `/gnadd:<skill>`. The skills CLI path is unchanged
+  and both channels track `main` (the manifests carry no version so plugin
+  updates follow the commit). `test/run.sh` checks the manifests (#78).
+
 ## [0.4.0] — 2026-07-22
 
 ### Added

@@ -83,7 +83,12 @@ update questions with the path that matches, and never assume a scope.
   repo's `scripts/sync.sh` while developing): `skills update` cannot track
   local-path installs and skips them silently — re-run `scripts/sync.sh`
   from the checkout instead.
-- **Caveats for any update:** the skills CLI installs from the repo's
+- **Installed as a Claude Code plugin** (`claude plugin install gnadd@gnadd`,
+  skills invoked as `/gnadd:<skill>`): refresh the marketplace, then the
+  plugin — `claude plugin marketplace update gnadd` followed by
+  `claude plugin update gnadd@gnadd` (or the same two steps as `/plugin ...`
+  inside a session). `npx skills update` does not see plugin installs.
+- **Caveats for any update:** both channels install from the repo's
   default branch, so an update pulls the latest `main`, not the last tagged
   release. Pre-1.0, read the release notes (repo Releases page) before
   updating. `gnadd version` reports the release *baseline* — the installed

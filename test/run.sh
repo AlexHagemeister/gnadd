@@ -799,28 +799,31 @@ done
 t plugin_manifests; CURRENT=plugin_manifests
 # The repo root is also a Claude Code plugin: .claude-plugin/plugin.json is the
 # plugin and .claude-plugin/marketplace.json is a one-entry marketplace pointing
-# at it. Both carry the release baseline, so they must agree with bin/gnadd.
+# at it. Neither may carry a "version" field: with one set, `claude plugin
+# update` keeps users on the cached copy until the string changes, which would
+# pin the plugin channel to releases while the skills CLI tracks main. Omitted,
+# the plugin version is the resolved commit and every merge to main is an
+# update, matching the skills CLI (the release baseline stays in bin/gnadd).
 # When the claude CLI is on PATH the manifests are validated with it too. The
 # only warning the plugin manifest is allowed is the CLAUDE.md-at-root one:
 # that file is this repo's own agent instructions and must not ship as plugin
 # context, so the warning describes the behavior we want.
-BASELINE="$(sed -nE 's/^VERSION="([^"]*)"/\1/p' "$GNADD")"
 for f in plugin.json marketplace.json; do
-  if [ -f "$ROOT/.claude-plugin/$f" ]; then ok
-  else fail ".claude-plugin/$f missing"; fi
+  if [ ! -f "$ROOT/.claude-plugin/$f" ]; then fail ".claude-plugin/$f missing"
+  elif grep -qE '^ *"version" *:' "$ROOT/.claude-plugin/$f"; then
+    fail ".claude-plugin/$f sets \"version\", which pins plugin installs to that string instead of tracking main"
+  else ok; fi
 done
-PLUGIN_VER="$(sed -nE 's/^ *"version": *"([^"]*)".*/\1/p' "$ROOT/.claude-plugin/plugin.json" | head -1)"
-MARKET_VER="$(sed -nE 's/^ *"version": *"([^"]*)".*/\1/p' "$ROOT/.claude-plugin/marketplace.json" | head -1)"
-[ "$PLUGIN_VER" = "$BASELINE" ] && ok || fail "plugin.json version '$PLUGIN_VER' != bin/gnadd VERSION '$BASELINE' — run scripts/release.sh"
-[ "$MARKET_VER" = "$BASELINE" ] && ok || fail "marketplace.json version '$MARKET_VER' != bin/gnadd VERSION '$BASELINE' — run scripts/release.sh"
 if command -v claude >/dev/null 2>&1; then
-  OUT="$(claude plugin validate "$ROOT" --strict 2>&1)"; ST=$?
-  expect_status 0 "$ST"
-  OUT="$(claude plugin validate "$ROOT/.claude-plugin/plugin.json" 2>&1)"; ST=$?
-  expect_status 0 "$ST"
-  # Strip the one sanctioned warning; anything left is a real problem.
-  LEFT="$(printf '%s\n' "$OUT" | grep -E '^\s*(❯|-) ' | grep -v 'CLAUDE.md at the plugin root' || true)"
-  [ -z "$LEFT" ] && ok || fail "plugin.json validation reported more than the CLAUDE.md warning: $LEFT"
+  # Two warnings are sanctioned (see above): the CLAUDE.md one and the
+  # missing-version one. Anything else the validator reports is a real problem.
+  for target in "$ROOT" "$ROOT/.claude-plugin/plugin.json"; do
+    OUT="$(claude plugin validate "$target" 2>&1)"; ST=$?
+    expect_status 0 "$ST"
+    LEFT="$(printf '%s\n' "$OUT" | grep -E '^\s*(❯|-) ' \
+      | grep -v 'CLAUDE.md at the plugin root' | grep -v 'No version specified' || true)"
+    [ -z "$LEFT" ] && ok || fail "validate $(basename "$target") reported more than the sanctioned warnings: $LEFT"
+  done
 else
   echo "note: claude CLI not on PATH, plugin manifests checked for version agreement only"
 fi

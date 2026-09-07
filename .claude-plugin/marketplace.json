@@ -9,7 +9,6 @@
       "name": "gnadd",
       "source": "./",
       "description": "GNADD: an agent-driven development loop on GitHub issues, branches, and PRs.",
-      "version": "0.4.0",
       "category": "productivity"
     }
   ]
