@@ -28,24 +28,24 @@ fail() {
 ok() { PASS=$((PASS+1)); }
 
 expect_status() { # expect_status <want> <got>
-  [ "$2" = "$1" ] && ok || fail "expected exit $1, got $2 — output: $OUT"
+  [ "$2" = "$1" ] && ok || fail "expected exit $1, got $2, output: $OUT"
 }
 
 expect_contains() { # expect_contains <needle>
   case "$OUT" in
     *"$1"*) ok ;;
-    *) fail "output missing '$1' — output: $OUT" ;;
+    *) fail "output missing '$1', output: $OUT" ;;
   esac
 }
 
 expect_not_contains() {
   case "$OUT" in
-    *"$1"*) fail "output unexpectedly contains '$1' — output: $OUT" ;;
+    *"$1"*) fail "output unexpectedly contains '$1', output: $OUT" ;;
     *) ok ;;
   esac
 }
 
-run() { # run <args...> — capture OUT and ST
+run() { # run <args...>: capture OUT and ST
   OUT="$("$GNADD" "$@" 2>&1)"
   ST=$?
 }
@@ -372,7 +372,7 @@ TREE_AFTER="$(git -C "$ROOT" status --porcelain)"
 expect_status 1 "$ST"
 expect_contains 'no "## [9.9.9]" entry'
 expect_contains "## [9.9.9]"
-# Bullets only exist when the range has commits — at a freshly tagged HEAD
+# Bullets only exist when the range has commits. At a freshly tagged HEAD
 # the range is empty and a header-only draft is correct.
 REL_LAST_TAG="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null || true)"
 REL_COUNT="$(git -C "$ROOT" rev-list --count "${REL_LAST_TAG:+$REL_LAST_TAG..}HEAD" 2>/dev/null || echo 0)"
@@ -788,9 +788,9 @@ expect_contains "Preview launch: (none yet"
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd init-gnadd; do
   if [ ! -f "$ROOT/skills/$skill/gnadd.sh" ]; then
-    fail "skills/$skill/gnadd.sh missing — run scripts/build.sh"
+    fail "skills/$skill/gnadd.sh missing, run scripts/build.sh"
   elif ! diff -q "$ROOT/bin/gnadd" "$ROOT/skills/$skill/gnadd.sh" >/dev/null; then
-    fail "skills/$skill/gnadd.sh out of sync with bin/gnadd — run scripts/build.sh"
+    fail "skills/$skill/gnadd.sh out of sync with bin/gnadd, run scripts/build.sh"
   else
     ok
   fi
@@ -837,6 +837,14 @@ for dir in "$ROOT"/skills/*/; do
   if grep -q '<skill-dir>/gnadd.sh' "$dir/SKILL.md" && [ ! -f "$dir/gnadd.sh" ]; then
     fail "skills/$name/SKILL.md runs <skill-dir>/gnadd.sh but the build does not copy the script there (add it to scripts/build.sh, or name the prime-gnadd copy)"
   else ok; fi
+done
+
+t mechanics_have_no_em_dash; CURRENT=mechanics_have_no_em_dash
+# The changelog and the docs carry no em dashes, so nothing the mechanics
+# print or draft may reintroduce one (release.sh's changelog draft did).
+EM="$(printf '\xe2\x80\x94')"
+for f in "$ROOT"/bin/gnadd "$ROOT"/scripts/*.sh "$ROOT"/test/run.sh; do
+  if grep -q "$EM" "$f"; then fail "$(basename "$f") contains an em dash"; else ok; fi
 done
 
 t docs_name_every_skill; CURRENT=docs_name_every_skill

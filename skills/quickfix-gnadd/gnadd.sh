@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gnadd — deterministic mechanics for the GNADD workflow.
+# gnadd: deterministic mechanics for the GNADD workflow.
 #
 # Skills call these subcommands instead of improvising raw git. Humans can
 # call them too. Every invariant the workflow depends on is enforced here,
@@ -100,7 +100,7 @@ require_clean_tree() {
   fi
 }
 
-gh_json() { # gh_json <field> <gh args...> — single field via --jq
+gh_json() { # gh_json <field> <gh args...>: single field via --jq
   local field="$1"; shift
   "$GH" "$@" --json "$field" --jq ".$field"
 }
@@ -108,7 +108,7 @@ gh_json() { # gh_json <field> <gh args...> — single field via --jq
 # ---------------------------------------------------------------- trace
 #
 # Every subcommand leaves a receipt: one line per invocation (UTC time,
-# command, exit status, branch) appended to gnadd-trace.log inside .git/ —
+# command, exit status, branch) appended to gnadd-trace.log inside .git/,
 # never in the committed tree. The trace turns "did the mechanics go through
 # the rails?" from a trust question into a checkable artifact: a run that
 # improvised raw git has gaps here. `gnadd trace show|reset` reads/opens it.
@@ -127,7 +127,7 @@ trace_on_exit() {
   trap - EXIT
   # When a run is killed mid-pipe (SIGPIPE), bash 3.2 keeps the stdout it
   # failed to write and flushes that stale buffer into the next redirection
-  # or command substitution — i.e. straight into the trace line (issue #38).
+  # or command substitution, i.e. straight into the trace line (issue #38).
   # Drain it to /dev/null first, then build and append the line whole.
   printf '\n' >/dev/null 2>&1 || true
   { [ -n "$TRACE_FILE" ] && [ -n "$TRACE_CMD" ]; } || return 0
@@ -230,7 +230,7 @@ cmd_start() {
     if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
       fetch_origin >/dev/null || true
       if ! git merge --ff-only '@{u}' >/dev/null 2>&1; then
-        die_state BRANCH_DIVERGED_FROM_REMOTE "'$existing' and its remote have diverged; do not merge or rebase autonomously — a human decides"
+        die_state BRANCH_DIVERGED_FROM_REMOTE "'$existing' and its remote have diverged; do not merge or rebase autonomously. A human decides"
       fi
     fi
     say "result=resumed"
@@ -250,7 +250,7 @@ cmd_start() {
       exit 2
     fi
     git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
-      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report — never merge, rebase, or reset here"
+      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report. Never merge, rebase, or reset here"
   fi
   git checkout -b "$target" >/dev/null 2>&1
   say "result=created"
@@ -338,7 +338,7 @@ cmd_ship_merge() {
   mergeable="$(gh_json mergeable pr view "$pr" 2>/dev/null || echo UNKNOWN)"
   case "$mergeable" in
     MERGEABLE) ;;
-    CONFLICTING) die_state PR_CONFLICTING "PR #$pr conflicts with $MAIN; hand resolution to the human — never resolve autonomously" ;;
+    CONFLICTING) die_state PR_CONFLICTING "PR #$pr conflicts with $MAIN; hand resolution to the human. Never resolve autonomously" ;;
     *) die_state MERGEABILITY_UNKNOWN "GitHub reports mergeable=$mergeable for PR #$pr; wait and re-run 'gnadd ship status $pr'" ;;
   esac
   "$GH" pr merge "$pr" --squash >/dev/null 2>&1 || die_state MERGE_FAILED "gh pr merge failed for PR #$pr; report and stop"
@@ -359,7 +359,7 @@ cmd_sync_main() {
     exit 2
   fi
   git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
-    die_state FF_REFUSED "fast-forward refused; stop and report — never retry without --ff-only"
+    die_state FF_REFUSED "fast-forward refused; stop and report. Never retry without --ff-only"
   say "synced=true"
   say "main_commit=$(git rev-parse HEAD)"
 }
@@ -413,7 +413,7 @@ cmd_cleanup() {
 # The fast path THROUGH the rails for trivial changes: no issue, but always
 # branch → PR → CI → squash merge. The guard is what keeps "no issue, no
 # plan" safe: the diff must stay glanceable (size cap) and must never touch
-# the safety machinery itself (protected paths) — those changes take the
+# the safety machinery itself (protected paths). Those changes take the
 # full loop where a spec and a plan exist.
 
 QF_MAX_FILES="${GNADD_QF_MAX_FILES:-3}"
@@ -461,7 +461,7 @@ cmd_quickfix_start() {
       exit 2
     fi
     git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
-      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report — never merge, rebase, or reset here"
+      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report. Never merge, rebase, or reset here"
   fi
   git checkout -b "$target" >/dev/null 2>&1
   say "result=created"
@@ -469,7 +469,7 @@ cmd_quickfix_start() {
 }
 
 cmd_quickfix_guard() {
-  # Scope: everything this quickfix would land — commits beyond origin/main
+  # Scope: everything this quickfix would land: commits beyond origin/main
   # plus any uncommitted changes. Binary files count toward the file cap.
   local base="origin/$MAIN"
   git rev-parse --verify --quiet "$base" >/dev/null || base="$MAIN"
@@ -536,10 +536,10 @@ cmd_quickfix_merge() {
     local checks row status
     checks="$("$GH" pr checks "$pr" 2>/dev/null || true)"
     if [ -z "$checks" ] || printf '%s' "$checks" | grep -qi '^no checks'; then
-      die_state QF_NO_CHECKS "no CI checks reported for PR #$pr; nothing automated verified it — a human must decide (re-run with --no-check to accept that)"
+      die_state QF_NO_CHECKS "no CI checks reported for PR #$pr; nothing automated verified it. A human must decide (re-run with --no-check to accept that)"
     fi
     row="$(printf '%s\n' "$checks" | awk -F'\t' -v c="$check" '$1 == c { print; exit }')"
-    [ -n "$row" ] || die_state QF_CHECK_NOT_FOUND "check '$check' not found on PR #$pr; available checks are informational — pick one with --check <name> or use --no-check deliberately"
+    [ -n "$row" ] || die_state QF_CHECK_NOT_FOUND "check '$check' not found on PR #$pr; available checks are informational. Pick one with --check <name> or use --no-check deliberately"
     status="$(printf '%s\n' "$row" | awk -F'\t' '{ print $2 }')"
     case "$status" in
       pass) say "check=$check"; say "check_status=pass" ;;
@@ -632,7 +632,7 @@ doctor_rescue_main() {
 
   # Lossless by construction, and never uses reset:
   #   1. bookmark the stray commits on a rescue branch
-  #   2. step onto it (same commit as main — the working tree does not change)
+  #   2. step onto it (same commit as main, so the working tree does not change)
   #   3. move the main ref back to origin/main with branch -f (main is no
   #      longer checked out, so this touches no files)
   git branch "$rescue" "$MAIN" >/dev/null 2>&1
@@ -645,7 +645,7 @@ doctor_rescue_main() {
   say "rescue_branch=$rescue"
   say "main_commit=$(git rev-parse "$MAIN")"
   note "stray commits preserved on '$rescue'; you are standing on it"
-  note "route them through the loop: open an issue, rename or PR this branch — never push them to $MAIN directly"
+  note "route them through the loop: open an issue, rename or PR this branch. Never push them to $MAIN directly"
 }
 
 # ---------------------------------------------------------------- test
@@ -743,7 +743,7 @@ cmd_init() {
 RULESET
     then
       say "ruleset=created"
-      [ "$strict" = 1 ] && note "strict mode: no bypass — even admins must go through PRs"
+      [ "$strict" = 1 ] && note "strict mode: no bypass. Even admins must go through PRs"
     else
       say "ruleset=failed"
       note "could not create the ruleset via gh api; add one in repo Settings → Rules (require PR, block force pushes and deletion on $MAIN)"
@@ -1092,14 +1092,14 @@ main() {
     trace)        cmd_trace "$@" ;;
     version|--version)
       # VERSION is stamped by scripts/release.sh at release time, but installs
-      # track the default branch — so a copy may carry post-release changes.
+      # track the default branch, so a copy may carry post-release changes.
       # Report the baseline honestly rather than implying an exact release.
       say "gnadd $VERSION"
       say "channel=main"
       note "$VERSION is the release baseline; installed copies track main and may include post-release changes (see the repo's releases page)" ;;
     *)
       cat <<'USAGE'
-gnadd — deterministic mechanics for the GNADD workflow
+gnadd: deterministic mechanics for the GNADD workflow
 
   state [--no-fetch]              snapshot: branch, tree, stashes, main classification
   start <N> <slug> [--carry]      resume or create issue-<N>/<slug> safely
