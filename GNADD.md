@@ -1,4 +1,4 @@
-# GNADD — Git-Native Agent-Driven Development
+# GNADD: Git-Native Agent-Driven Development
 
 A lightweight project-management workflow where GitHub Issues, branches, PRs, and
 git history are the **sole** system of record. No external trackers, no markdown
@@ -6,9 +6,9 @@ task files. Issues capture intent (behavioral specs), PRs capture outcome, and a
 coding agent handles the git mechanics through a set of skills.
 
 This document is the canonical description of the workflow. Parts 1–3 are the
-user's guide — start there, and come back for refreshers. Part 4 is the reference
+user's guide. Start there, and come back for refreshers. Part 4 is the reference
 model. Part 5 records the design decisions and their rationale. The skills are the
-executable spec — when this doc and a skill disagree on a mechanical detail, **the
+executable spec: when this doc and a skill disagree on a mechanical detail, **the
 skill wins** and this doc should be corrected.
 
 ---
@@ -17,10 +17,10 @@ skill wins** and this doc should be corrected.
 
 | Layer | Lives at | Authoritative for | Edited by |
 |---|---|---|---|
-| **Script** | `bin/gnadd` (canonical); bundled into skills as `gnadd.sh` by `scripts/build.sh` | The git mechanics themselves — every sequence, guard, and halt, enforced in code | Claude; verified by `test/run.sh` |
-| **Skills** | `skills/<name>/SKILL.md` in this repo | Judgment and conversation: the gates, questions, and interpretation around the script | Claude |
-| **Skills (installed)** | Agent skills dir via `npx skills add`, or the Claude Code plugin cache via `claude plugin install` | Runtime copy your agent loads (script travels inside each skill) | Install once; refresh per install path — GitHub installs: `npx skills update` in the matching scope; local-checkout installs: `scripts/sync.sh`; plugin installs: `claude plugin update` (see help-gnadd's Install & Update) |
-| **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | Claude |
+| **Script** | `bin/gnadd` (canonical); bundled into skills as `gnadd.sh` by `scripts/build.sh` | The git mechanics themselves: every sequence, guard, and halt, enforced in code | The agent, with the maintainer; verified by `test/run.sh` |
+| **Skills** | `skills/<name>/SKILL.md` in this repo | Judgment and conversation: the gates, questions, and interpretation around the script | The agent, with the maintainer |
+| **Skills (installed)** | Agent skills dir via `npx skills add`, or the Claude Code plugin cache via `claude plugin install` | Runtime copy your agent loads (script travels inside each skill) | Install once; refresh per install path. GitHub installs: `npx skills update` in the matching scope; local-checkout installs: `scripts/sync.sh`; plugin installs: `claude plugin update` (see help-gnadd's Install & Update) |
+| **This doc** | `GNADD.md` in this repo | The model, the rationale, and how to drive it | The agent, with the maintainer |
 | **Conventions file** | `AGENTS.md` in the project, written by `/init-gnadd` | Telling any agent the repo runs GNADD, to start with prime, and how to launch a preview | `/init-gnadd` (once per repo, safe to rerun) |
 
 **Distribution channel:** `main` is the channel for both install paths. The
@@ -31,11 +31,11 @@ reports a release *baseline*, not an exact release: an installed copy may
 include changes merged after the stamped version.
 
 The script carries the mechanics; the skills carry the judgment around them. This
-doc deliberately does **not** restate either — that would create copies that drift
+doc deliberately does **not** restate either, because that would create copies that drift
 apart. It concentrates on the things code can't hold: the model, the human's role,
 and the reasoning behind the design. When this doc and a skill disagree on a
 mechanical detail, the skill wins; when a skill and the script disagree, the
-script wins — it is the layer with tests.
+script wins, because it is the layer with tests.
 
 ---
 
@@ -55,7 +55,7 @@ the GitHub CLI (`gh`) installed and authenticated, and a GitHub account.
 
 ---
 
-## Part 1 — Starting a Project
+## Part 1: Starting a Project
 
 ### The rule that sorts your old habits
 
@@ -64,8 +64,8 @@ what survives:
 
 > **Files that *describe* stay. Files that *track* go.**
 
-The whole reason this workflow exists is that mutable state in markdown —
-checkboxes, statuses, "current progress" notes — goes stale and quietly poisons
+The whole reason this workflow exists is that mutable state in markdown
+(checkboxes, statuses, "current progress" notes) goes stale and quietly poisons
 agent context. Stable reference text the agent merely reads has none of that
 problem. Applied to the usual kit:
 
@@ -81,7 +81,7 @@ keep. It's read-only orientation, not state.
 
 And when you're unsure about any file:
 
-> **Would the agent need to keep this up to date?** If yes, it shouldn't exist —
+> **Would the agent need to keep this up to date?** If yes, it shouldn't exist:
 > that state has a home in GitHub. If the agent only ever reads it, it's harmless.
 
 ### What about the design phase?
@@ -193,7 +193,7 @@ lives where all decision history lives: in merged PRs and closed issues.
 ### The startup sequence
 
 1. **Create the repo on GitHub first.** Remote, `main` branch, `gh` authenticated.
-   The workflow assumes GitHub exists from minute one — there's no offline phase.
+   The workflow assumes GitHub exists from minute one, so there's no offline phase.
 2. **Run `/init-gnadd`.** It turns on the server-side rails and writes the
    conventions file. The rails (`gnadd.sh init` underneath; add `--ci` for a
    minimal test workflow) make GitHub itself enforce the two most important
@@ -212,56 +212,56 @@ lives where all decision history lives: in merged PRs and closed issues.
    "Where the higher-order requirements live"). The README is run instructions
    and a pointer to VISION.md. Resist putting anything with a status, an order,
    or a plan in either.
-4. **Capture the first few issues with `/new-issue-gnadd`** — and here's the habit change
+4. **Capture the first few issues with `/new-issue-gnadd`**, and here's the habit change
    that will feel most wrong at first: *don't* front-load the whole backlog the way
    you'd write a full `tasks.md`. Write the first three or four vertical slices and
-   stop. Issues are cheap to add at any moment — `/new-issue-gnadd` works mid-conversation
-   and mines the discussion — and a 30-issue upfront breakdown is just your old
+   stop. Issues are cheap to add at any moment (`/new-issue-gnadd` works mid-conversation
+   and mines the discussion), and a 30-issue upfront breakdown is just your old
    speculative task list wearing a new costume. Half of it will be wrong by issue
    six.
 5. **Make the first issue a walking skeleton.** "Project runs end-to-end and does
-   one trivial thing" is a legitimate vertical slice — repo scaffold, hello-world
+   one trivial thing" is a legitimate vertical slice: repo scaffold, hello-world
    behavior, maybe deploy. It gets the loop turning immediately.
 6. **`/start-issue-gnadd 1`** and you're in the development loop.
 
-**Adopting GNADD on an existing repo?** Run `/audit-gnadd` first — it reviews
+**Adopting GNADD on an existing repo?** Run `/audit-gnadd` first. It reviews
 context files and workflow alignment, then proposes minimal fixes to capture as
 issues before you enter the loop.
 
 ---
-## Part 2 — The Development Loop
+## Part 2: The Development Loop
 
 Every piece of work moves through the same five commands.
 
-### 1. `/prime-gnadd` — start every session here
+### 1. `/prime-gnadd`: start every session here
 
 Read-only and always safe. It fetches the latest from GitHub and reports: what the
 project looks like, what branch you're on, the open phase if there is one, open
 issues, PRs in flight, what recently shipped. Three things in its output deserve
 attention:
 
-- A **"main has diverged"** warning — stop and sort that out before anything else.
-- A **stash warning** — you have invisible saved work; deal with it or it will be
+- A **"main has diverged"** warning: stop and sort that out before anything else.
+- A **stash warning**: you have invisible saved work; deal with it or it will be
   forgotten.
-- **PRs awaiting review** — someone's waiting on you.
+- **PRs awaiting review**: someone's waiting on you.
 
-### 2. `/new-issue-gnadd` — when you have work to capture
+### 2. `/new-issue-gnadd`: when you have work to capture
 
 The skill interviews you, one question at a time, until it can write the issue.
-Your only job: describe **what** should happen and **why** — observable behavior,
+Your only job: describe **what** should happen and **why**: observable behavior,
 not implementation. "Users can search and see results," not "build the search data
 layer." If you catch yourself dictating *how*, the skill will redirect you; let
-it. It will also flag when you're bundling several issues into one — take the
+it. It will also flag when you're bundling several issues into one. Take the
 split. You approve the draft before anything is created.
 
-### 3. `/start-issue-gnadd <N>` — when you're ready to work
+### 3. `/start-issue-gnadd <N>`: when you're ready to work
 
 It branches off main, loads the issue as your working spec, and proposes an
-ordered plan derived from the acceptance criteria. Review it — confirm, correct
-intent, or redirect — before any implementation begins; say "go" when the plan
+ordered plan derived from the acceptance criteria. Review it (confirm, correct
+intent, or redirect) before any implementation begins; say "go" when the plan
 looks right. If you have uncommitted changes lying around, it stops and asks
 what to do with them: **choose "commit" unless you have a specific reason not
-to** — a commit is visible and recoverable; a stash is invisible and easy to
+to**: a commit is visible and recoverable; a stash is invisible and easy to
 lose. If you already started editing files before remembering to run this
 (everyone does), don't worry: it carries your changes onto the new branch safely.
 
@@ -273,7 +273,7 @@ whether to run another round or resolve, and enters resolve only when you say
 the work is done. A branch that spans sessions picks up at the last round, read
 from the round comments on the issue. The procedure lives in the skill.
 
-### 4. `/commit-gnadd` — early and often while working
+### 4. `/commit-gnadd`: early and often while working
 
 These are save points; they're cheap, and you can have many per issue. The skill
 shows you what changed, flags anything suspicious (credentials, logs, scratch
@@ -281,17 +281,17 @@ files), drafts a message, and waits for your approval. You can also just say
 "commit this" mid-conversation. On an issue branch each commit also posts a
 round comment on the issue (see "Mid-work issue updates" below).
 
-### 5. `/resolve-issue-gnadd` — when the work feels done
+### 5. `/resolve-issue-gnadd`: when the work feels done
 
 The skill checks the actual changes against the issue's acceptance criteria and
-tells you what's met, unmet, or descoped — and runs the project's test suite,
+tells you what's met, unmet, or descoped, and runs the project's test suite,
 reporting results alongside. Don't wave past unmet items or failing tests
-silently — either finish them or explicitly accept the gap. It then drafts the
+silently: either finish them or explicitly accept the gap. It then drafts the
 final commit and a PR, and asks whether to merge.
 
 If you leave the PR open instead of merging, that's fine: running
-`/resolve-issue-gnadd` on the branch later picks up at the merge gate automatically —
-it will never try to create a second PR.
+`/resolve-issue-gnadd` on the branch later picks up at the merge gate automatically.
+It will never try to create a second PR.
 
 **This is the moment that matters most: read the diff before you say "merge
 now."** AI-written changes read as confident and can hide subtle errors; the
@@ -301,7 +301,7 @@ Two more habits at this gate:
 
 - If you made a non-obvious decision during the work, put the *why* in the PR
   body. Chat evaporates; PRs are permanent.
-- Note the merge commit hash it reports — that's your one-command undo for the
+- Note the merge commit hash it reports: that's your one-command undo for the
   whole feature if it ever comes to that.
 
 After your go-ahead it merges, syncs the issue checkboxes, cleans up the branch,
@@ -329,9 +329,9 @@ Three things follow:
 
 ---
 
-## Part 3 — Rules of the Road
+## Part 3: Rules of the Road
 
-**When a skill stops with a warning, that's the system working — not breaking.**
+**When a skill stops with a warning, that's the system working, not breaking.**
 The skills are built to halt rather than guess whenever git is in a state that
 could lose work: a diverged main, a merge conflict, a pull that won't
 fast-forward. When that happens: read what it tells you, pick from the options it
@@ -346,14 +346,14 @@ Two things to never do:
 2. **Don't run raw git commands from outside the skills.** The server and script
    rails still stand, but the judgment gates don't. If something seems to need a
    git operation no skill covers, ask "is there a skill-shaped way to do this?"
-   first — and for recovering from a bad state, `gnadd.sh doctor` is the answer
+   first. For recovering from a bad state, `gnadd.sh doctor` is the answer
    (see Recovery below).
 
 **Merge conflicts** are rare and deliberately a human event: the agent will never
 resolve one for you. Resolve it in GitHub's web editor, or ask for a step-by-step
 walkthrough.
 
-### Recovery — the sanctioned path out of a bad state
+### Recovery: the sanctioned path out of a bad state
 
 "Halt and don't improvise" only works as a policy if there's a vetted road back.
 That road is `gnadd.sh doctor` (bundled with the `prime-gnadd` skill). Run with no
@@ -362,7 +362,7 @@ each; it changes nothing on its own. The recipes:
 
 - **Diverged `main`** (local commits origin lacks): `gnadd.sh doctor
   --rescue-main rescue/<desc>`. It bookmarks the stray commits on a rescue
-  branch, verifies the bookmark, then realigns `main` to origin — lossless by
+  branch, verifies the bookmark, then realigns `main` to origin, lossless by
   construction, and it never uses `reset`. You end up standing on the rescue
   branch; route it through an issue and PR like any other work.
 - **Stashed work you forgot about:** `git stash branch rescue/<desc>` turns the
@@ -373,7 +373,7 @@ each; it changes nothing on its own. The recipes:
   them; `gnadd.sh cleanup <pr> <branch>` deletes only after GitHub confirms the
   merge.
 
-Everything doctor does is additive — it creates branches, it never deletes or
+Everything doctor does is additive: it creates branches, it never deletes or
 rewrites. If a state falls outside this list, that's the moment to stop and ask
 for help, not to accept an improvised `reset`/`force` fix.
 
@@ -382,15 +382,15 @@ for help, not to accept an improvised `reset`/`force` fix.
 Prime first. Describe what, not how. Slice thin and don't front-load the backlog.
 Commit often. Read the diff. Treat every skill warning as real. Keep files that
 describe; kill files that track. The rails catch nearly every mistake you can make
-inside them — the one they can't catch is merging without looking.
+inside them. The one they can't catch is merging without looking.
 
 ---
 
-## Part 4 — Reference
+## Part 4: Reference
 
 ### The enforcement layers
 
-Every invariant lives at the **lowest layer that can hold it** — the further down,
+Every invariant lives at the **lowest layer that can hold it**: the further down,
 the harder the guarantee:
 
 | Layer | Holds | Failure mode if bypassed |
@@ -405,7 +405,7 @@ plus context and exit code 2 whenever a human decision is needed. A `state=` hal
 is the system working. The named states: `DIRTY_TREE`, `DIVERGED_MAIN`,
 `FF_REFUSED`, `BRANCH_DIVERGED_FROM_REMOTE`, `ON_MAIN`, `DETACHED_HEAD`,
 `NOT_ISSUE_BRANCH`, `NOTHING_TO_SHIP`, `PR_CONFLICTING`, `MERGEABILITY_UNKNOWN`,
-`NOT_MERGED`, and a few rarer ones — each skill documents the conversation for
+`NOT_MERGED`, and a few rarer ones. Each skill documents the conversation for
 the states it can encounter.
 
 ### The skills
@@ -428,15 +428,15 @@ when installed with `-g`.
   section (orientation, not instructions).
 - **Acceptance criteria are the definition of done.** They state observable conditions
   a reviewer could check *without reading the code*. They are written in `new-issue-gnadd`,
-  surfaced in `start-issue-gnadd`, and verified in `resolve-issue-gnadd` — the same contract,
+  surfaced in `start-issue-gnadd`, and verified in `resolve-issue-gnadd`: the same contract,
   carried end to end.
 - **Vertical slices over horizontal layers.** Each issue delivers a thin, end-to-end,
-  observable behavior. "Users can search and see results" — not "build the search
+  observable behavior. "Users can search and see results", not "build the search
   data layer."
 - **Context is loaded on demand, not speculatively.** `prime-gnadd` gives the map.
   `start-issue-gnadd` gives the terrain. Source files are read when the work needs them.
 - **The PR is the record of what actually shipped.** If the outcome diverged from the
-  issue, the PR body says so. Implementation *decisions* belong here too — this is how
+  issue, the PR body says so. Implementation *decisions* belong here too: this is how
   reasoning made in chat survives into git.
 - **The agent never silently loses commits, resets main, or resolves conflicts
   autonomously.** These are hard rules in the skills, not aspirations.
@@ -456,7 +456,7 @@ when installed with `-g`.
 
 - Branches are named `issue-<N>/<slug>` and are short-lived.
 - Main moves forward by **squash-merge**: each issue becomes exactly one commit on
-  main. After `gnadd.sh init`, this is repo policy, not convention — merge commits
+  main. After `gnadd.sh init`, this is repo policy, not convention: merge commits
   and rebase-merges are disabled, and the PR body becomes the squash commit's
   message, so the decision record lands in git history itself.
 - There is **no local rebase** before merging (see Part 5 for why). GitHub computes
@@ -476,7 +476,7 @@ Re #<N>      ← mid-work commits (a save point)
 ```
 
 The final PR uses `Closes #<N>` instead of `Re #<N>`. Types: `feat`, `fix`, `chore`,
-`docs`, `refactor`, `test`, `style`, `perf` — chosen from the actual change, not the
+`docs`, `refactor`, `test`, `style`, `perf`, chosen from the actual change, not the
 issue label.
 
 ### Behind vs. diverged (the one git concept worth internalizing)
@@ -488,7 +488,7 @@ difference will keep you from panicking at a normal message or ignoring a real o
   main has nothing extra. Right after every merge, your local main is behind by exactly
   the commit you just merged. A plain pull catches you up cleanly. No action needed
   beyond pulling.
-- **Diverged** (dangerous, rare): your local main has commits that are *not* on origin —
+- **Diverged** (dangerous, rare): your local main has commits that are *not* on origin,
   usually a sign something was committed straight to main or its history was rewritten.
   A plain pull can't reconcile this. The skills will **stop** and hand it to you
   rather than guess. If you see this, it's worth asking for help rather than
@@ -496,11 +496,11 @@ difference will keep you from panicking at a normal message or ignoring a real o
 
 The skills watch for the dangerous direction specifically, at every point where they
 touch main, and all pulls onto main are fast-forward-only. If a skill ever halts and
-says main has diverged, that's the real thing — don't wave it through.
+says main has diverged, that's the real thing. Don't wave it through.
 
 ### The mistakes the system catches (and the ones it can't)
 
-Caught by the skills — you'll be stopped and offered a safe path, so these are
+Caught by the skills: you'll be stopped and offered a safe path, so these are
 recoverable, not catastrophic:
 
 - **Editing before starting the issue.** You open the project, change files while on `main`,
@@ -513,7 +513,7 @@ recoverable, not catastrophic:
 - **A diverged `main`, however it happened.** `prime-gnadd`, `start-issue-gnadd`, and `resolve-issue-gnadd`
   all detect it and stop; every pull onto `main` is fast-forward-only.
 
-Not catchable by skills — these live with you (though after `gnadd.sh init`,
+Not catchable by skills: these live with you (though after `gnadd.sh init`,
 the server catches the worst versions):
 
 - **Merging without reading the diff.** Still the load-bearing human habit; nothing
@@ -521,40 +521,40 @@ the server catches the worst versions):
 - **Running raw git commands outside the skills**, including ones an agent suggests
   mid-conversation. The script and server rails still stand, but judgment gates
   don't. If a git operation seems needed and no skill covers it, prefer asking
-  "is there a skill-shaped way to do this?" — and for known bad states,
+  "is there a skill-shaped way to do this?". For known bad states,
   `gnadd.sh doctor` is the sanctioned answer.
 - **Approving an agent's improvised fix when a git command fails.** Failures inside
   skills are designed to stop and report. If an agent instead proposes a reset, a
-  force-push, or on-the-fly conflict resolution, that is the moment to slow down — those
+  force-push, or on-the-fly conflict resolution, that is the moment to slow down. Those
   are exactly the operations this workflow exists to keep away from improvisation.
   (With the `init` ruleset in place, a force-push to `main` fails at the server
   even if approved.)
 
 ---
 
-## Part 5 — Design Decisions & Rationale
+## Part 5: Design Decisions & Rationale
 
 This is the anti-drift log. Each entry records a deliberate choice and why it was made,
 so the reasoning doesn't evaporate and get "helpfully" reverted later. If you're about
-to change one of these, read the rationale first — it may already address your concern.
-With no separate change log (git history covers that), these entries are also where the
-workflow's history lives.
+to change one of these, read the rationale first: it may already address your concern.
+Release-by-release history is in [CHANGELOG.md](CHANGELOG.md); the reasoning behind
+each choice lives here.
 
 ### Mechanics live in code, not prose (2026-07)
 **Decision:** Every git sequence the workflow depends on moved from SKILL.md prose
-into a single tested script — canonical at `bin/gnadd`, copied verbatim into each
+into a single tested script, canonical at `bin/gnadd`, copied verbatim into each
 operational skill as `gnadd.sh` by `scripts/build.sh` (so installed skills are
 self-contained), with `test/run.sh` failing if the copies drift. Skills now hold
 judgment and conversation; the script holds mechanics and halts with `state=<NAME>`
 at every human decision point.
 **Why:** Prose instructions are re-performed from memory by an agent on every
-invocation — each run is a fresh chance to typo, skip a step, or improvise a
+invocation. Each run is a fresh chance to typo, skip a step, or improvise a
 variant, and none of it is testable. Code runs the same way every time, on any
 agent, and every guarantee ("cleanup never deletes an unmerged branch") is now a
 regression test rather than a hope. This is the same insight the workflow was
 founded on, applied to its own safety layer: state belongs in git, not markdown;
 invariants belong in code, not prompts.
-**Rule:** never edit `skills/*/gnadd.sh` directly — edit `bin/gnadd`, run
+**Rule:** never edit `skills/*/gnadd.sh` directly. Edit `bin/gnadd`, run
 `scripts/build.sh`, and keep `test/run.sh` green. When a skill and the script
 disagree on a mechanical detail, the script wins.
 
@@ -563,25 +563,26 @@ disagree on a mechanical detail, the script wins.
 squash commit message = PR title + body, delete-branch-on-merge, and a ruleset on
 `main` requiring a PR and blocking force pushes and deletion. Default keeps an
 admin bypass (solo escape hatch); `--strict` removes it.
-**Why:** The two most dangerous outcomes — unreviewed work landing on `origin/main`
-and history rewrites of `main` — were previously prevented only by agents following
+**Why:** The two most dangerous outcomes (unreviewed work landing on `origin/main`
+and history rewrites of `main`) were previously prevented only by agents following
 instructions. The server can reject both outright, which converts a diverged local
 `main` from "dangerous" to "unpushable" and makes squash-discipline a fact rather
 than a convention. PR_BODY as the squash message also puts the PR's decision record
 into git history itself, strengthening "the PR is the record."
 **Note:** this supersedes the old habit of committing small doc fixes directly to
-`main`. If the loop feels too heavy for a typo, that is the trigger for the
-deferred `quick` skill — build the fast path, don't keep the side door.
+`main`. When the loop feels too heavy for a typo, the fast path is `quickfix-gnadd`
+(one trivial change through a CI-gated PR, no issue). Build the fast path, don't
+keep the side door.
 
 ### Doctor is the sanctioned recovery path (2026-07)
 **Decision:** `gnadd.sh doctor` diagnoses the known bad states (diverged main,
 stashes, dirty main, detached HEAD, leftover branches) and offers exactly one
 vetted recipe per state. Its only mutating action, `--rescue-main`, bookmarks the
 stray commits on a rescue branch, verifies the bookmark, steps onto it, and moves
-the `main` ref back to origin with `branch -f` — additive at every step, no
+the `main` ref back to origin with `branch -f`, additive at every step, no
 `reset`, no force-push, nothing deleted.
 **Why:** The old rule was "halt and don't let the agent improvise," with no
-sanctioned path out — so the actual behavior at halt time would have been exactly
+sanctioned path out, so the actual behavior at halt time would have been exactly
 the improvisation the rule forbids. A recovery tool written and tested while calm
 beats a recipe invented mid-incident. The "never reset main" hard rule stands
 unchanged; rescue-main achieves realignment without any history-destroying
@@ -593,12 +594,12 @@ opens a PR, and lets GitHub's squash-merge apply the work as one commit on curre
 Conflicts are detected via `gh pr view --json mergeable` and handed to the human.
 **Why:** Squash-merge already produces one commit per feature on top of latest main, so
 a local pre-rebase is largely redundant. Rebase is the single most dangerous git
-operation to hand an agent — it rewrites history and forces a force-push, which is the
+operation to hand an agent: it rewrites history and forces a force-push, which is the
 exact class of operation behind an earlier incident where an agent reset main and
 dropped a commit. For a small repo, the benefit of rebase (strictly linear,
 bisect-grade history) is almost never cashed in, while the risk is constant.
 **Reversible:** If the repo grows to a team that bisects main, a pre-rebase step can be
-reintroduced — but it must come with a hard `git push --force-with-lease` rule (never
+reintroduced, but it must come with a hard `git push --force-with-lease` rule (never
 bare `--force`) and explicit rebase-abort handling. Don't add it back casually.
 
 ### Squash-merge (accepting the bisect tradeoff)
@@ -612,7 +613,7 @@ self-documenting. For a small repo's scale, bisect is rare and the tradeoff is w
 **Decision:** `resolve-issue-gnadd` cleanup deletes the branch with `-D` (force), but only
 after confirming via `gh pr view --json state,mergedAt` that the PR actually merged.
 **Why:** After a *squash*-merge, the branch's commits are not ancestors of main, so git's
-safe delete (`-d`) refuses every time — it would fail on every successful resolve. `-D`
+safe delete (`-d`) refuses every time: it would fail on every successful resolve. `-D`
 is correct here, and the merge-state check is what makes it provably non-destructive:
 if the PR merged, the work is on main, so the branch is genuinely redundant.
 **Do not** revert this to `-d`; it will break on every merge.
@@ -622,7 +623,7 @@ if the PR merged, the work is on main, so the branch is genuinely redundant.
 `git log origin/main..main` (local-ahead) shows commits.
 **Why:** A naive check that stops whenever local and origin differ would halt on *every*
 merge, because being behind by the just-merged commit always shows a difference. That
-would make the safety warning fire constantly and train the user to ignore it —
+would make the safety warning fire constantly and train the user to ignore it,
 defeating its purpose. The genuinely dangerous state is local main holding commits
 origin lacks (`origin/main..main` non-empty); being behind (`main..origin/main`
 non-empty) is the normal, safe, fast-forwardable state. Verified empirically.
@@ -630,16 +631,16 @@ non-empty) is the normal, safe, fast-forwardable state. Verified empirically.
 **Extended (2026-06):** the behind-vs-diverged classification now runs at **every** main
 touchpoint, not just resolve time: `prime-gnadd` reports divergence as a prominent warning,
 `start-issue-gnadd` classifies before its fresh-start pull, and all pulls onto `main` (and
-onto issue branches at resume) use `--ff-only` — so a merge commit on main is
+onto issue branches at resume) use `--ff-only`, so a merge commit on main is
 mechanically impossible even if a classification step is somehow missed.
 
 ### Skills verify the *branch*, not just the issue
 **Decision:** `resolve-issue-gnadd` refuses to run from `main` or detached HEAD and requires an
 explicit, working-tree-safe switch to an issue branch. `commit-gnadd` stops and requires
 explicit confirmation before committing on `main` or in detached HEAD. `start-issue-gnadd`
-never commits rescued changes to `main` — a dirty tree on `main` at fresh start is
+never commits rescued changes to `main`: a dirty tree on `main` at fresh start is
 carried onto the new issue branch via `checkout -b` (which preserves the working tree).
-**Why:** The original `resolve-issue-gnadd` asked "which issue?" when the branch didn't match —
+**Why:** The original `resolve-issue-gnadd` asked "which issue?" when the branch didn't match,
 then operated on the *current* branch anyway. Invoked from `main`, that path would
 commit and push directly to `origin/main`, shipping unreviewed work around the PR gate:
 the only such path in the system, reachable by one wrong answer to an innocuous
@@ -670,18 +671,18 @@ not-yet-on-spec scaffolding). Drift is caught once, at resolve time, before it s
 **Decision:** The in-progress-work safety check runs before resuming or creating any
 branch, including before checking out an existing issue branch.
 **Why:** An earlier ordering checked out the resume branch first, which could fail or
-silently carry uncommitted changes onto the wrong branch — the quiet-data-movement bug
+silently carry uncommitted changes onto the wrong branch, the quiet-data-movement bug
 the whole workflow is meant to design out. Protecting the working tree first closes it.
 
 ### prime-gnadd fetches remote state (and stays read-only)
 **Decision:** `prime-gnadd` runs `git fetch --prune` and surfaces behind-count, divergence,
 stashes, and open PRs.
-**Why:** Without a fetch, prime-gnadd reports a stale local cache — invisible to collaborators'
+**Why:** Without a fetch, prime-gnadd reports a stale local cache, invisible to collaborators'
 pushes and blind to local main being behind. `fetch --prune` updates remote-tracking
 refs only; it touches no working files or branches, so it honors prime-gnadd's read-only
 contract.
 
-### YOLO mode trades the pre-merge human review — deliberately (2026-07)
+### YOLO mode trades the pre-merge human review, deliberately (2026-07)
 **Decision:** `yolo-gnadd` runs one already-decided issue or quickfix through the
 entire loop with the mid-loop gates (plan approval, staging confirmation,
 PR-draft approval, merge confirmation) auto-approved. What substitutes for the
@@ -691,16 +692,16 @@ addressed or dismissed-with-reason), the script-enforced CI gate, and post-merge
 revertability via the squash commit. Three hard boundaries: every `state=` halt,
 guard refusal, and CI failure remains a stop (with a 2-round self-repair budget
 before escalating); a diff touching `bin/`, `scripts/`, `.github/`, or a
-`gnadd.sh` copy is never merged autonomously — the run stops at the merge gate;
-and YOLO never chooses its own work — explicit invocation on a decided unit is
+`gnadd.sh` copy is never merged autonomously (the run stops at the merge gate);
+and YOLO never chooses its own work: explicit invocation on a decided unit is
 the consent.
 **Why:** Once the spec is human-approved, the mid-loop gates mostly rubber-stamp
 what the spec already authorized, while each round-trip costs a session
-interruption. The rails that made this safe to trade were built first — server-side
+interruption. The rails that made this safe to trade were built first: server-side
 PR requirement, script-owned merge path, one-command revert. The review moves,
 it doesn't disappear: post-merge skim-and-revert, armed by a closing report.
 **Enforcement is structural, not promised:** yolo contains no loop mechanics of
-its own — each phase is executed by loading the sibling skill — and every
+its own (each phase is executed by loading the sibling skill) and every
 `gnadd.sh` invocation leaves a receipt line in `.git/gnadd-trace.log` (`gnadd
 trace show`). The closing report must include the trace and call out any gaps;
 a freewheeled run is visible, not deniable.
@@ -789,12 +790,12 @@ first thing to try).
   requests changes and the real shape is known. A separate need from `update-issue`.
   (The narrower "merge the PR I left open yesterday" case is already covered:
   `resolve-issue-gnadd` detects an existing open PR and resumes at the merge gate.)
-- **`quick`** — landed as `quickfix-gnadd` (2026-07): the micro-task overhead
+- **`quick`**: landed as `quickfix-gnadd` (2026-07): the micro-task overhead
   trigger fired in practice. One trivial change per invocation, no issue (the PR
   is the record), with a deterministic guard (small diffs only; never `bin/`,
   `scripts/`, `.github/`, or `gnadd.sh` copies) and a CI-gated squash merge
   enforced in the script. A fast path *through* the safety rails, not around them.
-- **Hard CI gate** in `resolve-issue-gnadd`: partially landed — `resolve-issue-gnadd` runs the
+- **Hard CI gate** in `resolve-issue-gnadd`: partially landed. `resolve-issue-gnadd` runs the
   project's test suite locally via `gnadd.sh test` before the PR, and `gnadd.sh
   init --ci` bootstraps a GitHub Actions workflow. Make the GitHub-side check
   *blocking* (not just reported at the merge gate) once a project's CI is stable
