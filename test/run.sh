@@ -987,6 +987,104 @@ expect_contains "rounds=2"
 expect_not_contains "gnadd:round"
 case "$OUT" in *"Round 1"*"Round 2"*) ok ;; *) fail "rounds out of order: $OUT" ;; esac
 
+t round_feedback_posts_without_commit; setup_repo
+run start 12 rounds
+export GH_STUB_ROUND_COUNT=2 GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round feedback --feedback "good, but the header wraps"
+expect_status 0 "$ST"
+expect_contains "issue=12"
+expect_contains "round=2"
+expect_contains "posted=true"
+expect_not_contains "pushed="
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "<!-- gnadd:feedback -->"
+expect_contains "## Round 2 feedback"
+expect_contains "transcribed by the agent from chat"
+expect_contains "> good, but the header wraps"
+expect_gh_called "gh issue comment 12 --body-file" "feedback not posted via gh issue comment"
+git ls-remote --exit-code --heads origin issue-12/rounds >/dev/null 2>&1 && fail "round feedback pushed the branch" || ok
+
+t round_feedback_file_and_none; setup_repo
+run start 13 rounds
+export GH_STUB_ROUND_COUNT=1 GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+printf 'ship it\n' > "$SANDBOX/fb.txt"
+run round feedback --feedback-file "$SANDBOX/fb.txt"
+expect_status 0 "$ST"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "> ship it"
+run round feedback --no-feedback "user stepped away"
+expect_status 0 "$ST"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "**Feedback:** none this round (user stepped away)."
+
+t round_feedback_refuses_without_a_round; setup_repo
+run start 14 rounds
+run round feedback --feedback "nice"
+expect_status 2 "$ST"
+expect_contains "state=NO_ROUNDS"
+expect_gh_not_called "issue comment" "feedback posted with no round to answer"
+
+t round_feedback_refuses_duplicate; setup_repo
+run start 15 rounds
+export GH_STUB_ROUND_COUNT=1 GH_STUB_ROUND_LAST=feedback
+run round feedback --feedback "again"
+expect_status 2 "$ST"
+expect_contains "state=FEEDBACK_RECORDED"
+expect_gh_not_called "issue comment" "duplicate feedback posted"
+
+t round_feedback_refuses_empty_and_off_branch; setup_repo
+run round feedback --feedback "x"
+expect_status 2 "$ST"
+expect_contains "state=NOT_ISSUE_BRANCH"
+run start 16 rounds
+export GH_STUB_ROUND_COUNT=1
+run round feedback
+expect_status 1 "$ST"
+expect_contains "never inferred"
+run round feedback --feedback ""
+expect_status 1 "$ST"
+expect_contains "feedback text is empty"
+run round feedback --feedback "a" --no-feedback "b"
+expect_status 1 "$ST"
+expect_gh_not_called "issue comment" "posted despite refusal"
+
+t round_post_cites_recorded_feedback; setup_repo
+run start 17 rounds
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice two"
+export GH_STUB_ROUND_COUNT=1 GH_STUB_ROUND_LAST=feedback GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "second slice"
+expect_status 0 "$ST"
+expect_contains "round=2"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "**Feedback:** recorded on round 1."
+expect_not_contains "transcribed"
+
+t round_post_refuses_feedback_already_recorded; setup_repo
+run start 18 rounds
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice two"
+export GH_STUB_ROUND_COUNT=1 GH_STUB_ROUND_LAST=feedback
+run round post --changed "second slice" --feedback "ok"
+expect_status 1 "$ST"
+expect_contains "already on the record"
+expect_gh_not_called "issue comment" "duplicate feedback carried into round post"
+
+t round_post_still_requires_feedback_when_unrecorded; setup_repo
+run start 19 rounds
+export GH_STUB_ROUND_COUNT=1 GH_STUB_ROUND_LAST=round
+run round post --changed "second slice"
+expect_status 1 "$ST"
+expect_contains "never inferred"
+
+t round_list_includes_feedback; setup_repo
+run start 20 rounds
+export GH_STUB_ROUND_COUNT=1
+export GH_STUB_ROUND_BODIES='<!-- gnadd:round -->\n## Round 1\n\n**Changed:** a\n<!-- gnadd:feedback -->\n## Round 1 feedback\n\n> ship it'
+run round list
+expect_status 0 "$ST"
+expect_contains "rounds=1"
+expect_not_contains "gnadd:feedback"
+case "$OUT" in *"Round 1"*"Round 1 feedback"*"> ship it"*) ok ;; *) fail "feedback missing from round list: $OUT" ;; esac
+
 t round_list_none; setup_repo
 run round list 11
 expect_status 0 "$ST"

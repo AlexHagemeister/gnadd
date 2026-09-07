@@ -16,6 +16,7 @@
 #   GH_STUB_FAIL          set = every command fails
 #   GH_STUB_ROUND_COUNT   existing round comments on an issue (unset = 0)
 #   GH_STUB_ROUND_BODIES  bodies for `round list` (\n-separated, printf %b)
+#   GH_STUB_ROUND_LAST    kind of the latest marked comment: round / feedback (unset = round)
 #   GH_STUB_COMMENT_FILE  where `issue comment --body-file` copies its body
 #   GH_STUB_PHASES        open milestones as tab rows 'num\ttitle\topen\tclosed\tdesc'
 #                         (\n for multiple rows; unset = none open)
@@ -123,8 +124,9 @@ case "$1" in
     case "$2" in
       */issues/*/comments)
         case "$jq_expr" in
-          *length*) printf '%s\n' "${GH_STUB_ROUND_COUNT:-0}" ;;
-          *)        [ -n "${GH_STUB_ROUND_BODIES:-}" ] && printf '%b\n' "$GH_STUB_ROUND_BODIES" ;;
+          *length*)     printf '%s\n' "${GH_STUB_ROUND_COUNT:-0}" ;;
+          *if\ contains*) [ "${GH_STUB_ROUND_COUNT:-0}" -gt 0 ] && printf '%s\n' "${GH_STUB_ROUND_LAST:-round}" ;;
+          *)            [ -n "${GH_STUB_ROUND_BODIES:-}" ] && printf '%b\n' "$GH_STUB_ROUND_BODIES" ;;
         esac
         exit 0 ;;
     esac
