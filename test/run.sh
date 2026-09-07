@@ -725,6 +725,15 @@ run trace show
 expect_status 0 "$ST"
 expect_contains "trace=empty"
 
+t trace_note_records_a_step_outside_the_script; setup_repo
+run trace note gh pr create --draft
+expect_status 0 "$ST"
+expect_contains "trace=noted"
+run trace show
+expect_contains " note gh pr create --draft branch=main"
+run trace note
+expect_status 1 "$ST"
+
 t trace_survives_midpipe_kill; setup_repo
 # Killing a run mid-pipe (reader closes early → SIGPIPE) must not garble the
 # trace: bash 3.2 flushes the stdout it failed to write into the trace line
