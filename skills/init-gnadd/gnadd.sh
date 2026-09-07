@@ -226,21 +226,42 @@ cmd_state() {
 # ---------------------------------------------------------------- start
 
 cmd_start() {
-  local carry=0 args=()
-  for a in "$@"; do
-    case "$a" in
+  local carry=0 from="" args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
       --carry) carry=1 ;;
-      *) args+=("$a") ;;
+      --from) shift; from="${1:-}"; [ -n "$from" ] || usage_die "--from needs a branch name" ;;
+      *) args+=("$1") ;;
     esac
+    shift
   done
-  [ ${#args[@]} -eq 2 ] || usage_die "usage: gnadd start <issue-number> <slug> [--carry]"
+  [ ${#args[@]} -eq 2 ] || usage_die "usage: gnadd start <issue-number> <slug> [--carry | --from <branch>]"
   local n="${args[0]}" slug="${args[1]}"
   [[ "$n" =~ ^[0-9]+$ ]] || usage_die "issue number must be numeric, got: $n"
   [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || usage_die "slug must be kebab-case, got: $slug"
+  { [ "$carry" = 1 ] && [ -n "$from" ]; } && usage_die "--carry and --from are separate rescues; pick one"
 
   local target="issue-$n/$slug"
   local existing
   existing="$(git branch --list "issue-$n/*" --format='%(refname:short)' | head -1)"
+
+  if [ -n "$from" ]; then
+    # Onward path for a rescued branch (doctor --rescue-main, or any local
+    # branch holding commits that need an issue): the branch becomes the
+    # issue branch by rename. Nothing is copied, nothing is lost, and the
+    # rescue name disappears so it cannot linger as a leftover.
+    [ "$from" != "$MAIN" ] || die_state FROM_IS_MAIN "--from $MAIN makes no sense; a fresh issue branch already starts from $MAIN"
+    git show-ref --verify --quiet "refs/heads/$from" || die_state FROM_NOT_FOUND "no local branch '$from' to start from"
+    [ -z "$existing" ] || die_state FROM_HAS_EXISTING_BRANCH "branch '$existing' already exists for issue #$n; --from cannot merge two branches. Resume it, or drop one"
+    require_clean_tree
+    git branch -m "$from" "$target" >/dev/null 2>&1 || usage_die "cannot rename '$from' to '$target'"
+    git checkout "$target" >/dev/null 2>&1
+    say "result=created-from"
+    say "branch=$target"
+    say "from=$from"
+    note "'$from' is now '$target' with its commits intact; continue with the issue's plan"
+    return 0
+  fi
 
   if [ "$carry" = 1 ]; then
     # Rescue path: dirty tree on main, no existing branch for this issue.
@@ -550,6 +571,49 @@ cmd_cleanup() {
   fi
 }
 
+# ---------------------------------------------------------------- drop
+#
+# The discard exit for a branch no PR will ever land (a doctor rescue the
+# human decides to throw away). cleanup deletes only after GitHub proves a
+# merge; drop deletes only after the human has seen the commits it holds and
+# said so with --yes. The refusal lists them, so the decision is informed.
+
+cmd_drop() {
+  local yes=0 branch=""
+  for a in "$@"; do
+    case "$a" in
+      --yes) yes=1 ;;
+      *) [ -z "$branch" ] || usage_die "usage: gnadd drop <branch> [--yes]"; branch="$a" ;;
+    esac
+  done
+  [ -n "$branch" ] || usage_die "usage: gnadd drop <branch> [--yes]"
+  [ "$branch" != "$MAIN" ] || die_state DROP_MAIN "never drop $MAIN"
+  git show-ref --verify --quiet "refs/heads/$branch" || die_state DROP_NOT_FOUND "no local branch '$branch'"
+  local br; br="$(current_branch)"
+  [ "$br" != "$branch" ] || die_state ON_TARGET_BRANCH "cannot drop the branch you are standing on; run 'gnadd sync-main' first"
+
+  local base="origin/$MAIN"
+  git rev-parse --verify --quiet "$base" >/dev/null || base="$MAIN"
+  local count; count="$(git rev-list --count "$base..$branch" 2>/dev/null || echo "?")"
+  say "branch=$branch"
+  say "commits_beyond_${base//\//_}=$count"
+  if [ "$count" != "0" ]; then
+    err "commits on '$branch' that $base lacks (these are dropped for good):"
+    git log --oneline "$base..$branch" | sed 's/^/  /' >&2
+  fi
+  if has_remote && git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+    note "origin also has '$branch'; drop touches only the local branch"
+  fi
+
+  if [ "$yes" != 1 ]; then
+    say "state=DROP_NEEDS_CONFIRM"
+    err "nothing deleted. Show the commits above to the human; rerun with --yes on their word"
+    exit 2
+  fi
+  git branch -D "$branch" >/dev/null 2>&1 || usage_die "delete of '$branch' failed"
+  say "dropped=true"
+}
+
 # ---------------------------------------------------------------- quickfix
 #
 # The fast path THROUGH the rails for trivial changes: no issue, but always
@@ -730,9 +794,10 @@ cmd_doctor() {
       findings=$((findings+1))
       say "finding=DIVERGED_MAIN"
       show_divergence
-      note "recipe: gnadd doctor --rescue-main rescue/<desc>"
+      note "recipe: gnadd doctor --rescue-main quickfix/<slug>   (or rescue/<desc>)"
       note "  moves the stray commits to a rescue branch (lossless), realigns $MAIN to origin/$MAIN"
-      note "  without any reset, and leaves you on the rescue branch to route through a PR"
+      note "  without any reset, and leaves you on the rescue branch. A quickfix/ name lets"
+      note "  /quickfix-gnadd ship it as-is; any name can become an issue branch or be dropped"
     fi
   fi
 
@@ -795,8 +860,15 @@ doctor_rescue_main() {
   say "rescued=true"
   say "rescue_branch=$rescue"
   say "main_commit=$(git rev-parse "$MAIN")"
-  note "stray commits preserved on '$rescue'; you are standing on it"
-  note "route them through the loop: open an issue, rename or PR this branch. Never push them to $MAIN directly"
+  note "stray commits preserved on '$rescue'; you are standing on it. Never push them to $MAIN directly"
+  note "next step, one of:"
+  if [[ "$rescue" =~ ^quickfix/ ]]; then
+    note "  land as a quickfix:   /quickfix-gnadd (the branch already has a quickfix/ name; 'gnadd quickfix ship' accepts it)"
+  else
+    note "  land as a quickfix:   not with this name (quickfix ship wants quickfix/<slug>); next time rescue onto one"
+  fi
+  note "  land through an issue: open one, then 'gnadd start <N> <slug> --from $rescue' (renames it to issue-<N>/<slug>)"
+  note "  discard:               'gnadd sync-main', then 'gnadd drop $rescue' (lists the commits, deletes only with --yes)"
 }
 
 # ---------------------------------------------------------------- test
@@ -1312,6 +1384,7 @@ main() {
   case "$cmd" in
     state)        cmd_state "$@" ;;
     start)        cmd_start "$@" ;;
+    drop)         cmd_drop "$@" ;;
     push)         cmd_push "$@" ;;
     guard-commit) cmd_guard_commit "$@" ;;
     ship)
@@ -1367,6 +1440,8 @@ gnadd: deterministic mechanics for the GNADD workflow
 
   state [--no-fetch]              snapshot: branch, tree, stashes, main classification
   start <N> <slug> [--carry]      resume or create issue-<N>/<slug> safely
+  start <N> <slug> --from <branch> rename a rescued branch into issue-<N>/<slug>, commits intact
+  drop <branch> [--yes]           delete a branch no PR will land; lists its commits, refuses without --yes
   push                            checkpoint push: branch to origin, sets upstream, never forces
   guard-commit                    refuse commits on main/master/detached HEAD
   ship push [--any-branch]        push branch, detect existing PR

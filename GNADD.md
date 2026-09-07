@@ -364,7 +364,10 @@ each; it changes nothing on its own. The recipes:
   --rescue-main rescue/<desc>`. It bookmarks the stray commits on a rescue
   branch, verifies the bookmark, then realigns `main` to origin, lossless by
   construction, and it never uses `reset`. You end up standing on the rescue
-  branch; route it through an issue and PR like any other work.
+  branch, and doctor prints its three exits: name it `quickfix/<slug>` and
+  `/quickfix-gnadd` ships it as-is, or open an issue and `gnadd.sh start <N>
+  <slug> --from <branch>` renames it into the issue branch, or `gnadd.sh drop
+  <branch>` discards it (it lists the commits and deletes only with `--yes`).
 - **Stashed work you forgot about:** `git stash branch rescue/<desc>` turns the
   newest stash into a visible branch.
 - **Dirty tree on `main`:** `/start-issue-gnadd` carries it onto a fresh issue branch.
@@ -374,7 +377,8 @@ each; it changes nothing on its own. The recipes:
   merge.
 
 Everything doctor does is additive: it creates branches, it never deletes or
-rewrites. If a state falls outside this list, that's the moment to stop and ask
+rewrites. The one deleting exit, `drop`, is a separate command that shows what
+it would lose and waits for the human's `--yes`. If a state falls outside this list, that's the moment to stop and ask
 for help, not to accept an improvised `reset`/`force` fix.
 
 ### The short version

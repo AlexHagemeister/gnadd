@@ -87,6 +87,12 @@ Confirmed dirty-main rescue only:
 bash "<skill-dir>/gnadd.sh" start <N> <slug> --carry
 ```
 
+Rescued branch only (the user is on, or names, a branch `doctor --rescue-main` left, and has opened an issue for its commits): the branch is renamed into the issue branch with its commits intact.
+
+```bash
+bash "<skill-dir>/gnadd.sh" start <N> <slug> --from <branch>
+```
+
 The script resumes an existing `issue-<N>/*` branch (with a fast-forward-only pull if it has a remote) or creates a fresh one off a verified-safe, freshly synced `main`. Handle its outcomes:
 
 | Output | Meaning | What to do |
@@ -94,6 +100,8 @@ The script resumes an existing `issue-<N>/*` branch (with a fast-forward-only pu
 | `result=created` | Fresh branch off synced main | Continue to step 4 |
 | `result=resumed` | Existing branch checked out and up to date | Continue to step 4 (resume flavor) |
 | `result=created-carry` | Branch created with your uncommitted changes carried | Continue; sync `main` next time the tree is clean |
+| `result=created-from` | The rescued branch is now the issue branch, commits intact | Continue to step 4; the plan covers the rescued commits too |
+| `state=FROM_NOT_FOUND` / `FROM_IS_MAIN` / `FROM_HAS_EXISTING_BRANCH` | `--from` named a branch that does not exist, is `main`, or collides with an existing branch for this issue | Report and ask; never merge two branches to resolve it |
 | `state=DIRTY_TREE` | Tree not clean | Return to the step-2 conversation |
 | `state=DIVERGED_MAIN` | Local main has commits origin lacks | **Stop.** Show the listed commits, explain, offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Do not pull, reset, or reconcile yourself |
 | `state=BRANCH_DIVERGED_FROM_REMOTE` | Issue branch and its remote diverged | **Stop and report.** Do not merge or rebase autonomously |

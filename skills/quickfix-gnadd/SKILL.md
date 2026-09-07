@@ -86,6 +86,10 @@ Derive `<slug>` from the change: short kebab-case (e.g. `readme-typo`).
   bash "<skill-dir>/gnadd.sh" quickfix start <slug> --carry
   ```
 
+- **Already on a `quickfix/<slug>` branch** (a `doctor --rescue-main
+  quickfix/<slug>` rescue leaves you there): skip branch creation. The
+  commits it holds are the change; go to step 3.
+
 - **Dirty tree elsewhere, or any `state=` halt** (`DIVERGED_MAIN`,
   `QF_BRANCH_EXISTS`, `FF_REFUSED`): stop and resolve with the user;
   `gnadd.sh doctor` is the recovery path for bad states.
