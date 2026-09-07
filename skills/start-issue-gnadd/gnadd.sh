@@ -379,10 +379,24 @@ cmd_cleanup() {
   fi
   merge_commit="$("$GH" pr view "$pr" --json mergeCommit --jq .mergeCommit.oid 2>/dev/null || true)"
 
+  # The merged check only proves that PR #<pr>'s head landed. It says nothing
+  # about <branch> unless <branch> IS that head, so confirm the name matches
+  # and that nothing was committed to the branch after the head GitHub merged.
+  local head_name head_oid
+  head_name="$(gh_json headRefName pr view "$pr" 2>/dev/null || true)"
+  head_oid="$(gh_json headRefOid pr view "$pr" 2>/dev/null || true)"
+  [ -n "$head_name" ] || die_state BRANCH_MISMATCH "could not read PR #$pr's head branch from GitHub; refusing to delete '$branch'"
+  [ "$head_name" = "$branch" ] || die_state BRANCH_MISMATCH "PR #$pr merged branch '$head_name', not '$branch'; refusing to delete a branch the PR did not land"
+
   local br; br="$(current_branch)"
   [ "$br" != "$branch" ] || die_state ON_TARGET_BRANCH "cannot delete the branch you are standing on; run 'gnadd sync-main' first"
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
+    local tip; tip="$(git rev-parse "refs/heads/$branch")"
+    if [ -n "$head_oid" ] && [ "$tip" != "$head_oid" ]; then
+      local after; after="$(git rev-list --count "$head_oid..$tip" 2>/dev/null || echo "?")"
+      die_state UNMERGED_COMMITS "'$branch' is at $tip but PR #$pr merged $head_oid ($after commit(s) after the merged head); refusing to delete. Push them as a new PR or drop them yourself"
+    fi
     git branch -D "$branch" >/dev/null 2>&1
     say "local_deleted=true"
   else
@@ -1121,7 +1135,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   phase close <title> --verdict <text>
                                   close the phase; the verdict lands in its description
   sync-main                       return to main and fast-forward it (ff-only)
-  cleanup <pr> <branch>           delete branch only after GitHub confirms merge
+  cleanup <pr> <branch>           delete branch only after GitHub confirms the PR merged,
+                                  that <branch> is its head, and nothing was committed after
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset

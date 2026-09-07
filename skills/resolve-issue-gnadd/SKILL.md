@@ -218,6 +218,8 @@ bash "<skill-dir>/gnadd.sh" cleanup <PR> issue-<N>/<slug>
 The script confirms via GitHub that the PR actually merged (`state=MERGED` with a real `mergedAt`) **before** force-deleting the branch — that check is what makes `-D` provably non-destructive after a squash-merge (safe `-d` always refuses, because squash commits are not ancestors of the branch). It then removes the remote branch if GitHub's auto-delete hasn't already, and reports `merge_commit=<hash>`.
 
 - **`state=NOT_MERGED`:** the PR didn't merge (left open, or merge failed) — the branch is **not** deleted. Stop and report.
+- **`state=BRANCH_MISMATCH`:** the branch named is not the merged PR's head, so the merge proves nothing about it. Nothing is deleted. Check which PR the branch belongs to and rerun with the matching pair.
+- **`state=UNMERGED_COMMITS`:** the branch has commits after the head GitHub merged. Nothing is deleted. Those commits never shipped: push them as a new PR, or the user drops them by hand. Never delete around this.
 - **Never run `git reset` on `main` to discard commits** — in any form, for any reason. If anything about main looks wrong here, `gnadd.sh doctor` is the sanctioned path.
 
 Report what was cleaned up, and give the user the merge commit hash — their one-command undo for the whole feature (`git revert <hash>`).

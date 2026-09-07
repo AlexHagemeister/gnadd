@@ -71,7 +71,8 @@ setup_repo() {
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
         GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE GH_STUB_PHASES \
-        GH_STUB_PHASE_DESC GH_STUB_API_INPUT GH_STUB_RULESETS 2>/dev/null || true
+        GH_STUB_PHASE_DESC GH_STUB_API_INPUT GH_STUB_RULESETS \
+        GH_STUB_PR_HEAD GH_STUB_PR_HEAD_OID 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -303,6 +304,7 @@ echo x > x.txt && git_q add x.txt && git_q commit -m x
 git_q push -u origin HEAD
 git_q checkout main
 export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z GH_STUB_MERGE_COMMIT=deadbeef
+export GH_STUB_PR_HEAD=issue-18/gone GH_STUB_PR_HEAD_OID="$(git rev-parse issue-18/gone)"
 run cleanup 46 issue-18/gone
 expect_status 0 "$ST"
 expect_contains "local_deleted=true"
@@ -313,10 +315,43 @@ git ls-remote --exit-code --heads origin issue-18/gone >/dev/null 2>&1 && fail "
 
 t cleanup_refuses_from_target_branch; setup_repo
 git_q checkout -b issue-19/here
-export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z GH_STUB_PR_HEAD=issue-19/here
 run cleanup 47 issue-19/here
 expect_status 2 "$ST"
 expect_contains "state=ON_TARGET_BRANCH"
+
+t cleanup_refuses_branch_mismatch; setup_repo
+git_q checkout -b rescue/stray
+echo x > x.txt && git_q add x.txt && git_q commit -m "stray"
+git_q checkout main
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z GH_STUB_PR_HEAD=quickfix/other
+run cleanup 48 rescue/stray
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_MISMATCH"
+expect_contains "quickfix/other"
+git show-ref --verify --quiet refs/heads/rescue/stray && ok || fail "branch deleted despite PR head mismatch"
+
+t cleanup_refuses_unknown_head; setup_repo
+git_q branch issue-20/keep
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z
+run cleanup 49 issue-20/keep
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_MISMATCH"
+git show-ref --verify --quiet refs/heads/issue-20/keep && ok || fail "branch deleted with unknown PR head"
+
+t cleanup_refuses_commits_after_merged_head; setup_repo
+git_q checkout -b issue-21/late
+echo x > x.txt && git_q add x.txt && git_q commit -m "in the PR"
+merged_head="$(git rev-parse HEAD)"
+echo y > y.txt && git_q add y.txt && git_q commit -m "after the merge"
+git_q checkout main
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-07-17T00:00:00Z
+export GH_STUB_PR_HEAD=issue-21/late GH_STUB_PR_HEAD_OID="$merged_head"
+run cleanup 50 issue-21/late
+expect_status 2 "$ST"
+expect_contains "state=UNMERGED_COMMITS"
+expect_contains "1 commit(s) after"
+git show-ref --verify --quiet refs/heads/issue-21/late && ok || fail "branch with post-merge commits deleted"
 
 # ---------------------------------------------------------------- doctor
 
