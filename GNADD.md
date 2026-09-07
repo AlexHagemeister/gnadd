@@ -764,11 +764,17 @@ if the verdict-in-description edit reads as tracking rather than record.
 comment on the issue (`gnadd round post`), numbered from the comments already
 there. The comment carries what changed and the user's feedback for that
 round, transcribed from chat and labeled as such. The issue body is never
-edited mid-work.
+edited mid-work. Before it comments, `round post` pushes the branch (upstream
+set on the first push, never a force), so the sha the comment cites is on
+GitHub the moment the comment is. `state` reports `upstream=` and
+`ahead_of_upstream=` so a session can see unpushed checkpoints, and `start`
+resumes an issue branch that exists on origin but not locally.
 
 **Why:** squash-merge keeps only the PR body, so the story of how a feature
 was built round by round had no home and a branch spanning sessions could not
-resume from the record. A GitHub comment survives the squash, is readable
+resume from the record. The push moved into `round post` after the v0.5.0
+testbed run found round comments citing commits that existed on one laptop
+only (#97): a record GitHub cannot resolve is not a record. A GitHub comment survives the squash, is readable
 without the chat transcript, and is what the next session reads. The
 feedback label and the empty-text refusal exist because only the agent can
 see the chat: the record states its own provenance rather than presenting an

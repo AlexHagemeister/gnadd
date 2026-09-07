@@ -106,8 +106,9 @@ git log -1 --format="%h %s"
 
 When the guard reported `issue=<N>`, every commit closes a round of the
 build/try/feedback loop, and the record of that round lives on the issue, not
-in chat. Post it through the script, which numbers the round from the comments
-already on the issue:
+in chat. Post it through the script, which pushes the branch first (setting
+upstream on the first push, never forcing) so the sha it cites is on GitHub,
+then numbers the round from the comments already on the issue:
 
 ```bash
 bash "<skill-dir>/gnadd.sh" round post --changed "<what this checkpoint changed, one or two lines>" --feedback-file <path>
@@ -125,8 +126,11 @@ Rules for the feedback:
 - **Short inline feedback** may use `--feedback "<text>"` instead of a file.
 
 Skip this step entirely when not on an issue branch (`issue=none`). On
-`state=COMMENT_FAILED` the commit is safe; report it and re-run `round post`
-when the user says so.
+`state=PUSH_FAILED` the commit is safe and nothing was posted: origin has
+commits this branch lacks, or the network or auth failed. Report it and stop;
+never force. On `state=COMMENT_FAILED` the push landed and the commit is safe;
+report it and re-run `round post` when the user says so. `pushed=false` with
+a note means the repo has no remote; the comment still posts.
 
 ## Closing Guidance
 

@@ -107,6 +107,7 @@ From the `state` output, report:
 - **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`."
 - **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks. **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix. Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
+- **Unpushed checkpoints:** on an issue branch, `upstream=none` or a nonzero `ahead_of_upstream` means commits exist only on this machine. Say so: the round trail on GitHub is behind the branch until the next `round post` or `push`.
 
 ### Authorship
 
