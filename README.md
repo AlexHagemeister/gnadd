@@ -8,6 +8,8 @@ It works with any agent the [skills CLI](https://github.com/vercel-labs/skills) 
 
 **Full guide:** [GNADD.md](GNADD.md). This README is the front door. The guide holds the model, the rules, and the reasoning behind each decision.
 
+**In a hurry?** The [Quickstart](#quickstart) is lower on the page, with a prompt to hand your agent and the install commands for each route.
+
 ## The problems it removes
 
 Working with a coding agent tends to produce three kinds of mess. GNADD is built around not creating them.
@@ -102,13 +104,33 @@ Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a
 | `quickfix-gnadd` | `/quickfix-gnadd` | One trivial change through a CI-gated PR, no issue. Refuses large or mechanics-touching diffs |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` | Runs one decided issue or quickfix through the full loop autonomously, with a review pass and a trace-backed report |
 
-## Install
+## Quickstart
 
-Requires the [GitHub CLI](https://cli.github.com/) (`gh`) logged in and an agent with shell access. Two channels ship the same skill files: the skills CLI for any agent, or the Claude Code plugin manager. Pick one.
+Requires the [GitHub CLI](https://cli.github.com/) (`gh`) logged in and an agent with shell access. There are three ways to install, and they ship the same skill files. Pick one.
 
-### Skills CLI (any agent)
+1. **Skills CLI**: any agent the [skills CLI](https://github.com/vercel-labs/skills) supports (Cursor, Claude Code, Codex, and more). Needs [Node.js](https://nodejs.org/) for `npx`.
+2. **Claude Code plugin**: Claude Code only, through its plugin manager. Skills come namespaced (`/gnadd:prime-gnadd`).
+3. **Fork and customize**: your own copy of GNADD on GitHub, adjusted to taste, installed by either of the two routes above with your username in place of mine.
 
-Requires [Node.js](https://nodejs.org/) for `npx`.
+### For humans
+
+Paste this to your agent and answer its one question:
+
+```text
+Install GNADD for me. Fetch https://raw.githubusercontent.com/AlexHagemeister/gnadd/main/README.md, find the section "For agents", and follow it. Ask me which install route I want before running anything.
+```
+
+To do it by hand instead, run the commands under the route you want below, then read [Per-project setup](#per-project-setup).
+
+### For agents
+
+1. Confirm `gh auth status` shows a logged-in account. If not, stop and ask the user to run `gh auth login`.
+2. Ask the user one question: which install route, skills CLI, Claude Code plugin, or fork and customize. Do not pick for them. For the skills CLI route, also ask which agent they use if you cannot tell from the environment. For the fork route, ask for their GitHub username.
+3. Run the install commands under that route below, exactly as written, with the user's substitutions.
+4. Confirm the install by listing the installed skills (the skills CLI prints them, the plugin manager shows them under `/plugin`) and tell the user to start their next session with `/prime-gnadd` (or `/gnadd:prime-gnadd` for the plugin route).
+5. If the current directory is a git repo with a GitHub remote, offer `/init-gnadd` (see [Per-project setup](#per-project-setup)). Do not run it unasked.
+
+### Route 1: Skills CLI (any agent)
 
 **Global install (recommended)**, so the skills are available in every repo:
 
@@ -129,7 +151,7 @@ npx skills update -p -y    # project
 
 Use the same scope (`-g` or project) you used at install. Updating the other scope leaves the active copies stale without warning. `skills update` only tracks installs that came from GitHub. If you installed from a local checkout with `scripts/sync.sh`, rerun that instead. Flags and interactive options are in the [skills CLI docs](https://github.com/vercel-labs/skills).
 
-### Claude Code plugin
+### Route 2: Claude Code plugin
 
 The repo is also a Claude Code plugin with its own one-entry marketplace. Add the marketplace, then install:
 
@@ -149,9 +171,28 @@ claude plugin update gnadd@gnadd
 
 The plugin manifests carry no version number on purpose: the plugin's version is the commit it was installed from, so an update pulls whatever is on `main`, the same as the skills CLI. `gnadd version` still reports the release baseline. Installing through both channels is harmless (you get `/prime-gnadd` and `/gnadd:prime-gnadd`, same skill), but one is enough.
 
+### Route 3: Fork and customize
+
+Fork the repo on GitHub (the **Fork** button, or `gh repo fork AlexHagemeister/gnadd`), edit the skills and the guide in your fork however you like, and install from it. Both routes above work unchanged with your username in place of `AlexHagemeister`:
+
+```bash
+npx skills add <you>/gnadd -g -a <agent> --copy -y
+```
+
+```bash
+claude plugin marketplace add <you>/gnadd
+claude plugin install gnadd@gnadd
+```
+
+The update commands are the same as the route you used. To work on your fork locally and install straight from the checkout, run `./scripts/sync.sh` (see [Authoring](#authoring-repo-maintainers)). Skill behavior lives in `skills/<name>/SKILL.md`, git mechanics in `bin/gnadd`. The [Repo layout](#repo-layout) table says what each file is for.
+
+If you make a change you think belongs upstream, [CONTRIBUTING.md](CONTRIBUTING.md) says how to send it back.
+
+### Versions and the distribution channel
+
 **Versioning.** Releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Before 1.0, a minor version may rename a skill or change its behavior, so read the release notes before updating. To be told about releases: **Watch, then Custom, then Releases** on the repo.
 
-**Distribution channel.** `main` is the channel for both install paths. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
+**Distribution channel.** `main` is the channel for every route. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
 
 ## Per-project setup
 
