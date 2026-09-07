@@ -7,7 +7,19 @@ change skill names, script subcommands, or workflow behavior.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `gnadd init land`: commits init's own files (`AGENTS.md`, the CI workflow)
+  on a `quickfix/gnadd-init` branch, pushes, and opens the PR, so a fresh
+  init ends with a clean tree without a chore issue. Refuses to sweep up any
+  other change in the tree (`INIT_LAND_FOREIGN_FILES`) (#98).
+
+### Changed
+
+- `init` and `conventions` end with an `uncommitted=` line naming init's
+  files not yet on main; `ruleset=failed` now prints gh's first error line
+  as `ruleset_error=`, and the skill covers the private free-plan case. The
+  preview lookup also greps README.md (#98).
 
 ## [0.5.0] - 2026-09-06
 
