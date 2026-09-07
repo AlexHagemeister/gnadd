@@ -2,7 +2,7 @@
 # Cut a GNADD release: verify the changelog entry, stamp the version, repin
 # the canonical-guide URLs to the release tag, rebuild skill copies, and run
 # the tests. Prints the final commit/tag/release commands instead of running
-# them — the release commit goes through the normal loop like any other
+# them: the release commit goes through the normal loop like any other
 # change, and the GitHub Release is created after the tag exists.
 #
 # Usage: scripts/release.sh v0.3.0
@@ -18,7 +18,7 @@ VERSION="${TAG#v}"
 # 0. Changelog gate: no release without a written entry for it. When the
 #    entry is missing, draft one from the commit history since the last tag
 #    (squash-only merges: one commit = one PR title, conventional-commit
-#    formatted) grouped into Keep a Changelog headings — the human curates
+#    formatted) grouped into Keep a Changelog headings. The human curates
 #    the draft into CHANGELOG.md and re-runs, instead of reconstructing the
 #    list by hand. The gate still blocks: drafting never releases.
 if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
@@ -26,10 +26,10 @@ if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
   RANGE="${LAST_TAG:+$LAST_TAG..}HEAD"
   {
     echo "CHANGELOG.md has no \"## [$VERSION]\" entry."
-    echo "Draft below covers every commit reachable from HEAD since ${LAST_TAG:-the first commit} — curate it into CHANGELOG.md, then re-run."
+    echo "Draft below covers every commit reachable from HEAD since ${LAST_TAG:-the first commit}. Curate it into CHANGELOG.md, then re-run."
   } >&2
   echo
-  echo "## [$VERSION] — $(date +%Y-%m-%d)"
+  echo "## [$VERSION] - $(date +%Y-%m-%d)"
   draft_group() { # <Keep-a-Changelog heading> <subject regex>
     local heading="$1" re="$2" subjects
     subjects="$(git log "$RANGE" --no-merges --pretty='%s' \
@@ -56,7 +56,7 @@ sed -i.bak -E "s/^VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" bin/gnadd && rm bin/
 
 # 2. Repin the canonical guide URLs to the release tag (raw.githubusercontent
 #    resolves tag names directly). This is the only sanctioned way to move
-#    the pin — see help-gnadd / audit-gnadd.
+#    the pin (see help-gnadd / audit-gnadd).
 for f in skills/help-gnadd/SKILL.md skills/audit-gnadd/SKILL.md; do
   sed -i.bak -E \
     "s#raw\.githubusercontent\.com/AlexHagemeister/gnadd/[^/]+/GNADD\.md#raw.githubusercontent.com/AlexHagemeister/gnadd/$TAG/GNADD.md#g" \
