@@ -71,7 +71,8 @@ Extract the operational taxonomy:
 | Tracking files | `tasks.md`, `TODO.md`, progress/session-state files, maintained plans, status checklists | Violation |
 | Expired phase artifacts | `requirements.md`, standalone PRD/spec/plan not distilled into `VISION.md` + issues | Warning |
 | Misplaced decisions | `decisions.md`, ADR folders used as live tracking | Warning |
-| Describe-only (OK) | `VISION.md` (Core, Possibility space, Open tensions, no status or order), README run instructions, `AGENTS.md`, agent rules, archived/dated requirements | OK |
+| Describe-only (OK) | `VISION.md` (Core, Possibility space, Open tensions, no status or order), README run instructions plus a pointer to `VISION.md`, `AGENTS.md`, agent rules, archived/dated requirements | OK |
+| README carrying intent | A README that restates vision, invariants, or done-criteria instead of pointing at `VISION.md` (the guide's Part 1: the README is run instructions and a pointer) | Warning |
 | Missing describe content | No `VISION.md` on a GNADD-shaped project (a README "What done looks like" section is the pre-VISION.md shape and reads as a Warning to migrate) | Warning |
 
 Apply the tiebreaker from GNADD Part 1:
@@ -117,10 +118,10 @@ rationale. When filename and content conflict, content wins.
 Determine whether GNADD skills appear available to the agent:
 
 ```bash
-ls .agents/skills/ 2>/dev/null
+ls .agents/skills/ .claude/skills/ ~/.claude/skills/ 2>/dev/null
 ```
 
-Look for `help-gnadd`, `prime-gnadd`, `new-issue-gnadd`, or similar GNADD skill names.
+Look for `help-gnadd`, `prime-gnadd`, `new-issue-gnadd`, or similar GNADD skill names in any of the three (project-local skills CLI, project-local Claude Code, global Claude Code).
 Optionally try `npx skills list 2>/dev/null` if the skills CLI is available.
 
 If undetectable or absent, report as **Info** — not a blocker. Include the
@@ -174,6 +175,14 @@ narrative:
 | Open issue #N with no branch and no recent merged PR | Info | Issue may be unstarted |
 | Active WIP branch not matching `issue-<N>/<slug>` | Warning | Off-loop branch naming |
 | Open PR with no issue reference in title/body | Warning | Weak issue linkage |
+| `phase status` reports more than one open milestone | Warning | The phase rule wants exactly one; the rest need a verdict |
+| `phase status` reports `phase=none` with open issues | Info | Work is not attached to a phase (fine for a small repo, worth naming on a GNADD-shaped one) |
+
+Read the phase layer through prime's copy of the script (this skill does not bundle it):
+
+```bash
+bash "<prime-gnadd skill-dir>/gnadd.sh" phase status
+```
 
 Do **not** review individual commits, run blame, or lint commit messages.
 

@@ -35,6 +35,10 @@ skills.
 - Recovery from bad states has a sanctioned path: `gnadd.sh doctor` (bundled
   with `prime-gnadd`) diagnoses and offers lossless fixes. Never improvise
   `reset`/`force` recoveries.
+- Two receipts are always available: `gnadd.sh trace show` prints every
+  script call this repo has seen (command, exit status, branch, kept in
+  `.git/gnadd-trace.log`), and `gnadd.sh round list <N>` prints an issue's
+  round trail from any branch, not only its own.
 - The user's load-bearing job is to describe desired behavior, answer scope
   questions, and read diffs before merge.
 
