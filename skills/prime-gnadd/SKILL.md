@@ -78,10 +78,11 @@ gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(
 bash "<skill-dir>/gnadd.sh" phase status
 ```
 
-If `state` reported an active issue N (`issue=<N>`), also run:
+If `state` reported an active issue N (`issue=<N>`), also run both (the issue view prints a comment count, never the comments, so the round trail needs its own read):
 
 ```bash
 gh issue view <N>
+bash "<skill-dir>/gnadd.sh" round list
 ```
 
 ## Interpretation
@@ -141,7 +142,7 @@ Summarize the last ~10 merged PRs. Highlight momentum, not every detail. Apply t
 
 ### Active Issue
 
-Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desired outcome, and subtasks. Do not fetch referenced issues or artifacts automatically.
+Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desired outcome, and subtasks, then the last round from `round list`: its number, what changed, and its feedback in the user's words as the comment has them. A round's feedback is its own "Round N feedback" comment or the block in round N+1. When the last round has neither, say "no feedback on the record yet", which is not "the user had no opinion"; `start-issue-gnadd` asks. When `rounds=0`, say the branch has no round trail. Do not fetch referenced issues or artifacts automatically.
 
 ## Output Format
 
@@ -171,7 +172,7 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 <last ~10 merged PRs; external ones annotated "— by @login">
 
 ## Active Issue
-<only if on issue branch>
+<only if on issue branch: spec summary, then the last round and its feedback, or "no feedback on the record yet">
 ```
 
 Keep the summary short enough to use as quick working context.

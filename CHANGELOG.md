@@ -9,6 +9,13 @@ change skill names, script subcommands, or workflow behavior.
 
 ### Added
 
+- `gnadd round feedback`: records the last round's feedback on the issue the
+  moment it is given, as its own append-only comment, with no commit. `round
+  post` then cites it ("recorded on round N") and refuses the feedback flags
+  as a duplicate; `round list` prints feedback comments in order. The round
+  loop records feedback right after the user speaks, resolve-issue records
+  the final word before the PR, prime reads the trail on an issue branch, and
+  a resume with no feedback on the last round asks instead of assuming (#96).
 - `gnadd init land`: commits init's own files (`AGENTS.md`, the CI workflow)
   on a `quickfix/gnadd-init` branch, pushes, and opens the PR, so a fresh
   init ends with a clean tree without a chore issue. Refuses to sweep up any

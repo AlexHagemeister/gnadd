@@ -268,7 +268,9 @@ lose. If you already started editing files before remembering to run this
 After "go", the work runs in rounds, not in a straight line to a PR. The agent
 implements a slice, checkpoints it, and hands you a running preview to try (the
 project's `Preview launch:` line in its conventions file tells it how). You try
-it and say what you think, and that drives the next slice. The agent asks
+it and say what you think, and that drives the next slice. What you say lands
+on the issue the moment you say it (`gnadd round feedback`), so a session that
+stops there leaves nothing only in chat. The agent asks
 whether to run another round or resolve, and enters resolve only when you say
 the work is done. A branch that spans sessions picks up at the last round, read
 from the round comments on the issue. The procedure lives in the skill.
@@ -322,6 +324,11 @@ Three things follow:
   so the comment labels the feedback block as transcribed by the agent. The
   script refuses an empty feedback text: a round with nothing from you is
   recorded as "none this round" with a reason, never left blank or invented.
+- **Feedback lives in one comment.** The agent records what you say as soon
+  as you say it (`gnadd round feedback`, its own comment on the last round),
+  and the next checkpoint cites that comment instead of carrying the words
+  again. A round with no feedback comment and no later round has no feedback
+  yet, which a resuming session asks about rather than reading as silence.
 - **Append only.** The issue body is never edited during work. Checking off
   acceptance criteria mid-work is not a thing anymore. `resolve-issue-gnadd`
   verifies every criterion against the actual diff at the end and ticks the
@@ -787,6 +794,15 @@ without the chat transcript, and is what the next session reads. The
 feedback label and the empty-text refusal exist because only the agent can
 see the chat: the record states its own provenance rather than presenting an
 agent transcription as a first-hand quote.
+
+**Amended (2026-09, #96):** feedback for a round is recorded the moment it is
+given, as its own append-only comment (`gnadd round feedback`), and `round
+post` cites it rather than carrying it again. Before this, round N's feedback
+was written only by round N+1's checkpoint, so the last word on every issue
+("ship it") never landed and a cold resume could not tell "no feedback yet"
+from "the user had no opinion". Editing the round comment in place was
+rejected: the trail is append-only, and a comment that changes after it was
+written is the same defect in another shape.
 
 **Hypothesis, and what would revise it:** the transcription rule is prose, not
 mechanism, so it can slip. If a round comment is ever found paraphrasing or

@@ -127,6 +127,11 @@ Rules for the feedback:
   slice, a mechanical checkpoint), pass `--no-feedback "<reason>"` instead of a
   file. The script refuses empty feedback text; do not fill it with anything.
 - **Short inline feedback** may use `--feedback "<text>"` instead of a file.
+- **Already recorded means omit.** When the previous round's feedback was
+  recorded as it was given (`round feedback`, the step after the user speaks
+  in the round loop), pass no feedback flag at all. The script sees it on the
+  record, refuses the flags as a duplicate, and writes "recorded on round N"
+  in their place. Feedback for a round lives in exactly one comment.
 
 Skip this step entirely when not on an issue branch (`issue=none`). On
 `state=PUSH_FAILED` the commit is safe and nothing was posted: origin has
