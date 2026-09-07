@@ -828,6 +828,17 @@ else
   echo "note: claude CLI not on PATH, plugin manifests checked for version agreement only"
 fi
 
+t skill_self_refs_have_a_copy; CURRENT=skill_self_refs_have_a_copy
+# A SKILL.md that tells the agent to run gnadd.sh from its own directory must
+# ship the script there. A skill without a copy (new-issue, vision, help,
+# audit) names the sibling that has one: "<prime-gnadd skill-dir>/gnadd.sh".
+for dir in "$ROOT"/skills/*/; do
+  name="$(basename "$dir")"
+  if grep -q '<skill-dir>/gnadd.sh' "$dir/SKILL.md" && [ ! -f "$dir/gnadd.sh" ]; then
+    fail "skills/$name/SKILL.md runs <skill-dir>/gnadd.sh but the build does not copy the script there (add it to scripts/build.sh, or name the prime-gnadd copy)"
+  else ok; fi
+done
+
 t docs_name_every_skill; CURRENT=docs_name_every_skill
 # The README's skills table is the one list of skills (GNADD.md points at it).
 # Every skill on disk must be in it, and no doc may name a skill that is not on disk.

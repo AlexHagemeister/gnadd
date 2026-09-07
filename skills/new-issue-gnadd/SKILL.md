@@ -188,9 +188,9 @@ After approval and creation confirmation, create the issue via `gh`.
    gh label list --search "<label>" --json name --jq '.[].name' | grep -qx "<label>" \
      || gh label create "<label>"
   ```
-2. Check for an open phase and offer to attach the issue to it (one question, attaching is the default; skip the question when `phase=none`):
+2. Check for an open phase and offer to attach the issue to it (one question, attaching is the default; skip the question when `phase=none`). This skill does not bundle the script; `prime-gnadd` does, and it is installed alongside this one:
   ```bash
-   bash "<skill-dir>/gnadd.sh" phase status
+   bash "<prime-gnadd skill-dir>/gnadd.sh" phase status
   ```
 3. Create the issue, with `--milestone "<phase title>"` when the user accepted the attach:
   ```bash
