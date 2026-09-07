@@ -561,6 +561,29 @@ run quickfix guard
 expect_status 2 "$ST"
 expect_contains "state=TOO_BIG"
 
+t quickfix_guard_exempts_new_vision_md; setup_repo
+run quickfix start vision
+seq 1 45 | sed 's/^/vision line /' > VISION.md && git_q add VISION.md && git_q commit -m "vision"
+run quickfix guard
+expect_status 0 "$ST"
+expect_contains "guard=ok"
+expect_contains "exempt=VISION.md"
+expect_contains "lines=0"
+# The exemption does not leak to other files in the same diff.
+seq 1 40 > big.txt && git_q add big.txt && git_q commit -m "big"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=TOO_BIG"
+
+t quickfix_guard_counts_modified_vision_md; setup_repo
+seq 1 5 > VISION.md && git_q add VISION.md && git_q commit -m "vision" && git_q push origin main
+run quickfix start revise-vision
+seq 1 45 > VISION.md && git_q add VISION.md && git_q commit -m "rewrite"
+run quickfix guard
+expect_status 2 "$ST"
+expect_contains "state=TOO_BIG"
+expect_not_contains "exempt="
+
 t quickfix_guard_refuses_too_many_files; setup_repo
 run quickfix start wide
 for f in a b c d; do echo x > "$f.txt"; done

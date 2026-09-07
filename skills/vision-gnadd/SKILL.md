@@ -37,8 +37,15 @@ only after confirmation.
   paraphrase silently.
 - The skill writes the file. It never opens a milestone or an issue. Those go
   through the existing skills, and only on the user's yes.
-- For the shape, the admission test, and the rationale, read `GNADD.md`. For
-  workflow orientation, use `help-gnadd`.
+- For the shape, the admission test, and the rationale, read `GNADD.md`
+  (section "The intent document: VISION.md"). It is not bundled with this
+  skill. Read it from the repo root when working inside the GNADD repo, or
+  fetch it from the pinned URL (pinned to a release by `scripts/release.sh`,
+  never hand-edited):
+
+  https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.5.0/GNADD.md
+
+  For workflow orientation, use `help-gnadd`.
 
 ## 1. Check For An Existing File
 
@@ -188,8 +195,10 @@ direct commit): pick one, and say which.
 The skill writes the file to the working tree and reports the path. It does
 not commit. Say plainly that the file is unstaged, and that on a
 rails-protected `main` the honest route is a branch and PR (`/quickfix-gnadd`
-fits a fresh VISION.md; a Core revision on an existing project may deserve an
-issue, per the open question above). The commit is the user's act.
+fits a fresh VISION.md: the guard exempts a newly added `VISION.md` from its
+line budget, so the file lands without an override. A Core revision on an
+existing project goes back under the budget and may deserve an issue, per
+the open question above). The commit is the user's act.
 
 ## 6. The Closing Offer
 
