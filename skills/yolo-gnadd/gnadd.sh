@@ -82,6 +82,27 @@ show_divergence() {
   git log --oneline "$MAIN..origin/$MAIN" | sed 's/^/  /'
 }
 
+print_upstream_state() { # upstream= (name or none) and ahead_of_upstream= for the current branch
+  local up
+  if up="$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
+    say "upstream=$up"
+    say "ahead_of_upstream=$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+  else
+    # No upstream: nothing on this branch is on GitHub yet, so every commit
+    # beyond origin/main counts as unpushed.
+    say "upstream=none"
+    say "ahead_of_upstream=$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 0)"
+  fi
+}
+
+railed_push() { # push the current branch to origin, setting upstream; never forces
+  # Fast-forward pushes only. If origin has commits this branch lacks, git
+  # refuses and the caller halts: a human decides, never a force.
+  git push -u origin HEAD >/dev/null 2>&1 || die_state PUSH_FAILED "push to origin failed (network, auth, or the remote branch has commits this one lacks); never force. Check and retry"
+  say "pushed=true"
+  say "upstream=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null || echo none)"
+}
+
 issue_from_branch() { # sets ISSUE_NUM ("" if not an issue branch)
   local b="$1"
   if [[ "$b" =~ ^issue-([0-9]+)/ ]]; then
@@ -180,6 +201,7 @@ cmd_state() {
   if has_remote; then
     say "remote=origin"
     [ "$do_fetch" = 1 ] && fetch_origin >/dev/null
+    [ -n "$br" ] && print_upstream_state
     print_main_state
     if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
       show_divergence
@@ -224,6 +246,21 @@ cmd_start() {
 
   require_clean_tree
 
+  if [ -z "$existing" ] && fetch_origin >/dev/null; then
+    # Fresh clone, same issue: the branch lives on origin but not here.
+    local remote_branch
+    remote_branch="$(git branch -r --list "origin/issue-$n/*" --format='%(refname:short)' | head -1)"
+    if [ -n "$remote_branch" ]; then
+      local local_name="${remote_branch#origin/}"
+      git checkout --track "$remote_branch" >/dev/null 2>&1 || usage_die "cannot check out $remote_branch"
+      say "result=resumed"
+      say "branch=$local_name"
+      say "upstream=$remote_branch"
+      note "branch existed on origin only; checked out tracking $remote_branch"
+      return 0
+    fi
+  fi
+
   if [ -n "$existing" ]; then
     # Resume. Tree is clean, so the checkout is safe.
     git checkout "$existing" >/dev/null 2>&1
@@ -255,6 +292,27 @@ cmd_start() {
   git checkout -b "$target" >/dev/null 2>&1
   say "result=created"
   say "branch=$target"
+}
+
+# ---------------------------------------------------------------- push
+
+# Checkpoint push: the round trail must cite commits GitHub holds, so every
+# checkpoint lands on origin. Rails: never from main/master or detached HEAD,
+# never a force. A repo with no remote is reported, not refused.
+cmd_push() {
+  local br; br="$(current_branch)"
+  [ -n "$br" ] || die_state DETACHED_HEAD "cannot push from detached HEAD; commits there belong to no branch"
+  if [ "$br" = "$MAIN" ] || [ "$br" = "master" ]; then
+    die_state ON_MAIN "never push $br from here: work reaches origin/$MAIN only through a PR"
+  fi
+  if ! has_remote; then
+    say "pushed=false"
+    say "upstream=none"
+    note "no remote configured; the checkpoint stays local"
+    return 0
+  fi
+  railed_push
+  say "branch=$br"
 }
 
 # ---------------------------------------------------------------- guard-commit
@@ -292,8 +350,7 @@ cmd_ship_push() {
   ahead=$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 0)
   [ "$ahead" -gt 0 ] || die_state NOTHING_TO_SHIP "no commits on '$br' beyond origin/$MAIN; nothing to resolve"
 
-  git push -u origin HEAD >/dev/null 2>&1 || die_state PUSH_FAILED "push to origin failed; check network/auth and retry"
-  say "pushed=true"
+  railed_push
   say "branch=$br"
   say "issue=${ISSUE_NUM:-none}"
 
@@ -902,6 +959,9 @@ cmd_round_post() {
     usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
   fi
 
+  # The comment cites a sha, so the sha must be on GitHub before the comment is.
+  cmd_push
+
   local n; n="$(round_count "$ISSUE_NUM")"
   local round=$((n+1))
   local sha; sha="$(git rev-parse --short HEAD)"
@@ -1123,6 +1183,7 @@ main() {
   case "$cmd" in
     state)        cmd_state "$@" ;;
     start)        cmd_start "$@" ;;
+    push)         cmd_push "$@" ;;
     guard-commit) cmd_guard_commit "$@" ;;
     ship)
       local sub="${1:-}"; shift || true
@@ -1176,6 +1237,7 @@ gnadd: deterministic mechanics for the GNADD workflow
 
   state [--no-fetch]              snapshot: branch, tree, stashes, main classification
   start <N> <slug> [--carry]      resume or create issue-<N>/<slug> safely
+  push                            checkpoint push: branch to origin, sets upstream, never forces
   guard-commit                    refuse commits on main/master/detached HEAD
   ship push [--any-branch]        push branch, detect existing PR
   ship status <pr>                mergeability + checks summary for the merge gate
@@ -1186,7 +1248,7 @@ gnadd: deterministic mechanics for the GNADD workflow
   quickfix merge <pr> [--check <name>|--no-check]
                                   squash-merge only after the CI check passes
   round post --changed <text> (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
-                                  post this checkpoint's round comment on the issue
+                                  push the branch, then post this checkpoint's round comment
   round list [N]                  print the issue's round comments in order
   phase status                    the open milestone (title, counts, description) or none
   phase open <title> --description <text>

@@ -118,6 +118,24 @@ echo x > s.txt && git_q add s.txt && git stash >/dev/null 2>&1
 run state
 expect_contains "stashes=1"
 
+t state_reports_upstream; setup_repo
+run start 3 upstream-lines
+run state
+expect_contains "upstream=none"
+expect_contains "ahead_of_upstream=0"
+echo a > a.txt && git_q add a.txt && git_q commit -m "local only"
+run state
+expect_contains "upstream=none"
+expect_contains "ahead_of_upstream=1"
+run push
+expect_status 0 "$ST"
+run state
+expect_contains "upstream=origin/issue-3/upstream-lines"
+expect_contains "ahead_of_upstream=0"
+echo b > b.txt && git_q add b.txt && git_q commit -m "one more"
+run state
+expect_contains "ahead_of_upstream=1"
+
 # ---------------------------------------------------------------- start
 
 t start_fresh; setup_repo
@@ -193,6 +211,21 @@ git_q checkout main
 run start 11 diverge-me
 expect_status 2 "$ST"
 expect_contains "state=BRANCH_DIVERGED_FROM_REMOTE"
+
+t start_resumes_remote_only_branch; setup_repo
+# Fresh clone, same issue: the branch exists on origin but not locally.
+( cd "$SANDBOX" && git_q clone origin.git other4 && cd other4
+  git config user.email o@o && git config user.name o
+  git_q checkout -b issue-13/elsewhere
+  echo remote >> r.txt && git_q add r.txt && git_q commit -m "remote work"
+  git_q push -u origin issue-13/elsewhere )
+run start 13 any-slug
+expect_status 0 "$ST"
+expect_contains "result=resumed"
+expect_contains "branch=issue-13/elsewhere"
+expect_contains "upstream=origin/issue-13/elsewhere"
+[ -f r.txt ] && ok || fail "remote branch content not checked out"
+[ "$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null)" = "origin/issue-13/elsewhere" ] && ok || fail "upstream not set on remote-only resume"
 
 # ---------------------------------------------------------------- guard-commit
 
@@ -649,7 +682,89 @@ run state
 [ -z "$(git status --porcelain)" ] && ok || fail "trace log dirtied the working tree"
 [ -f .git/gnadd-trace.log ] && ok || fail "trace log not written to .git/"
 
+# ---------------------------------------------------------------- push
+
+t push_sets_upstream_and_never_forces; setup_repo
+run start 40 checkpoint
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice"
+run push
+expect_status 0 "$ST"
+expect_contains "pushed=true"
+expect_contains "upstream=origin/issue-40/checkpoint"
+git ls-remote --exit-code --heads origin issue-40/checkpoint >/dev/null 2>&1 && ok || fail "branch not on remote"
+# Second push with a new commit: plain fast-forward.
+echo b > b.txt && git_q add b.txt && git_q commit -m "slice two"
+run push
+expect_status 0 "$ST"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/issue-40/checkpoint)" ] && ok || fail "second push did not land"
+# Remote moved on without us: refuse, do not force.
+( cd "$SANDBOX" && git_q clone origin.git other5 && cd other5
+  git config user.email o@o && git config user.name o
+  git_q checkout issue-40/checkpoint
+  echo remote >> r.txt && git_q add r.txt && git_q commit -m "remote work"
+  git_q push origin issue-40/checkpoint )
+remote_sha="$(git ls-remote origin refs/heads/issue-40/checkpoint | cut -f1)"
+echo c > c.txt && git_q add c.txt && git_q commit -m "local work"
+run push
+expect_status 2 "$ST"
+expect_contains "state=PUSH_FAILED"
+[ "$(git ls-remote origin refs/heads/issue-40/checkpoint | cut -f1)" = "$remote_sha" ] && ok || fail "remote branch was overwritten"
+
+t push_refuses_main; setup_repo
+run push
+expect_status 2 "$ST"
+expect_contains "state=ON_MAIN"
+
+t push_without_remote_reports; setup_repo
+run start 41 offline
+git_q remote remove origin
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice"
+run push
+expect_status 0 "$ST"
+expect_contains "pushed=false"
+expect_contains "upstream=none"
+
 # ---------------------------------------------------------------- round
+
+t round_post_pushes_before_commenting; setup_repo
+run start 42 rounds-push
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice one"
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "first slice" --feedback "fine"
+expect_status 0 "$ST"
+expect_contains "pushed=true"
+expect_contains "posted=true"
+git ls-remote --exit-code --heads origin issue-42/rounds-push >/dev/null 2>&1 && ok || fail "checkpoint not on remote after round post"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/issue-42/rounds-push)" ] && ok || fail "cited sha not on origin"
+OUT="$(cat "$SANDBOX/comment.md")"
+expect_contains "Commit: \`$(git rev-parse --short HEAD)\`"
+
+t round_post_halts_when_push_refused; setup_repo
+run start 43 rounds-halt
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice one"
+run push
+( cd "$SANDBOX" && git_q clone origin.git other6 && cd other6
+  git config user.email o@o && git config user.name o
+  git_q checkout issue-43/rounds-halt
+  echo remote >> r.txt && git_q add r.txt && git_q commit -m "remote work"
+  git_q push origin issue-43/rounds-halt )
+echo b > b.txt && git_q add b.txt && git_q commit -m "local work"
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "second slice" --feedback "ok"
+expect_status 2 "$ST"
+expect_contains "state=PUSH_FAILED"
+expect_not_contains "posted=true"
+[ -f "$SANDBOX/comment.md" ] && fail "comment posted despite refused push" || ok
+
+t round_post_without_remote_still_posts; setup_repo
+run start 44 rounds-offline
+git_q remote remove origin
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice one"
+export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
+run round post --changed "slice" --no-feedback "nothing to try"
+expect_status 0 "$ST"
+expect_contains "pushed=false"
+expect_contains "posted=true"
 
 t round_post_first_round; setup_repo
 run start 5 rounds
