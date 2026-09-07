@@ -562,7 +562,11 @@ disagree on a mechanical detail, the script wins.
 **Decision:** `gnadd.sh init` configures the repo itself: squash-only merges,
 squash commit message = PR title + body, delete-branch-on-merge, and a ruleset on
 `main` requiring a PR and blocking force pushes and deletion. Default keeps an
-admin bypass (solo escape hatch); `--strict` removes it.
+admin bypass (solo escape hatch); `--strict` removes it. The files init writes
+itself (`AGENTS.md`, the CI workflow) land on `main` through `gnadd.sh init
+land`: one commit on a `quickfix/gnadd-init` branch, a push, and a PR that the
+normal merge gate decides, with no issue (2026-09, after a testbed run where
+landing those two files cost a full issue loop).
 **Why:** The two most dangerous outcomes (unreviewed work landing on `origin/main`
 and history rewrites of `main`) were previously prevented only by agents following
 instructions. The server can reject both outright, which converts a diverged local

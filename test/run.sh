@@ -72,7 +72,7 @@ setup_repo() {
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
         GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE GH_STUB_PHASES \
         GH_STUB_PHASE_DESC GH_STUB_API_INPUT GH_STUB_RULESETS \
-        GH_STUB_PR_HEAD GH_STUB_PR_HEAD_OID 2>/dev/null || true
+        GH_STUB_PR_HEAD GH_STUB_PR_HEAD_OID GH_STUB_RULESET_FAIL 2>/dev/null || true
 }
 
 # Push a commit to origin/main from a second clone (simulates a merge or a
@@ -971,6 +971,76 @@ run init
 expect_status 0 "$ST"
 expect_contains "ruleset=exists"
 grep -q "POST" "$GH_STUB_LOG" && fail "created a second ruleset" || ok
+
+t init_ruleset_failure_names_cause; setup_repo
+export GH_STUB_RULESET_FAIL='gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)'
+run init
+expect_status 0 "$ST"
+expect_contains "ruleset=failed"
+expect_contains "ruleset_error=gh: Upgrade to GitHub Pro"
+
+t init_reports_its_uncommitted_files; setup_repo
+run init --ci
+expect_status 0 "$ST"
+expect_contains "ci=created"
+expect_contains "uncommitted=.github/workflows/gnadd-ci.yml"
+run conventions --preview "npm run dev"
+expect_contains "uncommitted=AGENTS.md,.github/workflows/gnadd-ci.yml"
+
+t init_reports_none_uncommitted_when_landed; setup_repo
+run init
+expect_contains "uncommitted=none"
+
+# ---------------------------------------------------------------- init land
+
+t init_land_ships_own_files; setup_repo
+export GH_STUB_PR_NUMBER=3
+run init --ci
+run conventions --preview "npm run dev"
+run init land
+expect_status 0 "$ST"
+expect_contains "branch=quickfix/gnadd-init"
+expect_contains "files=AGENTS.md,.github/workflows/gnadd-ci.yml"
+expect_contains "pr_number=3"
+expect_contains "pr_url=https://github.com/stub-owner/stub-repo/pull/3"
+[ "$(git symbolic-ref --short HEAD)" = "quickfix/gnadd-init" ] && ok || fail "not on the landing branch"
+[ -z "$(git status --porcelain)" ] && ok || fail "tree not clean after landing"
+git ls-files --error-unmatch AGENTS.md .github/workflows/gnadd-ci.yml >/dev/null 2>&1 && ok || fail "init files not committed"
+git rev-parse --verify --quiet origin/quickfix/gnadd-init >/dev/null && ok || fail "landing branch not pushed"
+grep -q "pr create" "$GH_STUB_LOG" && ok || fail "no PR created"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "local main moved"
+run state
+expect_contains "tree=clean"
+run init
+expect_contains "uncommitted=none"
+
+t init_land_nothing_to_land; setup_repo
+run init land
+expect_status 0 "$ST"
+expect_contains "landed=none"
+grep -qs "pr create" "$GH_STUB_LOG" && fail "created a PR with nothing to land" || ok
+
+t init_land_refuses_foreign_files; setup_repo
+run conventions
+echo x > mine.txt
+run init land
+expect_status 2 "$ST"
+expect_contains "state=INIT_LAND_FOREIGN_FILES"
+expect_contains "mine.txt"
+[ "$(git symbolic-ref --short HEAD)" = "main" ] && ok || fail "left main despite the halt"
+
+t init_land_refuses_off_main; setup_repo
+git_q checkout -b other
+run init land
+expect_status 2 "$ST"
+expect_contains "state=NOT_ON_MAIN"
+
+t init_land_refuses_diverged_main; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+run conventions
+run init land
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
 
 # ---------------------------------------------------------------- conventions
 

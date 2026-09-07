@@ -859,7 +859,8 @@ cmd_init() {
   else
     local bypass='[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}]'
     [ "$strict" = 1 ] && bypass='[]'
-    if "$GH" api -X POST "repos/$repo/rulesets" --input - >/dev/null 2>&1 <<RULESET
+    local ruleset_err; ruleset_err="$(mktemp)"
+    if "$GH" api -X POST "repos/$repo/rulesets" --input - >/dev/null 2>"$ruleset_err" <<RULESET
 {
   "name": "gnadd-main",
   "target": "branch",
@@ -885,8 +886,14 @@ RULESET
       [ "$strict" = 1 ] && note "strict mode: no bypass. Even admins must go through PRs"
     else
       say "ruleset=failed"
-      note "could not create the ruleset via gh api; add one in repo Settings → Rules (require PR, block force pushes and deletion on $MAIN)"
+      # The cause decides what to tell the user (a 403 "Upgrade to GitHub Pro
+      # or make this repository public" means rulesets are unavailable on a
+      # private free-plan repo), so the first line of gh's error is part of
+      # the report, not swallowed.
+      say "ruleset_error=$(grep -m1 . "$ruleset_err" 2>/dev/null || echo unknown)"
+      note "could not create the ruleset via gh api; add one in repo Settings > Rules (require PR, block force pushes and deletion on $MAIN)"
     fi
+    rm -f "$ruleset_err"
   fi
 
   if [ "$ci" = 1 ]; then
@@ -916,9 +923,102 @@ jobs:
           else echo "no test command detected"; fi
 YAML
       say "ci=created"
-      note "commit .github/workflows/gnadd-ci.yml through the loop (it is a normal change)"
     fi
   fi
+  init_report_uncommitted
+}
+
+# init's own files. Written to the working tree by `init --ci` and
+# `conventions`, landed on main by `init land`. Every command that writes
+# one of them ends by reporting which are not yet committed, so the report
+# has a slot for the leftover instead of leaving it for the next quickfix
+# to trip over.
+INIT_PATHS="AGENTS.md .github/workflows/gnadd-ci.yml"
+
+init_uncommitted() { # init's paths that are untracked or modified, one per line
+  local p
+  for p in $INIT_PATHS; do
+    [ -e "$p" ] || continue
+    if ! git ls-files --error-unmatch "$p" >/dev/null 2>&1 || ! git diff --quiet HEAD -- "$p" 2>/dev/null; then
+      printf '%s\n' "$p"
+    fi
+  done
+}
+
+init_report_uncommitted() {
+  local u; u="$(init_uncommitted | paste -sd, -)"
+  say "uncommitted=${u:-none}"
+  [ -n "$u" ] && note "land these on $MAIN with 'gnadd init land' (no issue needed; the PR is the record)"
+  return 0
+}
+
+cmd_init_land() {
+  # Land init's own files through the rails: a quickfix branch carrying them,
+  # one commit, a push, and a PR. The merge stays with 'ship merge' so the
+  # CI gate (which the workflow file itself may have just created) decides.
+  # Nothing here touches local main: the branch is checked out from it with
+  # the working tree intact, the same lossless rescue quickfix --carry uses.
+  local br; br="$(current_branch)"
+  [ "$br" = "$MAIN" ] || die_state NOT_ON_MAIN "init land starts from $MAIN (currently on '$br'); its files were written there"
+
+  local files; files="$(init_uncommitted)"
+  if [ -z "$files" ]; then
+    say "landed=none"
+    note "no init files are uncommitted; nothing to land"
+    return 0
+  fi
+
+  # Only init's files may ride on this PR. Anything else in the tree is the
+  # user's work, which has its own route (an issue, or quickfix) and must not
+  # be swept into a PR labeled as init's.
+  local foreign
+  foreign="$(git status --porcelain --untracked-files=all | awk '{ print $NF }' | grep -vxF -f <(printf '%s\n' "$files") || true)"
+  if [ -n "$foreign" ]; then
+    say "state=INIT_LAND_FOREIGN_FILES"
+    err "the tree holds changes that are not init's; commit or land them first, then re-run:"
+    printf '%s\n' "$foreign" | sed 's/^/  /'
+    exit 2
+  fi
+
+  if fetch_origin >/dev/null; then
+    main_counts
+    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
+      say "state=DIVERGED_MAIN"
+      err "local $MAIN has commits origin lacks; refusing to build on it"
+      show_divergence
+      note "run 'gnadd doctor' for the sanctioned recovery path"
+      exit 2
+    fi
+  fi
+
+  local target="quickfix/gnadd-init"
+  git show-ref --verify --quiet "refs/heads/$target" && \
+    die_state QF_BRANCH_EXISTS "branch '$target' already exists; finish or clean up that landing first (gnadd cleanup <pr> $target)"
+  git checkout -b "$target" >/dev/null 2>&1
+
+  local list; list="$(printf '%s\n' "$files" | paste -sd, -)"
+  # shellcheck disable=SC2086
+  git add -- $files
+  git commit -q -m "chore: land the GNADD init files" -m "Files: $list
+
+Written by gnadd init and gnadd conventions. Quickfix: no issue; this PR
+is the record." >/dev/null
+  railed_push
+
+  local pr_url pr_number
+  pr_url="$("$GH" pr create --title "chore: land the GNADD init files" --body "Files: $list
+
+Written by \`gnadd init\` and \`gnadd conventions\`: the conventions file that
+points agents at GNADD, and the CI workflow when one was requested.
+
+Quickfix: no issue; this PR is the record. Landed by \`gnadd init land\`." 2>/dev/null | grep -m1 -E '^https?://' || true)"
+  [ -n "$pr_url" ] || die_state PR_CREATE_FAILED "commit and push landed on '$target' but gh pr create failed; create the PR by hand (gh pr create) and continue with ship merge"
+  pr_number="${pr_url##*/}"
+  say "branch=$target"
+  say "files=$list"
+  say "pr_number=$pr_number"
+  say "pr_url=$pr_url"
+  note "next: 'gnadd ship merge $pr_number' once checks pass (--no-check when the repo has no CI), then 'gnadd sync-main' and 'gnadd cleanup $pr_number $target'"
 }
 
 # ---------------------------------------------------------------- round
@@ -1177,6 +1277,7 @@ cmd_conventions() {
   fi
   say "file=$CONV_FILE"
   say "preview=$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
+  init_report_uncommitted
 }
 
 # ---------------------------------------------------------------- dispatch
@@ -1230,7 +1331,8 @@ main() {
     cleanup)      cmd_cleanup "$@" ;;
     doctor)       cmd_doctor "$@" ;;
     test)         cmd_test "$@" ;;
-    init)         cmd_init "$@" ;;
+    init)
+      if [ "${1:-}" = "land" ]; then shift; cmd_init_land "$@"; else cmd_init "$@"; fi ;;
     conventions)  cmd_conventions "$@" ;;
     trace)        cmd_trace "$@" ;;
     version|--version)
@@ -1270,6 +1372,7 @@ gnadd: deterministic mechanics for the GNADD workflow
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
+  init land                       commit, push, and PR init's own files (AGENTS.md, CI workflow)
   conventions [--preview <cmd>]   write or update the GNADD block in AGENTS.md (idempotent)
   trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
   version                         release baseline + distribution channel
