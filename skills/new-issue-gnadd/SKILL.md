@@ -145,7 +145,7 @@ Use this section for the *negative* spec — boundaries that shape what counts a
 
 ## Label
 
-Suggest exactly one label, e.g. `bug`, `enhancement`, `chore`, etc. Choose based on the issue intent, then present it with the draft for user confirmation or override.
+Suggest exactly one label from GitHub's defaults: `bug`, `enhancement`, `documentation`, or `chore`. Choose based on the issue intent, then present it with the draft for user confirmation or override. Any other label is created on the repo if it does not exist (step 1 of Creating the Issue), so name that when proposing one.
 
 ## Review Gate
 
@@ -153,7 +153,7 @@ Before finalizing, show the user:
 
 ```markdown
 Title: <title>
-Label: <bug|feature|chore>
+Label: <bug|enhancement|documentation|chore>
 
 ## Problem / Motivation
 <observable problem or missing behavior>
@@ -188,7 +188,7 @@ After approval and creation confirmation, create the issue via `gh`.
    gh label list --search "<label>" --json name --jq '.[].name' | grep -qx "<label>" \
      || gh label create "<label>"
   ```
-2. Check for an open phase and offer to attach the issue to it (one question, attaching is the default; skip the question when `phase=none`). This skill does not bundle the script; `prime-gnadd` does, and it is installed alongside this one:
+2. Check for an open phase and offer to attach the issue to it (one question, attaching is the default; skip the question when `phase=none`). Run it once per session, not once per issue: the phase does not change between issues drafted in the same sitting. This skill does not bundle the script; `prime-gnadd` does, and it is installed alongside this one:
   ```bash
    bash "<prime-gnadd skill-dir>/gnadd.sh" phase status
   ```
