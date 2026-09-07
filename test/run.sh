@@ -45,6 +45,28 @@ expect_not_contains() {
   esac
 }
 
+# The stub log exists from setup_repo on, so a missing file is a miswired
+# harness (wrong path, stub not logging), never "zero calls".
+expect_gh_called() { # expect_gh_called <op> <message>
+  if [ ! -f "$GH_STUB_LOG" ]; then
+    fail "stub log missing at $GH_STUB_LOG; the harness is miswired"
+  elif grep -q -- "$1" "$GH_STUB_LOG"; then
+    ok
+  else
+    fail "$2"
+  fi
+}
+
+expect_gh_not_called() { # expect_gh_not_called <op> <message>
+  if [ ! -f "$GH_STUB_LOG" ]; then
+    fail "stub log missing at $GH_STUB_LOG; the harness is miswired"
+  elif grep -q -- "$1" "$GH_STUB_LOG"; then
+    fail "$2"
+  else
+    ok
+  fi
+}
+
 run() { # run <args...>: capture OUT and ST
   OUT="$("$GNADD" "$@" 2>&1)"
   ST=$?
@@ -67,6 +89,7 @@ setup_repo() {
   git_q branch -M main
   git_q push -u origin main
   export GNADD_GH="$STUB" GH_STUB_LOG="$SANDBOX/gh.log"
+  : > "$GH_STUB_LOG"
   unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
@@ -291,7 +314,7 @@ export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=CONFLICTING
 run ship merge 44
 expect_status 2 "$ST"
 expect_contains "state=PR_CONFLICTING"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "gh pr merge was called on a conflicting PR" || ok
+expect_gh_not_called "pr merge" "gh pr merge was called on a conflicting PR"
 
 t ship_merge_ok; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -300,7 +323,7 @@ run ship merge 44
 expect_status 0 "$ST"
 expect_contains "checks=pass"
 expect_contains "merged=true"
-grep -q "pr merge 44 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+expect_gh_called "pr merge 44 --squash" "gh pr merge --squash not called"
 
 t ship_merge_waits_for_pending_checks; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -309,7 +332,7 @@ run ship merge 44
 expect_status 2 "$ST"
 expect_contains "state=CHECKS_PENDING"
 expect_contains "gh pr checks 44 --watch"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with CI still pending" || ok
+expect_gh_not_called "pr merge" "merged with CI still pending"
 
 t ship_merge_refuses_any_failed_check; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -318,7 +341,7 @@ run ship merge 44
 expect_status 2 "$ST"
 expect_contains "state=CHECK_FAILED"
 expect_contains "test-macos=fail"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged despite failing check" || ok
+expect_gh_not_called "pr merge" "merged despite failing check"
 
 t ship_merge_skipping_check_is_not_a_failure; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -332,7 +355,7 @@ export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
 run ship merge 44
 expect_status 2 "$ST"
 expect_contains "state=NO_CHECKS"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with nothing verified" || ok
+expect_gh_not_called "pr merge" "merged with nothing verified"
 run ship merge 44 --no-check
 expect_status 0 "$ST"
 expect_contains "merged=true"
@@ -345,7 +368,7 @@ run ship merge 44
 expect_status 2 "$ST"
 expect_contains "state=CHECKS_PENDING"
 expect_contains "no checks reported yet"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged before the workflow started" || ok
+expect_gh_not_called "pr merge" "merged before the workflow started"
 
 t ship_status_reports_checks_summary; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -629,7 +652,7 @@ export GH_STUB_CHECKS='test\tpending\t0\turl'
 run quickfix merge 50
 expect_status 2 "$ST"
 expect_contains "state=QF_CHECKS_PENDING"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged with CI still pending" || ok
+expect_gh_not_called "pr merge" "merged with CI still pending"
 
 t quickfix_merge_refuses_failed_ci; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -637,7 +660,7 @@ export GH_STUB_CHECKS='test\tfail\t5s\turl'
 run quickfix merge 50
 expect_status 2 "$ST"
 expect_contains "state=QF_CHECK_FAILED"
-grep -q "pr merge" "$GH_STUB_LOG" && fail "merged despite failing CI" || ok
+expect_gh_not_called "pr merge" "merged despite failing CI"
 
 t quickfix_merge_after_green_ci; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -646,7 +669,7 @@ run quickfix merge 50
 expect_status 0 "$ST"
 expect_contains "check_status=pass"
 expect_contains "merged=true"
-grep -q "pr merge 50 --squash" "$GH_STUB_LOG" && ok || fail "gh pr merge --squash not called"
+expect_gh_called "pr merge 50 --squash" "gh pr merge --squash not called"
 
 t quickfix_merge_refuses_when_no_checks; setup_repo
 export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE
@@ -804,7 +827,7 @@ expect_contains "## Round 1"
 expect_contains "**Changed:** first slice"
 expect_contains "transcribed by the agent from chat"
 expect_contains "> looks good, make the button bluer"
-grep -q "gh issue comment 5 --body-file" "$GH_STUB_LOG" && ok || fail "comment not posted via gh issue comment"
+expect_gh_called "gh issue comment 5 --body-file" "comment not posted via gh issue comment"
 
 t round_post_numbers_from_record; setup_repo
 run start 6 rounds
@@ -844,7 +867,7 @@ expect_status 1 "$ST"
 expect_contains "feedback text is empty"
 run round post --changed "x" --feedback "a" --no-feedback "b"
 expect_status 1 "$ST"
-grep -q "issue comment" "$GH_STUB_LOG" && fail "posted despite refusal" || ok
+expect_gh_not_called "issue comment" "posted despite refusal"
 
 t round_post_refuses_non_issue_branch; setup_repo
 run round post --changed "x" --feedback "y"
@@ -854,7 +877,7 @@ git_q checkout -b quickfix/typo
 run round post --changed "x" --feedback "y"
 expect_status 2 "$ST"
 expect_contains "state=NOT_ISSUE_BRANCH"
-grep -q "issue comment" "$GH_STUB_LOG" && fail "posted off an issue branch" || ok
+expect_gh_not_called "issue comment" "posted off an issue branch"
 
 t round_list_in_order; setup_repo
 run start 10 rounds
@@ -916,7 +939,7 @@ run phase open "Second phase" --description "y"
 expect_status 2 "$ST"
 expect_contains "state=PHASE_OPEN"
 expect_contains "Idea to first version"
-grep -q "POST" "$GH_STUB_LOG" && fail "created a milestone despite an open phase" || ok
+expect_gh_not_called "POST" "created a milestone despite an open phase"
 
 t phase_open_requires_description; setup_repo
 run phase open "Second phase"
@@ -932,7 +955,7 @@ run phase close "Idea to first version" --verdict-file "$SANDBOX/verdict.txt"
 expect_status 0 "$ST"
 expect_contains "closed=true"
 expect_contains "phase_number=7"
-grep -q "PATCH repos/{owner}/{repo}/milestones/7" "$GH_STUB_LOG" && ok || fail "no PATCH on milestone 7"
+expect_gh_called "PATCH repos/{owner}/{repo}/milestones/7" "no PATCH on milestone 7"
 OUT="$(cat "$SANDBOX/api.json")"
 expect_contains '"state": "closed"'
 expect_contains 'find out whether X.\nEnds when Alex has ruled.\n\n## Verdict\n\nIt works. Rounds felt right, \"preview\" needs a script.'
@@ -942,7 +965,7 @@ export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
 run phase close "Idea to first version"
 expect_status 1 "$ST"
 expect_contains "needs --verdict"
-grep -q "PATCH" "$GH_STUB_LOG" && fail "closed without a verdict" || ok
+expect_gh_not_called "PATCH" "closed without a verdict"
 
 t phase_close_unknown_title; setup_repo
 export GH_STUB_PHASES='7\tIdea to first version\t0\t6\tx'
@@ -959,8 +982,8 @@ expect_status 0 "$ST"
 expect_contains "repo=stub-owner/stub-repo"
 expect_contains "merge_policy=squash-only"
 expect_contains "ruleset=created"
-grep -q -- "--squash-merge-commit-message pr-title-description" "$GH_STUB_LOG" && ok || fail "squash message not set to pr-title-description"
-grep -q -- "--squash-merge-commit-title" "$GH_STUB_LOG" && fail "uses a flag gh does not have" || ok
+expect_gh_called "--squash-merge-commit-message pr-title-description" "squash message not set to pr-title-description"
+expect_gh_not_called "--squash-merge-commit-title" "uses a flag gh does not have"
 OUT="$(cat "$SANDBOX/api.json")"
 expect_contains '"name": "gnadd-main"'
 expect_contains '"type": "pull_request"'
@@ -970,7 +993,7 @@ export GH_STUB_RULESETS='gnadd-main'
 run init
 expect_status 0 "$ST"
 expect_contains "ruleset=exists"
-grep -q "POST" "$GH_STUB_LOG" && fail "created a second ruleset" || ok
+expect_gh_not_called "POST" "created a second ruleset"
 
 t init_ruleset_failure_names_cause; setup_repo
 export GH_STUB_RULESET_FAIL='gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)'
@@ -1007,7 +1030,7 @@ expect_contains "pr_url=https://github.com/stub-owner/stub-repo/pull/3"
 [ -z "$(git status --porcelain)" ] && ok || fail "tree not clean after landing"
 git ls-files --error-unmatch AGENTS.md .github/workflows/gnadd-ci.yml >/dev/null 2>&1 && ok || fail "init files not committed"
 git rev-parse --verify --quiet origin/quickfix/gnadd-init >/dev/null && ok || fail "landing branch not pushed"
-grep -q "pr create" "$GH_STUB_LOG" && ok || fail "no PR created"
+expect_gh_called "pr create" "no PR created"
 [ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "local main moved"
 run state
 expect_contains "tree=clean"
@@ -1018,7 +1041,7 @@ t init_land_nothing_to_land; setup_repo
 run init land
 expect_status 0 "$ST"
 expect_contains "landed=none"
-grep -qs "pr create" "$GH_STUB_LOG" && fail "created a PR with nothing to land" || ok
+expect_gh_not_called "pr create" "created a PR with nothing to land"
 
 t init_land_refuses_foreign_files; setup_repo
 run conventions
