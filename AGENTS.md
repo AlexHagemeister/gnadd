@@ -20,3 +20,5 @@
 - Releases: `./scripts/release.sh vX.Y.Z` stamps the version and repins the canonical-guide URLs in `help-gnadd`/`audit-gnadd` to the tag.
 - `.gitignore` excludes `.cursor/`.
 - When `GNADD.md` and a skill disagree on mechanics, the skill wins; when a skill and `bin/gnadd` disagree, the script wins.
+
+- Testing the skills end to end after a change: `test/TESTBED.md` is the procedure (throwaway repo, phased subagents, findings become issues here).
