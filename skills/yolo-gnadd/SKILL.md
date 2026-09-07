@@ -51,11 +51,19 @@ this skill's directory:
 bash "<skill-dir>/gnadd.sh" trace reset
 ```
 
-Every `gnadd.sh` subcommand any phase runs leaves a line in the trace. The
-closing report includes `trace show` output verbatim. **Honesty rule:** before
-reporting, compare the trace against the phases actually claimed; if expected
-steps are missing (a phase went around the script), say so explicitly in the
-report — never present such a run as clean.
+Every `gnadd.sh` subcommand any phase runs leaves a line in the trace. Half
+of a run is `gh` the script never sees (PR create, checks, body edit, ready,
+issue edit), so after each `gh` call a phase makes, record it:
+
+```bash
+bash "<skill-dir>/gnadd.sh" trace note gh <subcommand and flags>
+```
+
+The closing report includes `trace show` output verbatim. **Honesty rule:**
+before reporting, compare the trace against the phases actually claimed; if
+expected steps are missing (a phase went around the script, or a `gh` call
+has no note), say so explicitly in the report. Never present such a run as
+clean.
 
 ## Mode Selection
 
@@ -82,8 +90,8 @@ stops — those need a human.
 criteria. If evidence emerges that the spec is wrong or the scope moved, stop
 and escalate. Do not improvise scope autonomously. YOLO runs without rounds:
 there is no one to try a preview or give feedback, so start-issue's round loop
-(step 7) collapses to one pass, and each checkpoint's round comment is posted
-with `--no-feedback "yolo run"`.
+(step 7) collapses to one pass, its preview step (7.3) is dropped, and each
+checkpoint's round comment is posted with `--no-feedback "yolo run"`.
 
 **Phase 3 — Commit.** Load and follow `../commit-gnadd/SKILL.md`.
 Auto-approved gate: staging confirmation (stage what the plan produced;
@@ -94,16 +102,20 @@ through its verification, test, push, and PR-creation steps, stopping before
 its merge gate. Auto-approved gate: PR-draft approval. One overlay: create
 the PR as a **draft** — verification is not finished yet, and draft status
 makes a premature merge impossible. The creation body is a working summary;
-the complete record lands in phase 7's single write. Any `state=` halt is a
-hard stop, as that skill specifies.
+the complete record lands in phase 7's single write. Draft status may also
+suppress bot reviewers (CodeRabbit skips drafts), and a bot check that
+reports green is not evidence that a review happened: phase 6 is the review.
+Any `state=` halt is a hard stop, as that skill specifies.
 
 **Phase 5 — CI gate.** Cheap signals before expensive ones: wait for the
 draft PR's checks with `gh pr checks <PR> --watch`, then read
 `gnadd.sh ship status <PR>` from the resolve-issue skill's directory.
 `checks=pass` → phase 6. `checks=failed` → fix within the self-repair budget:
-fix, re-run the project tests, re-push with `gnadd.sh ship push` (it handles
-an existing PR), and wait for CI again. `checks=none` is a hard stop in YOLO:
-nothing automated verified the head, and `--no-check` is never YOLO's to add.
+fix, re-run the project tests, re-push with `gnadd.sh ship push` from the
+resolve-issue skill's directory (the same push its push step ran in phase 4;
+it handles an existing PR), and wait for CI again. `checks=none` is a hard
+stop in YOLO: nothing automated verified the head, and `--no-check` is never
+YOLO's to add.
 The merge in phase 7 re-runs this gate inside the script (`ship merge`
 refuses unless every check passed), so a wait skipped here halts there.
 Never spend review effort on a head CI has not validated.
@@ -114,14 +126,21 @@ mode the stated trivial-change description) and the diff (`gh pr diff`),
 never this session's reasoning. Use a subagent where the platform supports
 one; otherwise perform a deliberate self-review pass restricted to spec +
 diff, and say which mode ran. Triage findings: worthwhile → fix, re-test,
-re-push through the same railed push as phase 5, and CI must return green
-(same budget); dismissed → record why. Every finding and its disposition
-goes into phase 7's body write under **## Autonomous review**.
+re-push with the same `ship push` as phase 5, and CI must return green
+(same budget); dismissed → record why. A test-shaped finding (a new test or
+assertion) counts only after it has been shown failing on the pre-fix head.
+A test that passes before the fix proves nothing, and a false-pass test (one
+that cannot fail, such as a `!`-prefixed line under `set -e`) is itself a
+finding to fix. Every finding and its disposition goes into phase 7's body
+write under **## Autonomous review**.
 
 **Phase 7 — Finalize and merge.** In one write, update the PR body with the
 acceptance-criteria table and the **## Autonomous review** record, then mark
-the draft ready. Resume `../resolve-issue-gnadd/SKILL.md` at its merge gate
-with the merge confirmation auto-approved — **except**:
+the draft ready. Leave resolve-issue's "Diff reviewed by a human before
+merge" checkbox unticked, with a note beside it pointing at the review
+record: no human read this diff, and the body must say so. Resume
+`../resolve-issue-gnadd/SKILL.md` at its merge gate with the merge
+confirmation auto-approved — **except**:
 
 - If the diff touches `bin/`, `scripts/`, `.github/`, or any `gnadd.sh` copy,
   stop at the merge gate and hand the merge to the human. Autonomy must not
@@ -130,7 +149,9 @@ with the merge confirmation auto-approved — **except**:
   otherwise hard stop. `CONFLICTING` and every other `state=` halt: hard
   stop, as that skill already specifies.
 
-After merge, complete that skill's record sync and cleanup.
+After merge, complete that skill's record sync and cleanup. Its phase-close
+prompt is not YOLO's to answer: closing a phase is a human decision, so skip
+it and, if the milestone has no open issues left, say so in the report.
 
 **Phase 8 — Report.** After merge + record sync + cleanup, report:
 
@@ -141,7 +162,9 @@ After merge, complete that skill's record sync and cleanup.
 ## Self-Repair Budget
 
 CI failures (phase 5) and worthwhile review findings (phase 6) share at most
-**2** fix → re-verify → re-push rounds across the whole run. After that,
+**2** fix → re-verify → re-push rounds across the whole run. One round is one
+re-push, however many fixes it bundles. Count the round when the push
+happens, not per finding. After that,
 escalate with: what failed, what was tried each round, and current branch/PR
 state. Unbounded retry loops are how autonomous runs drift; the budget is the
 leash.

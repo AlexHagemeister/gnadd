@@ -135,6 +135,8 @@ gh_json() { # gh_json <field> <gh args...>: single field via --jq
 # never in the committed tree. The trace turns "did the mechanics go through
 # the rails?" from a trust question into a checkable artifact: a run that
 # improvised raw git has gaps here. `gnadd trace show|reset` reads/opens it.
+# `gnadd trace note <text>` appends a line for a step the script did not run
+# (a raw gh call, say), so the receipt can cover a whole run.
 
 TRACE_FILE=""
 TRACE_CMD=""
@@ -169,7 +171,14 @@ cmd_trace() {
     reset)
       : > "$TRACE_FILE"
       say "trace=reset" ;;
-    *) usage_die "usage: gnadd trace [show|reset]" ;;
+    note)
+      shift
+      [ $# -gt 0 ] || usage_die "usage: gnadd trace note <text>"
+      local ts
+      ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" || ts=""
+      printf '%s note %s branch=%s\n' "$ts" "$*" "$(current_branch)" >> "$TRACE_FILE"
+      say "trace=noted" ;;
+    *) usage_die "usage: gnadd trace [show|reset|note <text>]" ;;
   esac
 }
 
@@ -1385,7 +1394,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
   init land                       commit, push, and PR init's own files (AGENTS.md, CI workflow)
   conventions [--preview <cmd>]   write or update the GNADD block in AGENTS.md (idempotent)
-  trace [show|reset]              per-invocation receipt log (.git/gnadd-trace.log)
+  trace [show|reset|note <text>]  per-invocation receipt log (.git/gnadd-trace.log);
+                                  note records a step taken outside the script
   version                         release baseline + distribution channel
 
 Exit codes: 0 ok · 1 usage/unexpected · 2 named state needing a human (state=NAME on stdout)
