@@ -33,8 +33,9 @@ skills.
   script (ff-only syncs, divergence halts, gated cleanup), the skills
   (judgment and conversation), and the human (reading the diff before merge).
 - Recovery from bad states has a sanctioned path: `gnadd.sh doctor` (bundled
-  with `prime-gnadd`) diagnoses and offers lossless fixes. Never improvise
-  `reset`/`force` recoveries.
+  with `prime-gnadd`) diagnoses and offers lossless fixes, and a rescued
+  branch has scripted exits (`/quickfix-gnadd`, `start --from`, `drop`).
+  Never improvise `reset`/`force` recoveries.
 - Two receipts are always available: `gnadd.sh trace show` prints every
   script call this repo has seen (command, exit status, branch, kept in
   `.git/gnadd-trace.log`), and `gnadd.sh round list <N>` prints an issue's

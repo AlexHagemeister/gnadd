@@ -516,6 +516,77 @@ expect_contains "rescued=true"
 [ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main not realigned"
 [ "$(git symbolic-ref --short HEAD)" = "rescue/stray" ] && ok || fail "not standing on rescue branch"
 
+t doctor_rescue_onto_quickfix_name_ships_through_quickfix; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit"
+run doctor --rescue-main quickfix/stray
+expect_status 0 "$ST"
+expect_contains "rescued=true"
+expect_contains "/quickfix-gnadd"
+expect_contains "gnadd start <N> <slug> --from quickfix/stray"
+expect_contains "gnadd drop quickfix/stray"
+run quickfix ship
+expect_status 0 "$ST"
+expect_contains "guard=ok"
+expect_contains "pushed=true"
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main gained a commit"
+
+t start_from_renames_rescued_branch_into_issue_branch; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit"
+STRAY="$(git rev-parse HEAD)"
+run doctor --rescue-main rescue/stray
+run start 21 rescued-work --from rescue/stray
+expect_status 0 "$ST"
+expect_contains "result=created-from"
+expect_contains "branch=issue-21/rescued-work"
+expect_contains "from=rescue/stray"
+[ "$(git symbolic-ref --short HEAD)" = "issue-21/rescued-work" ] && ok || fail "not on the issue branch"
+[ "$(git rev-parse HEAD)" = "$STRAY" ] && ok || fail "issue branch lost the stray commit"
+git show-ref --verify --quiet refs/heads/rescue/stray && fail "rescue branch still exists after rename" || ok
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main moved"
+
+t start_from_refusals; setup_repo
+run start 22 nope --from nosuch
+expect_status 2 "$ST"
+expect_contains "state=FROM_NOT_FOUND"
+run start 22 nope --from main
+expect_status 2 "$ST"
+expect_contains "state=FROM_IS_MAIN"
+git_q checkout -b issue-22/already && git_q checkout -b rescue/x && git_q checkout main
+run start 22 nope --from rescue/x
+expect_status 2 "$ST"
+expect_contains "state=FROM_HAS_EXISTING_BRANCH"
+run start 22 nope --from rescue/x --carry
+expect_status 1 "$ST"
+
+t drop_lists_commits_and_refuses_without_yes; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray commit"
+run doctor --rescue-main rescue/stray
+run sync-main
+run drop rescue/stray
+expect_status 2 "$ST"
+expect_contains "state=DROP_NEEDS_CONFIRM"
+expect_contains "commits_beyond_origin_main=1"
+expect_contains "stray commit"
+git show-ref --verify --quiet refs/heads/rescue/stray && ok || fail "branch deleted without --yes"
+run drop rescue/stray --yes
+expect_status 0 "$ST"
+expect_contains "dropped=true"
+git show-ref --verify --quiet refs/heads/rescue/stray && fail "branch survived --yes" || ok
+[ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ] && ok || fail "main moved"
+
+t drop_refusals; setup_repo
+run drop main --yes
+expect_status 2 "$ST"
+expect_contains "state=DROP_MAIN"
+run drop nosuch --yes
+expect_status 2 "$ST"
+expect_contains "state=DROP_NOT_FOUND"
+git_q checkout -b rescue/here
+run drop rescue/here --yes
+expect_status 2 "$ST"
+expect_contains "state=ON_TARGET_BRANCH"
+git show-ref --verify --quiet refs/heads/rescue/here && ok || fail "deleted the checked-out branch"
+
 t doctor_rescue_refuses_when_not_diverged; setup_repo
 run doctor --rescue-main rescue/nothing
 expect_status 2 "$ST"
