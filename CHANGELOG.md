@@ -7,6 +7,10 @@ change skill names, script subcommands, or workflow behavior.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.5.0] - 2026-09-06
+
 ### Added
 
 - `init-gnadd`: bootstraps a repo onto GNADD. Confirms the GitHub remote,

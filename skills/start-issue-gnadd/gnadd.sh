@@ -21,7 +21,7 @@
 
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 GH="${GNADD_GH:-gh}"
 MAIN="${GNADD_MAIN:-main}"
 
