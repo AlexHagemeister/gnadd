@@ -362,6 +362,36 @@ cmd_state() {
 # ---------------------------------------------------------------- start
 
 cmd_start() {
+  start_branch "$@"
+  worktree_setup
+}
+
+# A fresh linked worktree holds only what git tracks, so the app usually
+# cannot run there. A project names the fix once, as a `Worktree setup:` line
+# in its conventions file, and start runs it the first time an issue starts
+# in a linked worktree. The line is read from the branch just checked out.
+# A marker in the worktree's own git dir (never the tree) records success, so
+# a folder is set up once. A failure writes no marker: rerunning start retries.
+# The primary checkout is never set up: whoever cloned it already did.
+worktree_setup() {
+  local gitdir common
+  gitdir="$(real_dir "$(git rev-parse --git-dir)")"
+  common="$(real_dir "$(git rev-parse --git-common-dir)")"
+  [ "$gitdir" != "$common" ] || return 0
+  [ ! -f "$gitdir/gnadd-setup-done" ] || return 0
+  local top cmd
+  top="$(git rev-parse --show-toplevel)"
+  cmd="$(cd "$top" && grep -h '^Worktree setup:' CLAUDE.md AGENTS.md 2>/dev/null | head -1 | sed 's/^Worktree setup:[[:space:]]*//')" || true
+  [ -n "$cmd" ] || return 0
+  say "setup_command=$cmd"
+  local rc=0
+  ( cd "$top" && sh -c "$cmd" ) </dev/null 2>&1 | sed 's/^/  | /' || rc=$?
+  [ "$rc" -eq 0 ] || die_state SETUP_FAILED "worktree setup failed (exit $rc): this folder is not ready, so no code should be written here yet. The branch is checked out. Fix the cause, then rerun start to retry the setup"
+  : > "$gitdir/gnadd-setup-done"
+  say "setup=ran"
+}
+
+start_branch() {
   local carry=0 from="" args=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -1561,14 +1591,15 @@ JSON
 # fact the round loop needs: the preview launch line. It holds no task state
 # and nothing an agent must keep updated. Writes are idempotent: rerunning
 # changes only a preview line that actually differs, and never touches text
-# outside the marked block.
+# outside the marked block. The optional worktree setup line is written only
+# when given, never as a placeholder, because start runs it.
 
 CONV_FILE="AGENTS.md"
 CONV_START="<!-- gnadd:conventions -->"
 CONV_END="<!-- /gnadd:conventions -->"
 CONV_PLACEHOLDER="(none yet: put the command or URL that starts a dev preview here)"
 
-conventions_block() { # conventions_block <preview>
+conventions_block() { # conventions_block <preview> [setup]
   cat <<BLOCK
 $CONV_START
 ## GNADD
@@ -1580,43 +1611,58 @@ lands through an issue, a branch, and a PR, or through \`/quickfix-gnadd\` for
 a trivial one. Project intent lives in \`VISION.md\` when present.
 
 Preview launch: ${1:-$CONV_PLACEHOLDER}
-$CONV_END
+${2:+Worktree setup: $2
+}$CONV_END
 BLOCK
 }
 
 cmd_conventions() {
-  local preview=""
+  local preview="" setup="" current=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --preview) preview="${2:-}"; shift ;;
-      *) usage_die "usage: gnadd conventions [--preview <command or URL>]" ;;
+      --setup) setup="${2:-}"; shift ;;
+      *) usage_die "usage: gnadd conventions [--preview <command or URL>] [--setup <command>]" ;;
     esac
     shift
   done
   git rev-parse --show-toplevel >/dev/null 2>&1 || die_state NO_REPO "not inside a git repository"
   local f; f="$(git rev-parse --show-toplevel)/$CONV_FILE"
   if [ ! -f "$f" ]; then
-    conventions_block "$preview" > "$f"
+    conventions_block "$preview" "$setup" > "$f"
     say "conventions=created"
   elif ! grep -qF "$CONV_START" "$f"; then
-    { printf '\n'; conventions_block "$preview"; } >> "$f"
+    { printf '\n'; conventions_block "$preview" "$setup"; } >> "$f"
     say "conventions=updated"
     note "GNADD block appended to the existing $CONV_FILE; nothing else in it was touched"
   else
-    local current
+    local changed=0 tmp
     current="$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
     if [ -n "$preview" ] && [ "$current" != "$preview" ]; then
-      local tmp; tmp="$(mktemp)"
+      tmp="$(mktemp)"
       awk -v p="$preview" 'BEGIN{done=0} /^Preview launch: / && !done {print "Preview launch: " p; done=1; next} {print}' "$f" > "$tmp"
       mv "$tmp" "$f"
-      say "conventions=updated"
+      changed=1
       note "preview launch line changed from '$current'"
-    else
-      say "conventions=unchanged"
     fi
+    current="$(sed -n 's/^Worktree setup: //p' "$f" | head -1)"
+    if [ -n "$setup" ] && [ "$current" != "$setup" ]; then
+      # Replace the line in place, or add it as the block's last line.
+      tmp="$(mktemp)"
+      GNADD_SETUP="$setup" awk -v end="$CONV_END" 'BEGIN{done=0}
+        /^Worktree setup: / && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1; next}
+        $0 == end && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1}
+        {print}' "$f" > "$tmp"
+      mv "$tmp" "$f"
+      changed=1
+      [ -z "$current" ] || note "worktree setup line changed from '$current'"
+    fi
+    if [ "$changed" = 1 ]; then say "conventions=updated"; else say "conventions=unchanged"; fi
   fi
   say "file=$CONV_FILE"
   say "preview=$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
+  current="$(sed -n 's/^Worktree setup: //p' "$f" | head -1)"
+  [ -z "$current" ] || say "setup=$current"
   init_report_uncommitted
 }
 
@@ -1722,7 +1768,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
   init land                       commit, push, and PR init's own files (AGENTS.md, CI workflow)
-  conventions [--preview <cmd>]   write or update the GNADD block in AGENTS.md (idempotent)
+  conventions [--preview <cmd>] [--setup <cmd>]
+                                  write or update the GNADD block in AGENTS.md (idempotent)
   trace [show|reset|note <text>]  per-invocation receipt log (.git/gnadd-trace.log);
                                   note records a step taken outside the script
   version                         release baseline + distribution channel

@@ -101,14 +101,23 @@ test -f README.md && grep -nE 'localhost:[0-9]+|127\.0\.0\.1|(npm|pnpm|yarn|bun)
 Never guess silently. The line the user confirms is what every later session
 will run.
 
+Then offer the worktree setup line. A fresh linked worktree holds only what
+git tracks, so local config and installed dependencies are missing there.
+Ask: "What one command makes a fresh worktree of this repo runnable? Say
+none if there isn't one." Propose an obvious candidate (a setup script, an
+install command) for the user to confirm, and accept "none". Anything
+beyond one simple command belongs in a project script that CI also runs,
+so suggest that instead of a long chained line.
+
 ## 4. Write The Conventions File
 
 ```bash
-bash "<skill-dir>/gnadd.sh" conventions --preview "<confirmed command or URL>"
+bash "<skill-dir>/gnadd.sh" conventions --preview "<confirmed command or URL>" --setup "<confirmed setup command>"
 ```
 
 Omit `--preview` when the user has no preview yet; the script writes a
-placeholder they can fill in later. The script creates `AGENTS.md` if absent,
+placeholder they can fill in later. Omit `--setup` when the user said none:
+no line is written, because `start` would run a placeholder. The script creates `AGENTS.md` if absent,
 appends a marked GNADD block to an existing one without touching its other
 content, and on rerun changes only a preview line that differs. Report the
 result from its output: `conventions=created`, `updated`, or `unchanged`.

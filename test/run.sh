@@ -632,6 +632,69 @@ expect_status 2 "$ST"
 expect_contains "state=DIVERGED_MAIN"
 git show-ref --verify --quiet refs/heads/issue-30/alpha && fail "branch created on a diverged main" || ok
 
+# Issue #116: a `Worktree setup:` line runs once per fresh linked worktree.
+# The command logs the folder it ran in to a file outside every tree.
+commit_setup_line() { # commit_setup_line <command>: put the line on main and origin/main
+  printf 'Worktree setup: %s\n' "$1" > "$SANDBOX/work/AGENTS.md"
+  git_q -C "$SANDBOX/work" add AGENTS.md
+  git_q -C "$SANDBOX/work" commit -m "setup line"
+  git_q -C "$SANDBOX/work" push origin main
+}
+setup_runs() { if [ -f "$SANDBOX/setup.log" ]; then wc -l < "$SANDBOX/setup.log" | tr -d ' '; else echo 0; fi; }
+
+t wt_setup_line_runs_in_fresh_worktree; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log && echo installing"
+add_wt wt1
+cd "$WT"
+run start 40 setup
+expect_status 0 "$ST"
+expect_contains "branch=issue-40/setup"
+expect_contains "setup=ran"
+expect_contains "  | installing"
+[ "$(setup_runs)" = "1" ] && ok || fail "setup ran $(setup_runs) times, wanted 1"
+[ "$(cat "$SANDBOX/setup.log" 2>/dev/null)" = "$WT" ] && ok || fail "setup did not run in the worktree folder"
+[ -z "$(git status --porcelain)" ] && ok || fail "setup marker landed in the tree"
+
+t wt_setup_failure_halts_and_rerun_retries; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log && echo boom && exit 3"
+add_wt wt1
+cd "$WT"
+run start 41 broken
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+expect_contains "not ready"
+expect_contains "  | boom"
+expect_not_contains "setup=ran"
+run start 41 broken
+expect_status 2 "$ST"
+[ "$(setup_runs)" = "2" ] && ok || fail "rerun after a failed setup did not retry it"
+
+t wt_setup_not_rerun_for_next_issue_in_same_folder; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log"
+add_wt wt1
+cd "$WT"
+run start 42 first
+run sync-main
+run start 43 second
+expect_status 0 "$ST"
+expect_contains "branch=issue-43/second"
+expect_not_contains "setup"
+[ "$(setup_runs)" = "1" ] && ok || fail "an already set-up folder was set up again"
+
+t wt_setup_absent_line_runs_nothing; setup_repo
+add_wt wt1
+cd "$WT"
+run start 44 plain
+expect_status 0 "$ST"
+expect_not_contains "setup"
+
+t wt_setup_skips_primary_checkout; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log"
+run start 45 primary
+expect_status 0 "$ST"
+expect_not_contains "setup"
+[ "$(setup_runs)" = "0" ] && ok || fail "setup ran in the primary checkout"
+
 t wt_quickfix_start_inside_linked_worktree; setup_repo
 add_wt wt1
 WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
@@ -1631,6 +1694,30 @@ expect_status 0 "$ST"
 expect_contains "conventions=created"
 OUT="$(cat AGENTS.md)"
 expect_contains "Preview launch: (none yet"
+expect_not_contains "Worktree setup:"
+
+t conventions_writes_setup_line_only_when_given; setup_repo
+run conventions --preview "npm run dev" --setup "./scripts/setup.sh"
+expect_status 0 "$ST"
+expect_contains "setup=./scripts/setup.sh"
+OUT="$(cat AGENTS.md)"
+expect_contains "Worktree setup: ./scripts/setup.sh"
+run conventions --preview "npm run dev"
+expect_contains "conventions=unchanged"
+expect_contains "setup=./scripts/setup.sh"
+
+t conventions_adds_and_updates_setup_line_in_block; setup_repo
+run conventions --preview "npm run dev"
+run conventions --setup "make setup"
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+[ "$(sed -n '/^Worktree setup:/{n;p;}' AGENTS.md)" = "<!-- /gnadd:conventions -->" ] && ok || fail "setup line not inside the block"
+run conventions --setup "make setup"
+expect_contains "conventions=unchanged"
+run conventions --setup "make bootstrap"
+expect_contains "conventions=updated"
+[ "$(grep -c '^Worktree setup:' AGENTS.md)" = "1" ] && ok || fail "setup line duplicated"
+grep -q '^Worktree setup: make bootstrap$' AGENTS.md && ok || fail "setup line not replaced"
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd init-gnadd; do
