@@ -205,7 +205,14 @@ lives where all decision history lives: in merged PRs and closed issues.
    file (`AGENTS.md`) tells every agent the repo runs GNADD, to start with
    prime, and how to launch a preview (`Preview launch: <command or URL>`, the
    one fact the round loop needs). It is a pointer, never task state, and the
-   skill is safe to rerun.
+   skill is safe to rerun. It can also carry how to make a fresh worktree
+   runnable (`Worktree setup: <command>`), since a linked worktree holds only
+   what git tracks. `start` runs that command once, the first time an issue
+   starts in a linked worktree, and a failure halts before any code is
+   written. GNADD knows nothing about env files or package managers: the line
+   names a command the project owns. Setup beyond one simple command belongs
+   in a project script that CI also runs, so it fails loudly when it goes
+   stale.
 3. **Write `VISION.md` in conversation with `/vision-gnadd`.** Brain-dump the
    idea to the agent and let it write the document in the shape above, in your
    words, confirmed by you. It closes by offering to open the first phase (see
