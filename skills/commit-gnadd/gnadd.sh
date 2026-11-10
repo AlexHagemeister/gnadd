@@ -1667,8 +1667,8 @@ cmd_question_list() {
   while IFS="$(printf '\t')" read -r n kind title; do
     [ -n "$n" ] || continue
     question_load "$n"
-    local k st to src tx
-    while IFS="$(printf '\t')" read -r k st to src tx; do
+    local k st to _src tx
+    while IFS="$(printf '\t')" read -r k st to _src tx; do
       case "$st" in
         answered|unanswered) ;;
         *) continue ;;
