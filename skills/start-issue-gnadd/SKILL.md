@@ -109,7 +109,7 @@ The script resumes an existing `issue-<N>/*` branch (with a fast-forward-only pu
 | `state=BRANCH_IN_WORKTREE` | Another folder (`worktree=`) has the branch checked out | **Stop and report.** Resume the issue in that folder; never remove or move a folder yourself. When `branch=` is `main` or the message says the folder is gone or mid-rebase, relay the script's own recipe instead |
 | `state=CHECKOUT_REFUSED` | Git refused to check out the issue branch, and the message carries git's reason | **Stop and report** what git said. Nothing changed |
 | `setup=ran` (after a `result=`) | First start in this linked worktree, and the project's `Worktree setup:` line ran there and passed | Continue. It runs once per folder, never in the primary checkout |
-| `state=SETUP_FAILED` | The `Worktree setup:` command failed (its output is above, prefixed `  \|`). The branch is checked out, but the folder is not ready | **Stop and report** the output. Write no code here. Once the cause is fixed, rerun the plain `start <N> <slug>` the message names (no `--carry` or `--from`). It retries the setup without a checkout and leaves the tree as it is |
+| `state=SETUP_FAILED` | The `Worktree setup:` command failed (its output is above, prefixed `  \|`). The branch is checked out, but the folder is not ready | **Stop and report** the output. Write no code here. Once the cause is fixed, rerun the plain `start <N> <slug>` the message names (no `--carry` or `--from`). It runs the setup again. Uncommitted changes (what the setup wrote, or a carry) stay as they are. On a clean tree it is an ordinary resume, so it can still halt on a diverged branch |
 
 A halt is the system working, not breaking. When halted, skip steps 5–6 (blocker-first) and resolve the blocker with the user.
 

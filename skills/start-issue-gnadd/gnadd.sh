@@ -371,8 +371,8 @@ cmd_start() {
 # in its conventions file (AGENTS.md), and start runs it the first time an
 # issue starts in a linked worktree. The line is read from the branch just
 # checked out. A marker in the worktree's own git dir (never the tree) records
-# success, so a folder is set up once. A failure writes no marker, and a rerun
-# of the plain start on the same branch retries the setup without a checkout.
+# success, so a folder is set up once. A failure writes no marker, so the next
+# start in the folder runs the setup again.
 # The primary checkout is never set up: whoever cloned it already did.
 
 setup_gitdir() { # prints a linked worktree's git dir while its setup is not done; fails otherwise
@@ -382,14 +382,42 @@ setup_gitdir() { # prints a linked worktree's git dir while its setup is not don
   [ "$gitdir" != "$common" ] && [ ! -f "$gitdir/gnadd-setup-done" ] && printf '%s\n' "$gitdir"
 }
 
-setup_command() { # the Worktree setup: value, one wrapping backtick pair stripped; empty for none
-  local f v
+setup_unfinished_here() { # a setup started in this linked worktree and never finished (its log exists, its marker does not)
+  local gitdir
+  gitdir="$(setup_gitdir)" || return 1
+  [ -f "$gitdir/gnadd-setup.log" ]
+}
+
+is_none() { # "none" in any letter case
+  case "$1" in [Nn][Oo][Nn][Ee]) return 0 ;; esac
+  return 1
+}
+
+# The one definition of the setup line, shared by start and conventions: the
+# first line of the file that begins with CONV_SETUP_KEY. Its value is the
+# rest of that line with the whitespace around it dropped.
+setup_line_exists() { grep -q "^$CONV_SETUP_KEY" "$1" 2>/dev/null; }
+
+setup_line_value() { # setup_line_value <file>
+  local v
+  v="$(sed -n "s/^$CONV_SETUP_KEY[[:space:]]*//p" "$1" 2>/dev/null | head -1)" || true
+  v="${v%"${v##*[![:space:]]}"}"
+  printf '%s' "$v"
+}
+
+setup_command() { # the command start would run: the line's value, empty for no line or none
+  local f v inner
   f="$(git rev-parse --show-toplevel)/$CONV_FILE"
   [ -f "$f" ] || return 0
-  v="$(sed -n 's/^Worktree setup:[[:space:]]*//p' "$f" | head -1)" || true
-  v="${v%"${v##*[![:space:]]}"}"
-  case "$v" in \`*\`) v="${v#\`}"; v="${v%\`}" ;; esac
-  [ "$v" != "none" ] || v=""
+  v="$(setup_line_value "$f")"
+  # Markdown habit: a value that is exactly one backtick-wrapped span is the
+  # command inside it. Any other backtick is shell syntax and is left alone.
+  case "$v" in
+    \`*\`)
+      inner="${v#\`}"; inner="${inner%\`}"
+      case "$inner" in *\`*) ;; *) v="$inner" ;; esac ;;
+  esac
+  ! is_none "$v" || v=""
   printf '%s' "$v"
 }
 
@@ -400,16 +428,19 @@ worktree_setup() {
   [ -n "$cmd" ] || return 0
   say "setup_command=$cmd"
   # Output goes to a file, never a pipe, so start returns when the command
-  # exits even if it leaves a process (a dev server) running. Each line is
-  # printed prefixed, so none of it reads as a key=value fact.
-  local top log rc=0
+  # exits even if it leaves a process (a dev server) running. It is printed
+  # afterwards with every line prefixed and ended, and a carriage return
+  # starts a new prefixed line, so none of it reads as a key=value fact and
+  # the next fact starts on its own line whatever the command printed.
+  local top log rc=0 br
   top="$(git rev-parse --show-toplevel)"
   log="$gitdir/gnadd-setup.log"
+  br="$(current_branch)" # read before the command runs, so the rerun recipe names the branch start checked out
   ( cd "$top" && sh -c "$cmd" ) </dev/null >"$log" 2>&1 || rc=$?
-  sed 's/^/  | /' "$log"
+  LC_ALL=C awk '{ sub(/\r$/, ""); gsub(/\r/, "\n  | "); print "  | " $0 }' "$log" 2>/dev/null || true
   if [ "$rc" -ne 0 ]; then
-    local br n slug
-    br="$(current_branch)"; n="${br#issue-}"; n="${n%%/*}"; slug="${br#*/}"
+    local n slug
+    n="${br#issue-}"; n="${n%%/*}"; slug="${br#*/}"
     die_state SETUP_FAILED "worktree setup failed (exit $rc): this folder is not ready, so write no code here yet. $br is checked out. Fix the cause, then rerun 'start $n $slug' (no other flags) to retry the setup"
   fi
   : > "$gitdir/gnadd-setup-done"
@@ -432,17 +463,37 @@ start_branch() {
   [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || usage_die "slug must be kebab-case, got: $slug"
   { [ "$carry" = 1 ] && [ -n "$from" ]; } && usage_die "--carry and --from are separate rescues; pick one"
 
-  # Setup retry: this folder is already on the issue's branch and its
-  # worktree setup has not completed (the rerun after SETUP_FAILED). No
-  # checkout is needed, so the tree is left exactly as it is, including what
-  # the failed setup wrote or a carry brought.
+  # Setup retry on a dirty tree: this folder is already on the issue's branch,
+  # a setup started here and did not finish, and the tree has uncommitted
+  # changes (what the failed setup wrote, or what a carry brought). The
+  # ordinary resume would halt DIRTY_TREE to protect the tree before a
+  # checkout, but no checkout is needed here, so the setup is retried with the
+  # tree left as it is. Every other case, including the same rerun on a clean
+  # tree, takes the ordinary path below, so no resume check is skipped. The
+  # one check that does not depend on a clean tree, a branch diverged from its
+  # remote, halts here as it does there. A branch behind its remote is not
+  # fast-forwarded under uncommitted changes, and the note says so.
   local cur; cur="$(current_branch)"
   case "$cur" in
     "issue-$n/"*)
-      if setup_gitdir >/dev/null && [ -n "$(setup_command)" ]; then
+      if tree_dirty && setup_unfinished_here && [ -n "$(setup_command)" ]; then
+        local behind=0
+        if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+          fetch_origin >/dev/null || true
+          if git merge-base --is-ancestor '@{u}' HEAD 2>/dev/null; then
+            :
+          elif git merge-base --is-ancestor HEAD '@{u}' 2>/dev/null; then
+            behind="$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+          else
+            die_state BRANCH_DIVERGED_FROM_REMOTE "'$cur' and its remote have diverged; do not merge or rebase autonomously. A human decides"
+          fi
+        fi
         say "result=resumed"
         say "branch=$cur"
-        note "already on $cur with its worktree setup not done; retrying the setup, the tree is left as it is"
+        note "already on $cur, where a worktree setup did not finish; retrying the setup with no checkout, so the uncommitted changes stay as they are"
+        [ "$carry" = 0 ] || note "--carry ignored: this folder is already on $cur, so there is nothing to carry"
+        [ -z "$from" ] || note "--from $from ignored: this folder is already on $cur, so nothing was renamed"
+        [ "$behind" = 0 ] || note "$cur is $behind commit(s) behind its remote and was not fast-forwarded, because the tree has uncommitted changes; rerun 'start $n ${cur#*/}' once the tree is clean to pull them"
         return 0
       fi ;;
   esac
@@ -1638,6 +1689,7 @@ CONV_FILE="AGENTS.md"
 CONV_START="<!-- gnadd:conventions -->"
 CONV_END="<!-- /gnadd:conventions -->"
 CONV_PLACEHOLDER="(none yet: put the command or URL that starts a dev preview here)"
+CONV_SETUP_KEY="Worktree setup:"
 
 conventions_block() { # conventions_block <preview> [setup]
   cat <<BLOCK
@@ -1668,59 +1720,73 @@ cmd_conventions() {
   done
   git rev-parse --show-toplevel >/dev/null 2>&1 || die_state NO_REPO "not inside a git repository"
   local f; f="$(git rev-parse --show-toplevel)/$CONV_FILE"
-  # "none" means no setup line: it is never written, and it removes one.
+  # "none" (any letter case) means no setup line: it is never written, and it
+  # removes every line start could run.
   local remove_setup=0
-  [ "$setup" != "none" ] || { setup=""; remove_setup=1; }
+  ! is_none "$setup" || { setup=""; remove_setup=1; }
   if [ ! -f "$f" ]; then
     conventions_block "$preview" "$setup" > "$f"
     say "conventions=created"
-  elif ! grep -qF "$CONV_START" "$f"; then
-    { printf '\n'; conventions_block "$preview" "$setup"; } >> "$f"
-    say "conventions=updated"
-    note "GNADD block appended to the existing $CONV_FILE; nothing else in it was touched"
   else
-    local changed=0 tmp msgs=""
-    current="$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
-    if [ -n "$preview" ] && [ "$current" != "$preview" ]; then
-      tmp="$(mktemp)"
-      awk -v p="$preview" 'BEGIN{done=0} /^Preview launch: / && !done {print "Preview launch: " p; done=1; next} {print}' "$f" > "$tmp"
-      mv "$tmp" "$f"
+    local changed=0 tmp msgs="" has_line=0 appended=0 line_edit=0
+    setup_line_exists "$f" && has_line=1
+    if ! grep -qF "$CONV_START" "$f"; then
+      # A setup line already in the file is the one start runs, so the new
+      # block carries none and that line is updated or removed below.
+      local block_setup="$setup"
+      [ "$has_line" = 0 ] || block_setup=""
+      { printf '\n'; conventions_block "$preview" "$block_setup"; } >> "$f"
       changed=1
-      msgs="${msgs}note: preview launch line changed from '$current'
-"
-    fi
-    current="$(sed -n 's/^Worktree setup: //p' "$f" | head -1)"
-    if [ "$remove_setup" = 1 ] && [ -n "$current" ]; then
-      tmp="$(mktemp)"
-      awk 'BEGIN{done=0} /^Worktree setup: / && !done {done=1; next} {print}' "$f" > "$tmp"
-      mv "$tmp" "$f"
-      changed=1
-      msgs="${msgs}note: worktree setup line removed (was '$current')
-"
-    elif [ -n "$setup" ] && [ "$current" != "$setup" ]; then
-      # Replace the line in place, or add it as the block's last line.
-      tmp="$(mktemp)"
-      GNADD_SETUP="$setup" awk -v end="$CONV_END" 'BEGIN{done=0}
-        /^Worktree setup: / && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1; next}
-        $0 == end && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1}
-        {print}' "$f" > "$tmp"
-      if cmp -s "$f" "$tmp"; then
-        rm -f "$tmp"
-        msgs="${msgs}note: worktree setup line not written: the GNADD block has no end marker ($CONV_END); add it, then rerun
-"
-      else
+      appended=1
+      setup_line_exists "$f" && has_line=1
+    else
+      current="$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
+      if [ -n "$preview" ] && [ "$current" != "$preview" ]; then
+        tmp="$(mktemp)"
+        awk -v p="$preview" 'BEGIN{done=0} /^Preview launch: / && !done {print "Preview launch: " p; done=1; next} {print}' "$f" > "$tmp"
         mv "$tmp" "$f"
         changed=1
-        [ -z "$current" ] || msgs="${msgs}note: worktree setup line changed from '$current'
+        msgs="${msgs}note: preview launch line changed from '$current'
 "
       fi
+    fi
+    current="$(setup_line_value "$f")"
+    if [ "$remove_setup" = 1 ] && [ "$has_line" = 1 ]; then
+      tmp="$(mktemp)"
+      awk -v key="$CONV_SETUP_KEY" 'index($0, key) == 1 {next} {print}' "$f" > "$tmp"
+      mv "$tmp" "$f"
+      changed=1
+      line_edit="$appended"
+      msgs="${msgs}note: worktree setup line removed (was '$current')
+"
+    elif [ -n "$setup" ] && [ "$has_line" = 0 ] && ! grep -qxF -e "$CONV_END" "$f"; then
+      msgs="${msgs}note: worktree setup line not written: the GNADD block has no end marker ($CONV_END); add it, then rerun
+"
+    elif [ -n "$setup" ] && { [ "$has_line" = 0 ] || [ "$current" != "$setup" ]; }; then
+      # Replace the line in place, or add it as the block's last line.
+      tmp="$(mktemp)"
+      GNADD_SETUP="$setup" awk -v end="$CONV_END" -v key="$CONV_SETUP_KEY" 'BEGIN{done=0}
+        index($0, key) == 1 && !done {print key " " ENVIRON["GNADD_SETUP"]; done=1; next}
+        $0 == end && !done {print key " " ENVIRON["GNADD_SETUP"]; done=1}
+        {print}' "$f" > "$tmp"
+      mv "$tmp" "$f"
+      changed=1
+      [ "$has_line" = 0 ] || { line_edit="$appended"; msgs="${msgs}note: worktree setup line changed from '$current'
+"; }
+    fi
+    if [ "$line_edit" = 1 ]; then
+      msgs="note: GNADD block appended to the existing $CONV_FILE; outside it, only the worktree setup line was touched
+$msgs"
+    elif [ "$appended" = 1 ]; then
+      msgs="note: GNADD block appended to the existing $CONV_FILE; nothing else in it was touched
+$msgs"
     fi
     if [ "$changed" = 1 ]; then say "conventions=updated"; else say "conventions=unchanged"; fi
     [ -z "$msgs" ] || printf '%s' "$msgs"
   fi
   say "file=$CONV_FILE"
   say "preview=$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
-  current="$(sed -n 's/^Worktree setup: //p' "$f" | head -1)"
+  current="$(setup_command)"
   [ -z "$current" ] || say "setup=$current"
   init_report_uncommitted
 }

@@ -779,6 +779,261 @@ run start 52 agents
 expect_status 0 "$ST"
 [ "$(cat "$SANDBOX/setup.log" 2>/dev/null)" = "agents" ] && ok || fail "setup line not read from AGENTS.md alone"
 
+# A retry must never skip a check the ordinary resume makes. The retry
+# shortcut is only for a dirty tree after a setup that did not finish here.
+# With a clean tree, or in a folder where no setup ever started, start takes
+# the ordinary path and then runs the setup as a first run would.
+branch_on_origin() { # branch_on_origin <branch>: local branch with one commit, pushed and tracking; work returns to main
+  git_q -C "$SANDBOX/work" checkout -b "$1"
+  echo one > "$SANDBOX/work/one.txt"
+  git_q -C "$SANDBOX/work" add one.txt && git_q -C "$SANDBOX/work" commit -m "one"
+  git_q -C "$SANDBOX/work" push -u origin "$1"
+  git_q -C "$SANDBOX/work" checkout main
+}
+advance_origin_branch() { # advance_origin_branch <branch>: a commit lands on origin's copy from another clone
+  ( cd "$SANDBOX"
+    rm -rf adv && git_q clone origin.git adv
+    cd adv
+    git config user.email o@o && git config user.name o
+    git_q checkout "$1"
+    echo "$RANDOM" >> remote.txt
+    git_q add remote.txt && git_q commit -m "remote change"
+    git_q push origin "$1" )
+}
+local_commit() { # local_commit <dir>: a commit origin does not have
+  echo local >> "$1/local.txt"
+  git_q -C "$1" add local.txt && git_q -C "$1" commit -m "local change"
+}
+
+t wt_setup_first_resume_in_worktree_added_on_branch_fast_forwards; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log"
+branch_on_origin issue-60/z
+advance_origin_branch issue-60/z
+git_q -C "$SANDBOX/work" worktree add "$SANDBOX/wtz" issue-60/z
+cd "$SANDBOX/wtz"
+run start 60 z
+expect_status 0 "$ST"
+expect_contains "result=resumed"
+expect_contains "setup=ran"
+git_q fetch origin
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/issue-60/z)" ] && ok || fail "the resume skipped the fast-forward pull"
+
+t wt_setup_first_resume_in_worktree_added_on_branch_halts_on_diverged; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log"
+branch_on_origin issue-61/z
+advance_origin_branch issue-61/z
+git_q -C "$SANDBOX/work" worktree add "$SANDBOX/wtz" issue-61/z
+local_commit "$SANDBOX/wtz"
+cd "$SANDBOX/wtz"
+run start 61 z
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_DIVERGED_FROM_REMOTE"
+expect_not_contains "result=resumed"
+[ "$(setup_runs)" = "0" ] && ok || fail "setup ran on a branch diverged from its remote"
+
+t wt_setup_dirty_tree_with_no_failed_setup_still_halts; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log"
+git_q -C "$SANDBOX/work" branch issue-62/z
+git_q -C "$SANDBOX/work" worktree add "$SANDBOX/wtz" issue-62/z
+cd "$SANDBOX/wtz"
+echo wip > wip.txt
+run start 62 z
+expect_status 2 "$ST"
+expect_contains "state=DIRTY_TREE"
+[ "$(setup_runs)" = "0" ] && ok || fail "setup ran past a dirty tree in a folder where no setup had failed"
+
+t wt_setup_retry_on_clean_tree_is_an_ordinary_resume; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; test -f $SANDBOX/ok"
+branch_on_origin issue-63/z
+add_wt wt1
+cd "$WT"
+run start 63 z
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+advance_origin_branch issue-63/z
+touch "$SANDBOX/ok"
+run start 63 z
+expect_status 0 "$ST"
+expect_contains "setup=ran"
+expect_not_contains "ignored"
+git_q fetch origin
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/issue-63/z)" ] && ok || fail "the clean rerun skipped the fast-forward pull"
+[ "$(setup_runs)" = "2" ] && ok || fail "the clean rerun did not retry the setup"
+
+t wt_setup_retry_on_clean_tree_halts_on_diverged; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; test -f $SANDBOX/ok"
+branch_on_origin issue-64/z
+add_wt wt1
+cd "$WT"
+run start 64 z
+expect_contains "state=SETUP_FAILED"
+advance_origin_branch issue-64/z
+local_commit "$WT"
+touch "$SANDBOX/ok"
+run start 64 z
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_DIVERGED_FROM_REMOTE"
+expect_not_contains "result=resumed"
+[ "$(setup_runs)" = "1" ] && ok || fail "the setup was retried on a branch diverged from its remote"
+
+t wt_setup_retry_on_dirty_tree_halts_on_diverged; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; cp README.md .env; test -f $SANDBOX/ok"
+branch_on_origin issue-65/z
+add_wt wt1
+cd "$WT"
+run start 65 z
+expect_contains "state=SETUP_FAILED"
+advance_origin_branch issue-65/z
+local_commit "$WT"
+touch "$SANDBOX/ok"
+run start 65 z
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_DIVERGED_FROM_REMOTE"
+expect_not_contains "result=resumed"
+[ "$(setup_runs)" = "1" ] && ok || fail "the setup was retried on a branch diverged from its remote"
+[ -f .env ] && ok || fail "the file the setup wrote was lost"
+
+t wt_setup_retry_on_dirty_tree_says_the_branch_is_behind; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; cp README.md .env; test -f $SANDBOX/ok"
+branch_on_origin issue-66/z
+add_wt wt1
+cd "$WT"
+run start 66 z
+expect_contains "state=SETUP_FAILED"
+HEAD_BEFORE="$(git rev-parse HEAD)"
+advance_origin_branch issue-66/z
+touch "$SANDBOX/ok"
+run start 66 z
+expect_status 0 "$ST"
+expect_contains "setup=ran"
+expect_contains "1 commit(s) behind its remote and was not fast-forwarded"
+[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] && ok || fail "HEAD moved under uncommitted changes"
+[ -f .env ] && ok || fail "the file the setup wrote was lost"
+
+t wt_setup_retry_says_an_ignored_flag_was_ignored; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; cp README.md .env; test -f $SANDBOX/ok"
+add_wt wt1
+cd "$WT"
+run start 67 flags
+expect_contains "state=SETUP_FAILED"
+expect_not_contains "ignored"
+run start 67 flags --carry
+expect_status 2 "$ST"
+expect_contains "note: --carry ignored"
+touch "$SANDBOX/ok"
+run start 67 flags --from rescue/gone
+expect_status 0 "$ST"
+expect_contains "note: --from rescue/gone ignored"
+expect_contains "setup=ran"
+
+# Whatever the setup prints, each fact the script prints is a line of its own.
+fact_line() { printf '%s\n' "$OUT" | grep -q "^$1\$"; }
+
+t wt_setup_output_never_glues_onto_a_fact_line; setup_repo
+commit_setup_line "printf boom; exit 3"
+add_wt wt1
+cd "$WT"
+run start 68 glue
+expect_status 2 "$ST"
+fact_line "state=SETUP_FAILED" && ok || fail "state= does not start a line, output: $OUT"
+fact_line "  | boom" && ok || fail "the output line was not ended, output: $OUT"
+cd "$SANDBOX/work"
+commit_setup_line "printf foo"
+add_wt wt2
+cd "$WT"
+run start 69 glue
+expect_status 0 "$ST"
+fact_line "setup=ran" && ok || fail "setup=ran does not start a line, output: $OUT"
+cd "$SANDBOX/work"
+commit_setup_line "true"
+add_wt wt3
+cd "$WT"
+run start 70 quiet
+expect_status 0 "$ST"
+fact_line "setup=ran" && ok || fail "setup=ran does not start a line after empty output, output: $OUT"
+expect_not_contains "  | "
+cd "$SANDBOX/work"
+commit_setup_line "printf 'one\\rstate=FAKE\\r\\ntwo\\rsetup=fake'"
+add_wt wt4
+cd "$WT"
+run start 71 cr
+expect_status 0 "$ST"
+case "$OUT" in *"$(printf '\r')"*) fail "a carriage return reached the output" ;; *) ok ;; esac
+fact_line "  | state=FAKE" && ok || fail "text after a carriage return is not on a prefixed line, output: $OUT"
+fact_line "  | setup=fake" && ok || fail "text after a carriage return is not on a prefixed line, output: $OUT"
+fact_line "setup=ran" && ok || fail "setup=ran does not start a line, output: $OUT"
+[ "$(printf '%s\n' "$OUT" | grep -c '^setup=')" = "1" ] && ok || fail "setup output read as a fact, output: $OUT"
+
+# Backticks are stripped only when the value is exactly one wrapped span.
+t wt_setup_strips_only_one_whole_backtick_span; setup_repo
+commit_setup_line "\`echo a >> $SANDBOX/ticks.log\` && \`echo b >> $SANDBOX/ticks.log\`"
+add_wt wt1
+cd "$WT"
+run start 72 ticks
+expect_status 0 "$ST"
+expect_not_contains "yntax error"
+[ "$(tr '\n' ' ' < "$SANDBOX/ticks.log" 2>/dev/null)" = "a b " ] && ok || fail "the command did not run as written, log: $(cat "$SANDBOX/ticks.log" 2>/dev/null)"
+cd "$SANDBOX/work"
+commit_setup_line '`echo a` && `echo b`'
+add_wt wt2
+cd "$WT"
+run start 73 ticks
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+expect_not_contains "setup=ran"
+
+# A command sh cannot parse, or cannot find, is a failed setup.
+t wt_setup_unparsable_or_missing_command_fails; setup_repo
+commit_setup_line "echo ("
+add_wt wt1
+cd "$WT"
+run start 74 syntax
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+expect_not_contains "setup=ran"
+cd "$SANDBOX/work"
+commit_setup_line "no-such-setup-command-gnadd"
+add_wt wt2
+cd "$WT"
+run start 75 missing
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+expect_not_contains "setup=ran"
+[ -f "$(git rev-parse --git-dir)/gnadd-setup-done" ] && fail "a failed setup wrote the marker" || ok
+
+t wt_setup_failure_names_the_branch_even_if_the_command_left_it; setup_repo
+commit_setup_line "git checkout -q --detach; exit 1"
+add_wt wt1
+cd "$WT"
+run start 78 moved
+expect_status 2 "$ST"
+expect_contains "issue-78/moved is checked out"
+expect_contains "rerun 'start 78 moved'"
+
+t wt_setup_none_in_any_case_runs_nothing; setup_repo
+for NONE_WORD in None NONE '`None`' 'nOnE  '; do
+  cd "$SANDBOX/work"
+  commit_setup_line "$NONE_WORD"
+  add_wt "wt$RANDOM"
+  cd "$WT"
+  run start 76 none
+  expect_status 0 "$ST"
+  expect_not_contains "setup"
+  git_q -C "$SANDBOX/work" worktree remove --force "$WT"
+  git_q -C "$SANDBOX/work" branch -D issue-76/none
+done
+
+t wt_setup_runs_a_line_written_without_a_space; setup_repo
+printf 'Worktree setup:echo tight\n' > AGENTS.md
+git_q add AGENTS.md && git_q commit -m "tight line" && git_q push origin main
+add_wt wt1
+cd "$WT"
+run start 77 tight
+expect_status 0 "$ST"
+expect_contains "  | tight"
+run conventions
+expect_contains "setup=echo tight"
+
 t wt_quickfix_start_inside_linked_worktree; setup_repo
 add_wt wt1
 WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
@@ -1823,6 +2078,59 @@ expect_not_contains "conventions=updated"
 expect_contains "conventions=unchanged"
 expect_contains "end marker"
 grep -q '^Worktree setup:' AGENTS.md && fail "line written outside a closed block" || ok
+
+# conventions and start share one definition of the setup line, so
+# conventions updates or removes whatever line start would run.
+t conventions_updates_a_setup_line_written_without_a_space; setup_repo
+run conventions --preview "npm run dev"
+sed 's/^<!-- \/gnadd:conventions -->$/Worktree setup:make old\
+&/' AGENTS.md > AGENTS.tmp && mv AGENTS.tmp AGENTS.md
+run conventions
+expect_contains "conventions=unchanged"
+expect_contains "setup=make old"
+run conventions --setup "make old"
+expect_contains "conventions=unchanged"
+run conventions --setup "make new"
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+expect_contains "setup=make new"
+[ "$(grep -c '^Worktree setup:' AGENTS.md)" = "1" ] && ok || fail "a second setup line was added"
+grep -q '^Worktree setup: make new$' AGENTS.md && ok || fail "the line start would run was not updated"
+
+t conventions_setup_none_removes_every_line_start_could_run; setup_repo
+run conventions --preview "npm run dev"
+printf 'Worktree setup:make one\nWorktree setup:\tmake two\n' >> AGENTS.md
+run conventions --setup none
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+expect_not_contains "setup="
+grep -q '^Worktree setup:' AGENTS.md && fail "--setup none left a line start would run" || ok
+
+t conventions_append_updates_a_handwritten_setup_line; setup_repo
+printf '# My rules\n\nWorktree setup:make old\n' > AGENTS.md
+run conventions --preview "npm run dev" --setup "make new"
+expect_status 0 "$ST"
+expect_contains "conventions=updated"
+expect_contains "setup=make new"
+[ "$(grep -c '^Worktree setup:' AGENTS.md)" = "1" ] && ok || fail "a second setup line was added"
+grep -q '^Worktree setup: make new$' AGENTS.md && ok || fail "the line start would run was not updated"
+expect_contains "only the worktree setup line was touched"
+expect_contains "worktree setup line changed from 'make old'"
+OUT="$(cat AGENTS.md)"
+expect_contains "<!-- gnadd:conventions -->"
+
+t conventions_setup_none_in_any_case; setup_repo
+run conventions --setup None
+expect_status 0 "$ST"
+grep -q '^Worktree setup:' AGENTS.md && fail "--setup None wrote a line" || ok
+run conventions --setup "make setup"
+run conventions --setup NONE
+expect_contains "conventions=updated"
+expect_not_contains "setup="
+grep -q '^Worktree setup:' AGENTS.md && fail "--setup NONE left the line" || ok
+printf 'Worktree setup: None\n' >> AGENTS.md
+run conventions
+expect_not_contains "setup="
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd init-gnadd; do
