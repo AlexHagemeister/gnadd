@@ -400,7 +400,7 @@ setup_line_exists() { grep -q "^$CONV_SETUP_KEY" "$1" 2>/dev/null; }
 
 setup_line_value() { # setup_line_value <file>
   local v
-  v="$(sed -n "s/^$CONV_SETUP_KEY[[:space:]]*//p" "$1" 2>/dev/null | head -1)" || true
+  v="$(sed -n "s/^${CONV_SETUP_KEY}[[:space:]]*//p" "$1" 2>/dev/null | head -1)" || true
   v="${v%"${v##*[![:space:]]}"}"
   printf '%s' "$v"
 }
