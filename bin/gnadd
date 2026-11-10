@@ -143,17 +143,49 @@ real_dir() { # real_dir <path>: physical path, or the path as given if the folde
 
 here_dir() { real_dir "$(git rev-parse --show-toplevel 2>/dev/null)"; }
 
+holder_of() { # holder_of <branch>: the folder that holds <branch>, or nothing
+  local hp; hp="$(git for-each-ref --format='%(worktreepath)' "refs/heads/$1" 2>/dev/null | head -1)"
+  [ -n "$hp" ] && { printf '%s\n' "$hp"; return 0; }
+  # A folder stopped mid-rebase or mid-bisect has a detached HEAD, so
+  # %(worktreepath) is empty, yet git still refuses the branch there. Read the
+  # same markers git reads: each worktree's rebase head-name and BISECT_START.
+  local common gd hn
+  common="$(real_dir "$(git rev-parse --git-common-dir 2>/dev/null)")"
+  for gd in "$common" "$common"/worktrees/*; do
+    [ -d "$gd" ] || continue
+    hn=""
+    [ -f "$gd/rebase-merge/head-name" ] && hn="$(cat "$gd/rebase-merge/head-name")"
+    [ -f "$gd/rebase-apply/head-name" ] && hn="$(cat "$gd/rebase-apply/head-name")"
+    [ -z "$hn" ] && [ -f "$gd/BISECT_START" ] && hn="refs/heads/$(cat "$gd/BISECT_START")"
+    [ "$hn" = "refs/heads/$1" ] || continue
+    if [ "$gd" = "$common" ]; then
+      git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'
+    else
+      hp="$(cat "$gd/gitdir" 2>/dev/null)"
+      printf '%s\n' "${hp%/.git}"
+    fi
+    return 0
+  done
+  return 1
+}
+
 held_elsewhere() { # held_elsewhere <branch>: true if another folder has it checked out; sets HOLDER
-  HOLDER="$(git for-each-ref --format='%(worktreepath)' "refs/heads/$1" 2>/dev/null | head -1)"
+  HOLDER="$(holder_of "$1" || true)"
   [ -n "$HOLDER" ] || return 1
   [ "$(real_dir "$HOLDER")" != "$(here_dir)" ]
+}
+
+held_by_gone_folder() { # held_by_gone_folder <branch>: held elsewhere by a worktree whose folder was deleted
+  held_elsewhere "$1" && [ ! -d "$HOLDER" ]
 }
 
 halt_held() { # halt_held <branch> <why the command needs it>: named halt for a branch another folder holds
   say "state=BRANCH_IN_WORKTREE"
   say "branch=$1"
   say "worktree=$HOLDER"
-  if [ -d "$HOLDER" ]; then
+  if [ -d "$HOLDER" ] && [ -z "$(git for-each-ref --format='%(worktreepath)' "refs/heads/$1" 2>/dev/null)" ]; then
+    err "'$1' is mid-rebase or mid-bisect in another folder ($HOLDER); a human finishes or aborts that there, then $2"
+  elif [ -d "$HOLDER" ]; then
     err "'$1' is checked out in another folder ($HOLDER); $2"
   else
     err "'$1' is held by a worktree whose folder is gone ($HOLDER); 'git worktree prune' releases it, then re-run"
@@ -161,8 +193,12 @@ halt_held() { # halt_held <branch> <why the command needs it>: named halt for a 
   exit 2
 }
 
-folder_is_parked() { # detached on origin/main while another folder holds main: sync-main's resting state
-  held_elsewhere "$MAIN" && [ "$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 1)" = "0" ]
+park_base() { # park_base: what sync-main parks a folder on (origin/main, or main with no origin)
+  if git rev-parse --verify --quiet "origin/$MAIN" >/dev/null; then echo "origin/$MAIN"; else echo "$MAIN"; fi
+}
+
+folder_is_parked() { # detached on the park base while another folder holds main: sync-main's resting state
+  held_elsewhere "$MAIN" && [ "$(git rev-list --count "$(park_base)..HEAD" 2>/dev/null || echo 1)" = "0" ]
 }
 
 worktree_count() { git worktree list --porcelain 2>/dev/null | grep -c '^worktree ' || true; }
@@ -174,6 +210,7 @@ worktree_count() { git worktree list --porcelain 2>/dev/null | grep -c '^worktre
 # push). The divergence halt applies the same either way: main is one ref.
 branch_off_synced_main() { # branch_off_synced_main <target>
   local target="$1"
+  held_by_gone_folder "$MAIN" && halt_held "$MAIN" "a new branch needs $MAIN free"
   if held_elsewhere "$MAIN"; then
     local base="$MAIN"
     if fetch_origin >/dev/null; then
@@ -304,6 +341,7 @@ cmd_state() {
     local fb fpath
     while IFS="$(printf '\t')" read -r fb fpath; do
       case "$fb" in issue-[0-9]*/*|quickfix/*) ;; *) continue ;; esac
+      [ -n "$fpath" ] || fpath="$(holder_of "$fb" || true)"
       say "in_flight=$fb folder=${fpath:-none}"
     done < <(git for-each-ref --format='%(refname:short)%09%(worktreepath)' refs/heads/)
   fi
@@ -399,7 +437,8 @@ cmd_start() {
     # Resume. Tree is clean, so the checkout is safe, unless another folder
     # holds the branch, which git refuses: resume it in that folder instead.
     held_elsewhere "$existing" && halt_held "$existing" "resume issue #$n in that folder"
-    git checkout "$existing" >/dev/null 2>&1 || usage_die "cannot check out $existing"
+    local co_out
+    co_out="$(git checkout "$existing" 2>&1)" || die_state CHECKOUT_REFUSED "git refused to check out '$existing'; nothing changed. git said: $co_out"
     if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
       fetch_origin >/dev/null || true
       if ! git merge --ff-only '@{u}' >/dev/null 2>&1; then
@@ -585,6 +624,7 @@ squash_merge() { # squash_merge <pr> <gate: full|none>: mergeability, then the C
 
 cmd_sync_main() {
   require_clean_tree
+  held_by_gone_folder "$MAIN" && halt_held "$MAIN" "sync-main needs $MAIN free"
   if held_elsewhere "$MAIN"; then
     sync_main_parked
     return 0
@@ -611,7 +651,7 @@ cmd_sync_main() {
 # folder ready to start the next issue. Local main itself is never moved from
 # here; it syncs from the folder that holds it.
 sync_main_parked() {
-  local base="$MAIN" synced=false
+  local base synced=false
   if fetch_origin >/dev/null; then
     main_counts
     if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
@@ -621,8 +661,9 @@ sync_main_parked() {
       note "run 'gnadd doctor' from $HOLDER for the sanctioned recovery path"
       exit 2
     fi
-    git rev-parse --verify --quiet "origin/$MAIN" >/dev/null && { base="origin/$MAIN"; synced=true; }
+    git rev-parse --verify --quiet "origin/$MAIN" >/dev/null && synced=true
   fi
+  base="$(park_base)"
   git checkout --detach "$base" >/dev/null 2>&1 || usage_die "cannot park this folder on $base"
   say "synced=$synced"
   say "parked=true"
@@ -664,7 +705,8 @@ cmd_cleanup() {
       local after; after="$(git rev-list --count "$head_oid..$tip" 2>/dev/null || echo "?")"
       die_state UNMERGED_COMMITS "'$branch' is at $tip but PR #$pr merged $head_oid ($after commit(s) after the merged head); refusing to delete. Push them as a new PR or drop them yourself"
     fi
-    git branch -D "$branch" >/dev/null 2>&1
+    local del_out
+    del_out="$(git branch -D "$branch" 2>&1)" || die_state DELETE_REFUSED "git refused to delete '$branch'; nothing deleted. git said: $del_out"
     say "local_deleted=true"
   else
     say "local_deleted=false"
@@ -729,7 +771,8 @@ cmd_drop() {
     err "nothing deleted. Show the commits above to the human; rerun with --yes on their word"
     exit 2
   fi
-  git branch -D "$branch" >/dev/null 2>&1 || usage_die "delete of '$branch' failed"
+  local del_out
+  del_out="$(git branch -D "$branch" 2>&1)" || die_state DELETE_REFUSED "git refused to delete '$branch'; nothing deleted. git said: $del_out"
   say "dropped=true"
 }
 
@@ -889,7 +932,7 @@ cmd_doctor() {
     # A folder sync-main parked (another folder holds main, and HEAD has
     # nothing beyond origin/main) is detached by design, not a bad state.
     if folder_is_parked; then
-      note "this folder is parked on origin/$MAIN ($MAIN is checked out in $HOLDER); ready to start an issue"
+      note "this folder is parked on $(park_base) ($MAIN is checked out in $HOLDER); ready to start an issue"
     else
       findings=$((findings+1))
       say "finding=DETACHED_HEAD"
@@ -939,7 +982,7 @@ cmd_doctor() {
         say "worktree=$wt_path"
         say "branch=${wt_branch:-(detached)}"
         note "recipe: git worktree prune  (releases the branch; the folder is already gone, nothing else changes)"
-        [ -n "$wt_branch" ] && note "  then, if its PR merged: gnadd cleanup <pr> $wt_branch   otherwise: gnadd drop $wt_branch"
+        [ -n "$wt_branch" ] && [ "$wt_branch" != "$MAIN" ] && note "  then, if its PR merged: gnadd cleanup <pr> $wt_branch   otherwise: gnadd drop $wt_branch"
         ;;
     esac
   done < <(git worktree list --porcelain 2>/dev/null)

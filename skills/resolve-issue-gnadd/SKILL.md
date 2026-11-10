@@ -227,7 +227,7 @@ The script confirms via GitHub that the PR actually merged (`state=MERGED` with 
 - **`state=NOT_MERGED`:** the PR didn't merge (left open, or merge failed) — the branch is **not** deleted. Stop and report.
 - **`state=BRANCH_MISMATCH`:** the branch named is not the merged PR's head, so the merge proves nothing about it. Nothing is deleted. Check which PR the branch belongs to and rerun with the matching pair.
 - **`state=UNMERGED_COMMITS`:** the branch has commits after the head GitHub merged. Nothing is deleted. Those commits never shipped: push them as a new PR, or the user drops them by hand. Never delete around this.
-- **`state=BRANCH_IN_WORKTREE`:** another folder has the branch checked out, and `worktree=` names it. Nothing is deleted. Run `sync-main` in that folder, then rerun cleanup. The folder itself stays: whoever made it removes it.
+- **`state=BRANCH_IN_WORKTREE`:** another folder has the branch checked out, and `worktree=` names it. Nothing is deleted. Run `sync-main` in that folder, then rerun cleanup. If the message says that folder is mid-rebase or mid-bisect, stop: the user finishes or aborts it there first. The folder itself stays: whoever made it removes it.
 - **Never run `git reset` on `main` to discard commits** — in any form, for any reason. If anything about main looks wrong here, `gnadd.sh doctor` is the sanctioned path.
 
 Report what was cleaned up, and give the user the merge commit hash — their one-command undo for the whole feature (`git revert <hash>`).

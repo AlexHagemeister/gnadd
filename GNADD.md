@@ -825,7 +825,8 @@ the script asks first whether another folder holds the branch it needs. When
 another folder holds `main`, `start` and `quickfix start` cut the new branch
 from `origin/main` without touching local `main`, and `sync-main` parks the
 folder on `origin/main` as a detached HEAD. Every other refusal halts with
-`state=BRANCH_IN_WORKTREE` and the folder that holds the branch. `state`
+`state=BRANCH_IN_WORKTREE` and the folder that holds the branch, including a
+folder stopped mid-rebase or mid-bisect and a folder that is gone. `state`
 lists each issue in flight and its folder whenever linked worktrees exist,
 and `doctor` reports worktrees whose folder is gone but whose branch git
 still holds. GNADD never creates or removes a folder: whoever made one

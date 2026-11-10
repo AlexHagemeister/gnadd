@@ -803,6 +803,101 @@ run doctor
 expect_not_contains "finding=DETACHED_HEAD"
 expect_contains "parked on origin/main"
 
+# A folder stopped mid-rebase or mid-bisect has a detached HEAD, so git's
+# worktree path for the branch is empty, yet git still refuses the branch.
+t wt_branch_mid_rebase_in_another_folder_halts_naming_it; setup_repo
+add_wt wt1
+( cd "$WT" && git_q checkout -b issue-9/nine
+  echo a > a.txt && git_q add a.txt && git_q commit -m a
+  echo b > b.txt && git_q add b.txt && git_q commit -m b
+  GIT_SEQUENCE_EDITOR="sed -i.bak s/^pick/edit/" git_q rebase -i HEAD~1 )
+[ -d "$(git rev-parse --git-common-dir)/worktrees/wt1/rebase-merge" ] && ok || fail "harness: worktree is not mid-rebase"
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-11-09T00:00:00Z
+export GH_STUB_PR_HEAD=issue-9/nine GH_STUB_PR_HEAD_OID="$(git rev-parse issue-9/nine)"
+run cleanup 3 issue-9/nine
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "worktree=$WT"
+expect_contains "mid-rebase or mid-bisect"
+run start 9 nine
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "worktree=$WT"
+run drop issue-9/nine --yes
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "worktree=$WT"
+git show-ref --verify --quiet refs/heads/issue-9/nine && ok || fail "deleted a branch a mid-rebase folder holds"
+[ "$(git symbolic-ref --short HEAD)" = "main" ] && ok || fail "main checkout moved off main"
+run state --no-fetch
+expect_contains "in_flight=issue-9/nine folder=$WT"
+# Following the recipe clears it: abort there, then cleanup proceeds.
+git_q -C "$WT" rebase --abort
+( cd "$WT" && "$GNADD" sync-main >/dev/null 2>&1 )
+run cleanup 3 issue-9/nine
+expect_status 0 "$ST"; expect_contains "local_deleted=true"
+
+t wt_branch_mid_bisect_in_another_folder_halts_naming_it; setup_repo
+add_wt wt1
+( cd "$WT" && git_q checkout -b issue-9/nine
+  for i in 1 2 3 4; do echo "$i" > "f$i.txt"; git_q add "f$i.txt"; git_q commit -m "c$i"; done
+  git_q bisect start; git_q bisect bad; git_q bisect good HEAD~4 )
+git -C "$WT" symbolic-ref --quiet HEAD >/dev/null && fail "harness: bisect did not detach the worktree" || ok
+run start 9 nine
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "worktree=$WT"
+run drop issue-9/nine --yes
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"
+git show-ref --verify --quiet refs/heads/issue-9/nine && ok || fail "deleted a branch a mid-bisect folder holds"
+
+t wt_parked_folder_without_origin_is_seen_as_parked; setup_repo
+git_q remote remove origin
+add_wt wt1
+cd "$WT"
+run sync-main
+expect_status 0 "$ST"; expect_contains "parked=true"
+run state
+expect_contains "detached=true"
+expect_contains "parked=true"
+run doctor
+expect_not_contains "finding=DETACHED_HEAD"
+expect_contains "parked on main"
+
+t wt_gone_folder_holding_main_gives_only_the_prune_recipe; setup_repo
+git_q checkout --detach
+git_q worktree add "$SANDBOX/wtm" main
+rm -rf "$SANDBOX/wtm"
+HEAD_BEFORE="$(git rev-parse HEAD)"
+run doctor
+expect_contains "finding=WORKTREE_FOLDER_GONE"
+expect_contains "branch=main"
+expect_contains "git worktree prune"
+expect_not_contains "gnadd cleanup <pr> main"
+expect_not_contains "gnadd drop main"
+run sync-main
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "git worktree prune"
+run start 5 five
+expect_status 2 "$ST"; expect_contains "state=BRANCH_IN_WORKTREE"; expect_contains "git worktree prune"
+git show-ref --verify --quiet refs/heads/issue-5/five && fail "start cut a branch while main's holder is gone" || ok
+[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] && ok || fail "HEAD moved before the halt"
+# Following the recipe clears it.
+git_q worktree prune
+run start 5 five
+expect_status 0 "$ST"; expect_contains "result=created"
+
+# Any other git refusal at the resume checkout or a branch delete still halts
+# with a named state. A held ref lock makes git refuse without a worktree.
+t git_refusal_at_resume_cleanup_and_drop_halts_with_a_state; setup_repo
+git_q branch issue-7/locked
+GD="$(git rev-parse --git-dir)"
+: > "$GD/HEAD.lock"
+run start 7 locked
+rm -f "$GD/HEAD.lock"
+expect_status 2 "$ST"; expect_contains "state=CHECKOUT_REFUSED"
+[ "$(git symbolic-ref --short HEAD)" = "main" ] && ok || fail "HEAD moved despite the refusal"
+mkdir -p "$GD/refs/heads/issue-7" && : > "$GD/refs/heads/issue-7/locked.lock"
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-11-09T00:00:00Z
+export GH_STUB_PR_HEAD=issue-7/locked GH_STUB_PR_HEAD_OID="$(git rev-parse issue-7/locked)"
+run cleanup 7 issue-7/locked
+expect_status 2 "$ST"; expect_contains "state=DELETE_REFUSED"
+run drop issue-7/locked --yes
+expect_status 2 "$ST"; expect_contains "state=DELETE_REFUSED"
+rm -f "$GD/refs/heads/issue-7/locked.lock"
+git show-ref --verify --quiet refs/heads/issue-7/locked && ok || fail "branch deleted despite the refusal"
+
 # ---------------------------------------------------------------- test / misc
 
 t test_detects_makefile; setup_repo
