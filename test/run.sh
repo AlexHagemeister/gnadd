@@ -7,9 +7,11 @@
 # you whether the guarantees still hold.
 #
 # Usage: test/run.sh [name-or-pattern]
-#   No argument runs every case, then the lint (scripts/lint.sh).
+#   No argument runs every case. The last one, named lint, runs
+#   scripts/lint.sh, the lint CI runs.
 #   A name runs that case alone. A shell glob ('question_*') runs every
-#   case it matches. A filtered run skips the lint.
+#   case it matches, and lint runs only if the filter selects it.
+#   A filter that matches no case, or a run where no check ran, exits 2.
 
 set -u
 
@@ -177,7 +179,7 @@ local_commit() { # local_commit <dir>: a commit origin does not have
   git_q -C "$1" add local.txt && git_q -C "$1" commit -m "local change"
 }
 fact_line() { printf '%s\n' "$OUT" | grep -q "^$1\$"; }
-q_reset() { # the question fixtures start from setup_repo; this adds the comment file
+q_reset() { # setup_repo clears the question fixtures. This adds the comment file.
   export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
 }
 
