@@ -1401,6 +1401,7 @@ expect_contains "rounds=0"
 q_reset() { # the question fixtures, cleared per test (setup_repo predates them)
   unset GH_STUB_QROWS GH_STUB_QROWS_5 GH_STUB_QROWS_6 GH_STUB_QROWS_7 GH_STUB_QBODY \
         GH_STUB_OPEN_ITEMS GH_STUB_ASSIGN_IGNORED GH_STUB_ISSUE_NUMBER GH_STUB_OTHER_ASSIGNEES 2>/dev/null || true
+  unset GH_STUB_ITEM_META GH_STUB_UNASSIGN_FAIL 2>/dev/null || true
   export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
 }
 
@@ -1411,7 +1412,7 @@ expect_contains "item=5"
 expect_contains "question=1"
 expect_contains "created_issue=false"
 OUT="$(cat "$GH_STUB_COMMENT_FILE")"
-expect_contains "<!-- gnadd:question 1 to=alex -->"
+expect_contains "<!-- gnadd:question 1 to=alex assigned=added -->"
 expect_contains "**Question:** Cache or recompute?"
 expect_contains "1. cache 2. recompute"
 expect_contains "**Recommendation:** 1, reads dominate"
@@ -1429,8 +1430,28 @@ expect_status 0 "$ST"
 expect_contains "posted=true"
 expect_not_contains "ASSIGN_FAILED"
 
+t question_ask_records_an_existing_assignment; setup_repo; q_reset
+export GH_STUB_ITEM_META='open\tAlex bob'
+run question ask --to alex --on 5 --question q --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 1 to=alex assigned=existing -->"
+expect_gh_not_called "X POST" "re-assigned someone who was already assigned"
+
+t question_ask_records_an_added_assignment; setup_repo; q_reset
+run question ask --to alex --on 5 --question q --options o --recommend r
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 1 to=alex assigned=added -->"
+
+t question_ask_halts_on_a_closed_item; setup_repo; q_reset
+export GH_STUB_ITEM_META='closed\t'
+run question ask --to alex --on 5 --question q --options o --recommend r
+expect_status 2 "$ST"
+expect_contains "state=ITEM_CLOSED"
+expect_gh_not_called "comments -F" "asked on a closed item, where list can never show it"
+
 t question_ask_numbers_from_the_record; setup_repo; q_reset
-export GH_STUB_QROWS='comment\tq\t1\talex\tfirst\ncomment\tc\t1\ncomment\tq\t2\talex\tsecond'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tfirst\ncomment\tc\t1\ncomment\tq\t2\talex\tadded\tsecond'
 run question ask --to alex --on 5 --question "third?" --options "a/b" --recommend "a"
 expect_status 0 "$ST"
 expect_contains "question=3"
@@ -1443,7 +1464,7 @@ expect_contains "item=31"
 expect_contains "created_issue=true"
 expect_gh_called "issue create --title Which license? --body-file .* --label question --assignee alex" "question issue not created with the question label and assignee"
 OUT="$(cat "$GH_STUB_COMMENT_FILE")"
-expect_contains "<!-- gnadd:question 1 to=alex -->"
+expect_contains "<!-- gnadd:question 1 to=alex assigned=added -->"
 
 t question_ask_refusals; setup_repo; q_reset
 run question ask --on 5 --question q --options o --recommend r
@@ -1477,9 +1498,13 @@ if command -v jq >/dev/null 2>&1; then
     {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:round -->\n## Round 3"},
     {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:answer 2 -->\n> cache"},
     {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question-closed 2 -->\ndone"},
-    {"user":{"login":"me","type":"User"},"body":"cache it"}]' \
+    {"user":{"login":"me","type":"User"},"body":"cache it"},
+    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:answer 2 -->\n> as asked in <!-- gnadd:question 7 to=bob -->"},
+    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question-closed 2 -->\n**Acted on:** quoted <!-- gnadd:answer 1 --> by hand"},
+    {"user":{"login":"me","type":"User"},"body":"yes, and I saw <!-- gnadd:round --> in the log"},
+    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question 3 to=bob assigned=existing -->\n**Question:** Own issue?"}]' \
     | jq -r "$QUESTION_JQ_DEF .[] | qrow" | tr '\t' ' ' | tr '\n' '|')"
-  [ "$OUT" = "reply|q 2 alex Cache or recompute?|other|other|a 2|c 2|reply|" ] && ok \
+  [ "$OUT" = "reply|q 2 alex added Cache or recompute?|other|other|a 2|c 2|reply|a 2|c 2|reply|q 3 bob existing Own issue?|" ] && ok \
     || fail "qrow misclassified the thread: $OUT"
 else
   ok; printf 'skip %s: jq not installed\n' "$CURRENT"
@@ -1489,9 +1514,9 @@ fi
 # agent's comments from the person's reply, and a bot's comment is no answer.
 t question_list_separates_answered_from_unanswered; setup_repo; q_reset
 export GH_STUB_OPEN_ITEMS='5\tissue\tCaching\n6\tpr\tAdd cache\n7\tissue\tLicense'
-export GH_STUB_QROWS_5='comment\tq\t1\talex\tCache or recompute?\ncomment\tother\ncomment\treply'
-export GH_STUB_QROWS_6='comment\tq\t1\talex\tShip behind a flag?\ncomment\tother'
-export GH_STUB_QROWS_7='comment\tq\t1\talex\tMIT?\ncomment\ta\t1\ncomment\tq\t2\talex\tYear?\ncomment\tq\t3\talex\tDone one\ncomment\treply\ncomment\tc\t3'
+export GH_STUB_QROWS_5='comment\tq\t1\talex\tadded\tCache or recompute?\ncomment\tother\ncomment\treply'
+export GH_STUB_QROWS_6='comment\tq\t1\talex\tadded\tShip behind a flag?\ncomment\tother'
+export GH_STUB_QROWS_7='comment\tq\t1\talex\tadded\tMIT?\ncomment\ta\t1\ncomment\tq\t2\talex\tadded\tYear?\ncomment\tq\t3\talex\tadded\tDone one\ncomment\treply\ncomment\tc\t3'
 run question list
 expect_status 0 "$ST"
 expect_contains "questions=4"
@@ -1507,7 +1532,7 @@ expect_gh_called "issues?state=open" "open items not read"
 
 t question_list_bot_comment_is_not_an_answer; setup_repo; q_reset
 export GH_STUB_OPEN_ITEMS='6\tpr\tAdd cache'
-export GH_STUB_QROWS_6='comment\tq\t1\talex\tFlag?\ncomment\tother'
+export GH_STUB_QROWS_6='comment\tq\t1\talex\tadded\tFlag?\ncomment\tother'
 run question list
 expect_contains "unanswered=1"
 expect_contains "answered=0"
@@ -1518,7 +1543,7 @@ expect_status 0 "$ST"
 expect_contains "questions=0"
 
 t question_answer_records_a_transcribed_answer; setup_repo; q_reset
-export GH_STUB_QROWS='comment\tq\t1\talex\tCache or recompute?'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tCache or recompute?'
 run question answer 5 --answer "cache it, recompute is too slow"
 expect_status 0 "$ST"
 expect_contains "question=1"
@@ -1531,7 +1556,7 @@ expect_contains "> cache it, recompute is too slow"
 t question_answer_refusals; setup_repo; q_reset
 run question answer 5 --answer "x"
 expect_status 2 "$ST"; expect_contains "state=NO_OPEN_QUESTION"
-export GH_STUB_QROWS='comment\tq\t1\talex\tA?\ncomment\tq\t2\talex\tB?'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tq\t2\talex\tadded\tB?'
 run question answer 5 --answer "x"
 expect_status 1 "$ST"; expect_contains "several open questions"
 run question answer 5 2 --answer ""
@@ -1541,7 +1566,7 @@ run question answer 5 2 --answer "B it is"
 expect_status 0 "$ST"; expect_contains "question=2"
 
 t question_close_says_so_and_unassigns; setup_repo; q_reset
-export GH_STUB_QROWS='comment\tq\t1\talex\tCache?\ncomment\treply'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tCache?\ncomment\treply'
 run question close 5 --acted "cached in round 2"
 expect_status 0 "$ST"
 expect_contains "status=closed"
@@ -1554,21 +1579,59 @@ expect_gh_called "api -X DELETE repos/{owner}/{repo}/issues/5/assignees -f assig
 expect_gh_not_called "issue close" "an ordinary item was closed"
 
 t question_close_keeps_assignment_another_question_needs; setup_repo; q_reset
-export GH_STUB_QROWS='comment\tq\t1\talex\tA?\ncomment\tq\t2\talex\tB?\ncomment\ta\t1'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tq\t2\talex\tadded\tB?\ncomment\ta\t1'
 run question close 5 1 --acted "did A"
 expect_status 0 "$ST"
 expect_contains "unassigned=false"
 expect_gh_not_called "X DELETE" "assignment removed while question 2 still needs it"
 
 t question_close_closes_a_question_issue; setup_repo; q_reset
-export GH_STUB_QBODY='body\tq\t1\talex\tMIT?' GH_STUB_QROWS='comment\treply'
+export GH_STUB_QBODY='body\tq\t1\talex\tadded\tMIT?' GH_STUB_QROWS='comment\treply'
 run question close 31 --acted "licensed MIT"
 expect_status 0 "$ST"
 expect_contains "closed_issue=true"
 expect_gh_called "issue close 31" "question issue left open after it was acted on"
 
+t question_close_keeps_an_assignment_ask_did_not_add; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\texisting\tOwn?\ncomment\treply'
+run question close 5 --acted "done"
+expect_status 0 "$ST"
+expect_contains "unassigned=false"
+expect_gh_not_called "X DELETE" "removed an assignment that was there before the question"
+
+t question_close_compares_logins_case_insensitively; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\tAlex\tadded\tA?\ncomment\tq\t2\talex\tadded\tB?\ncomment\ta\t1'
+run question close 5 1 --acted "did A"
+expect_status 0 "$ST"
+expect_contains "unassigned=false"
+expect_gh_not_called "X DELETE" "assignment removed while question 2 (same login, other case) needs it"
+
+t question_close_closes_question_issue_whichever_was_last; setup_repo; q_reset
+export GH_STUB_QBODY='body\tq\t1\talex\tadded\tMIT?' GH_STUB_QROWS='comment\tc\t1\ncomment\tq\t2\talex\tadded\tYear?\ncomment\treply'
+run question close 31 --acted "set the year"
+expect_status 0 "$ST"
+expect_contains "question=2"
+expect_contains "closed_issue=true"
+expect_gh_called "issue close 31" "question issue left open after its last question closed"
+
+t question_close_closes_the_issue_before_unassigning; setup_repo; q_reset
+export GH_STUB_QBODY='body\tq\t1\talex\tadded\tMIT?' GH_STUB_QROWS='comment\treply' GH_STUB_UNASSIGN_FAIL=1
+run question close 31 --acted "licensed MIT"
+expect_status 2 "$ST"
+expect_contains "state=UNASSIGN_FAILED"
+expect_gh_called "issue close 31" "the unassign halt left the question issue open"
+
+t question_answer_and_close_refuse_non_numeric_items; setup_repo; q_reset
+run question answer "5/../6" --answer x
+expect_status 1 "$ST"; expect_contains "issue or PR number"
+run question close "5/../6" --acted x
+expect_status 1 "$ST"; expect_contains "issue or PR number"
+run question close 5 "1x" --acted x
+expect_status 1 "$ST"; expect_contains "question number"
+expect_gh_not_called "issues/5/" "a malformed item reached the API"
+
 t question_close_refuses_unanswered; setup_repo; q_reset
-export GH_STUB_QROWS='comment\tq\t1\talex\tA?\ncomment\tother'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tother'
 run question close 5 --acted "guessed"
 expect_status 2 "$ST"
 expect_contains "state=QUESTION_UNANSWERED"

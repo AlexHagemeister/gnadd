@@ -194,7 +194,7 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 
 **Infer one primary suggestion** from repo state, plus at least one alternative when ambiguous:
 
-1. Answered question → act on it (`/start-issue-gnadd <N>` on its item) before starting new work. Unanswered questions wait on their person and do not block other work.
+1. Answered question → act on it before starting new work. On an issue: `/start-issue-gnadd <N>`. On a PR: `/start-issue-gnadd` on the issue the PR closes, which resumes its branch. On a question issue (`kind=issue`, labeled `question`, no related item): carry out the answer the way its size calls for (`/new-issue-gnadd` for new work, `/quickfix-gnadd` for a trivial change), then close the question as `start-issue-gnadd` step 7 describes. Unanswered questions wait on their person and do not block other work.
 2. Open PR awaiting review → review or merge before starting new work.
 3. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
 4. On `issue-<N>/*`, clean → continue that issue's work.

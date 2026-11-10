@@ -835,12 +835,15 @@ first thing to try).
 person. Asking posts one marked comment on the related issue or PR and
 assigns that item to the named person (`--to` is required, never inferred).
 A question with no related item opens an issue with GitHub's default
-`question` label. Questions are numbered per item from the record. A
-question counts as answered when an answer comment transcribed by the agent
-follows it, or when any later comment carries no gnadd marker and is not
-from a bot. Closing posts an "acted on" comment, removes the assignment
-unless another open question on the item names the same person, and closes
-a question issue. `list` reads only open items that are assigned or labeled
+`question` label. Asking on a closed item halts. Questions are numbered per
+item from the record. A marker counts only as a comment's first line, where
+the script writes it, so quoting one changes nothing. A question counts as
+answered when an answer comment transcribed by the agent follows it, or
+when any later comment carries no gnadd marker and is not from a bot. The
+question marker records whether asking added the assignment or found it
+there. Closing posts an "acted on" comment, closes a question issue when
+its last open question closes, and removes the assignment only if asking
+added it and no other open question on the item names the same person. `list` reads only open items that are assigned or labeled
 `question`, and reports answered questions before unanswered ones.
 
 **Why:** a question that exists only in chat stalls any work running without
