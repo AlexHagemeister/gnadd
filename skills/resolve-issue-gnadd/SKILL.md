@@ -157,7 +157,7 @@ Report the PR URL and, on its own line, the direct link to the diff: `https://gi
 
 ## 6. Merge Only If Confirmed
 
-Surface the two signals, then ask whether to merge now or leave the PR open. Do not auto-merge.
+Surface the two signals, then ask whether to merge now or leave the PR open. Do not auto-merge. First run `bash "<skill-dir>/gnadd.sh" question list` and name any open question on this issue or PR, because a question on an item drops out of the list once the item closes (a merge with `Closes #<N>` closes the issue).
 
 ```bash
 bash "<skill-dir>/gnadd.sh" ship status <PR>

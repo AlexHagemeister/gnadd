@@ -1566,6 +1566,293 @@ cmd_round_list() {
     | grep -v -F -e "$ROUND_MARKER" -e "$FEEDBACK_MARKER" | sed 's/^/  /'
 }
 
+# ---------------------------------------------------------------- question
+#
+# A question for a person lives on the issue or PR it is about, as one marked
+# comment, and the item is assigned to that person. Markers, never authors,
+# tell the agent's comments from a person's reply, so this works when both
+# post through one GitHub account. A marker counts only as a comment's whole
+# first line, where the script writes it, so quoting one changes nothing. A
+# later comment with no marker (and not from a bot) answers every question
+# still waiting. The question marker records whether asking added the
+# assignment (assigned=added) or found it there (assigned=existing), so close
+# removes only what asking added. The first open question to a person on an
+# item decides that, and each later one copies it, so every open question to
+# one person carries the same answer and the close order cannot matter.
+# Append only: answers and closings are new comments. Questions are numbered
+# per item from the record, the same way rounds are.
+
+QUESTION_JQ_DEF='def qrow: (.body // "") as $b
+  | (($b | split("\n") | .[0]) // "" | rtrimstr("\r")) as $l
+  | if ((.user.type // "") == "Bot") then "other"
+    elif ($l | test("^<!-- gnadd:question [0-9]+ to=[^ ]+( assigned=[a-z]+)? -->$")) then
+      ($l | capture("^<!-- gnadd:question (?<k>[0-9]+) to=(?<to>[^ ]+)( assigned=(?<a>[a-z]+))? -->$")) as $m
+      | "q\t\($m.k)\t\($m.to)\t\($m.a // "added")\t" + (((($b | split("\n") | map(select(startswith("**Question:** "))) | first) // "")) | ltrimstr("**Question:** "))
+    elif ($l | test("^<!-- gnadd:answer [0-9]+ -->$")) then "a\t" + ($l | capture("^<!-- gnadd:answer (?<k>[0-9]+) -->$").k)
+    elif ($l | test("^<!-- gnadd:question-closed [0-9]+ -->$")) then "c\t" + ($l | capture("^<!-- gnadd:question-closed (?<k>[0-9]+) -->$").k)
+    elif ($l | startswith("<!-- gnadd:")) then "other"
+    else "reply" end;'
+
+question_rows() { # question_rows <item>: tab rows "source kind ...", body first, then comments in order
+  "$GH" api "repos/{owner}/{repo}/issues/$1" --jq "$QUESTION_JQ_DEF \"body\t\" + qrow" \
+    && "$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate --jq "$QUESTION_JQ_DEF .[] | \"comment\t\" + qrow"
+}
+
+question_status() { # stdin: question_rows; stdout per question: number, status, login, source, assigned, text
+  awk -F'\t' '
+    $2=="q" { k=$3; if (!(k in st)) order[++n]=k; st[k]="unanswered"; to[k]=$4; src[k]=$1; asg[k]=$5; tx[k]=$6; next }
+    $2=="a" { if (($3 in st) && st[$3]=="unanswered") st[$3]="answered"; next }
+    $2=="reply" { for (i=1; i<=n; i++) if (st[order[i]]=="unanswered") st[order[i]]="answered"; next }
+    $2=="c" { if ($3 in st) st[$3]="closed"; next }
+    END { for (i=1; i<=n; i++) { k=order[i]; printf "%s\t%s\t%s\t%s\t%s\t%s\n", k, st[k], to[k], src[k], asg[k], tx[k] } }'
+}
+
+question_load() { # question_load <item>: sets QSTATUS (question_status output) or halts
+  local rows
+  rows="$(question_rows "$1")" || die_state QUESTION_READ_FAILED "could not read the comments on #$1 (network? auth? no such issue or PR?)"
+  QSTATUS="$(printf '%s\n' "$rows" | question_status)"
+}
+
+question_pick() { # question_pick <item> [<number>]: sets QK, QSTATE, QTO, QASG from QSTATUS; open questions only
+  local open; open="$(printf '%s\n' "$QSTATUS" | awk -F'\t' '$2!="" && $2!="closed"')"
+  if [ -n "${2:-}" ]; then
+    open="$(printf '%s\n' "$open" | awk -F'\t' -v k="$2" '$1==k')"
+    [ -n "$open" ] || die_state NO_OPEN_QUESTION "#$1 has no open question $2 (closed, or never asked)"
+  fi
+  [ -n "$open" ] || die_state NO_OPEN_QUESTION "#$1 has no open question on the record"
+  [ "$(printf '%s\n' "$open" | grep -c .)" -eq 1 ] \
+    || usage_die "#$1 has several open questions ($(printf '%s\n' "$open" | cut -f1 | tr '\n' ' ')); name one: <item> <number>"
+  QK="$(printf '%s' "$open" | cut -f1)"; QSTATE="$(printf '%s' "$open" | cut -f2)"
+  QTO="$(printf '%s' "$open" | cut -f3)"
+  QASG="$(printf '%s' "$open" | cut -f5)"
+}
+
+question_item_args() { # question_item_args <item> <number>: both digits only (number optional)
+  case "$1" in ""|*[!0-9]*) usage_die "takes an issue or PR number first (got: $1)" ;; esac
+  case "${2:-}" in *[!0-9]*) usage_die "the question number must be digits (got: $2)" ;; esac
+}
+
+question_post() { # question_post <item> <body file>: one new comment on an issue or PR
+  "$GH" api "repos/{owner}/{repo}/issues/$1/comments" -F "body=@$2" >/dev/null
+}
+
+cmd_question_ask() {
+  local to="" on="" title="" question="" options="" recommend=""
+  local usage="usage: gnadd question ask --to <login> (--on <issue-or-pr> | --title <new issue title>) --question <text> --options <text> --recommend <text>"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --to) to="${2:-}"; shift ;;
+      --on) on="${2:-}"; shift ;;
+      --title) title="${2:-}"; shift ;;
+      --question) question="${2:-}"; shift ;;
+      --options) options="${2:-}"; shift ;;
+      --recommend) recommend="${2:-}"; shift ;;
+      *) usage_die "$usage" ;;
+    esac
+    shift
+  done
+  to="${to#@}"
+  case "$to" in ""|*[!A-Za-z0-9-]*) usage_die "question ask needs --to <login>: the person who owns the call, never inferred" ;; esac
+  if [ -n "$on" ] && [ -n "$title" ]; then usage_die "question ask takes --on or --title, not both"; fi
+  [ -n "$on" ] || [ -n "$title" ] || usage_die "question ask needs --on <issue-or-pr> it is about, or --title for a question with no related item"
+  case "$on" in *[!0-9]*) usage_die "--on takes an issue or PR number (got: $on)" ;; esac
+  [ -n "$question" ] || usage_die "question ask needs --question <text>"
+  [ -n "$options" ] || usage_die "question ask needs --options <text>: the choices the person is picking between"
+  [ -n "$recommend" ] || usage_die "question ask needs --recommend <text>: the option the agent would take, and why"
+
+  local k=1 asg=added assign=1
+  if [ -n "$on" ]; then
+    # A closed item never shows in list, and an assignment already there is
+    # not ask's to remove later.
+    local meta tab earlier; tab="$(printf '\t')"
+    meta="$("$GH" api "repos/{owner}/{repo}/issues/$on" --jq '"\(.state)\t\([.assignees[].login] | join(" "))"')" \
+      || die_state QUESTION_READ_FAILED "could not read #$on (network? auth? no such issue or PR?)"
+    [ "${meta%%"$tab"*}" = open ] \
+      || die_state ITEM_CLOSED "#$on is not open, and question list reads open items only, so a question there would never show; reopen it, or ask with --title"
+    if printf '%s\n' "${meta#*"$tab"}" | tr ' ' '\n' | grep -ix -- "$to" >/dev/null; then asg=existing; assign=0; fi
+    question_load "$on"
+    # An earlier open question to the same person already settled whether the
+    # assignment is ask's to remove: copy it, whoever is assigned right now.
+    # (awk reads every row: an early exit could break the pipe under pipefail.)
+    earlier="$(printf '%s\n' "$QSTATUS" | awk -F'\t' -v to="$to" '!f && $1!="" && $2!="closed" && tolower($3)==tolower(to) {print $5; f=1}')"
+    case "$earlier" in "") ;; existing) asg=existing ;; *) asg=added ;; esac
+    k=$(( $(printf '%s\n' "$QSTATUS" | awk -F'\t' '$1+0>m{m=$1+0} END{print m+0}') + 1 ))
+  fi
+  local body; body="$(mktemp)"
+  {
+    printf '<!-- gnadd:question %s to=%s assigned=%s -->\n' "$k" "$to" "$asg"
+    printf '## Question %s for @%s\n\n' "$k" "$to"
+    printf '**Question:** %s\n\n' "$question"
+    printf '**Options:**\n\n%s\n\n' "$options"
+    printf '**Recommendation:** %s\n\n' "$recommend"
+    printf 'Answer in this thread, or tell the agent in chat. Either counts as the answer.\n'
+  } > "$body"
+  local created=false
+  if [ -n "$on" ]; then
+    if ! question_post "$on" "$body"; then
+      rm -f "$body"
+      die_state COMMENT_FAILED "could not post question $k on #$on (network? auth?); nothing was assigned, re-run question ask"
+    fi
+    rm -f "$body"
+  fi
+  if [ -n "$on" ] && [ "$assign" -eq 1 ]; then
+    # Read the whole reply before matching: a reader that stops at the first
+    # match breaks gh's later writes, and pipefail would call that a failure.
+    local assigned; assigned="$("$GH" api -X POST "repos/{owner}/{repo}/issues/$on/assignees" -f "assignees[]=$to" --jq '.assignees[].login' 2>/dev/null || true)"
+    if ! printf '%s\n' "$assigned" | grep -ix -- "$to" >/dev/null; then
+      die_state ASSIGN_FAILED "question $k is posted on #$on, but @$to was not assigned (not a collaborator? wrong login?); do not re-ask, assign the item by hand"
+    fi
+  elif [ -z "$on" ]; then
+    local url
+    if ! url="$("$GH" issue create --title "$title" --body-file "$body" --label question --assignee "$to")"; then
+      rm -f "$body"
+      die_state ISSUE_CREATE_FAILED "could not create the question issue (network? auth? no 'question' label? @$to not assignable?)"
+    fi
+    rm -f "$body"
+    on="${url##*/}"
+    created=true
+  fi
+  say "item=$on"
+  say "question=$k"
+  say "to=$to"
+  say "created_issue=$created"
+  say "posted=true"
+}
+
+cmd_question_answer() {
+  local item="" num="" answer="" answer_file="" have=0
+  local usage="usage: gnadd question answer <issue-or-pr> [<number>] (--answer <text> | --answer-file <path>)"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --answer) answer="${2:-}"; have=$((have+1)); shift ;;
+      --answer-file) answer_file="${2:-}"; have=$((have+1)); shift ;;
+      [0-9]*) if [ -z "$item" ]; then item="$1"; elif [ -z "$num" ]; then num="$1"; else usage_die "$usage"; fi ;;
+      *) usage_die "$usage" ;;
+    esac
+    shift
+  done
+  [ -n "$item" ] || usage_die "$usage"
+  question_item_args "$item" "$num"
+  [ "$have" -eq 1 ] || usage_die "question answer needs exactly one of --answer or --answer-file: an answer is never inferred"
+  if [ -n "$answer_file" ]; then
+    [ -s "$answer_file" ] || usage_die "answer file is missing or empty: $answer_file"
+    answer="$(cat "$answer_file")"
+  fi
+  [ -n "$answer" ] || usage_die "answer text is empty: pass the person's words as typed"
+  question_load "$item"
+  question_pick "$item" "$num"
+  local body; body="$(mktemp)"
+  {
+    printf '<!-- gnadd:answer %s -->\n' "$QK"
+    printf '## Answer to question %s\n\n' "$QK"
+    printf '**Answer** (transcribed by the agent from chat, the person'"'"'s words as typed):\n\n'
+    printf '%s\n' "$answer" | sed 's/^/> /'
+  } > "$body"
+  if ! question_post "$item" "$body"; then
+    rm -f "$body"
+    die_state COMMENT_FAILED "could not post the answer on #$item (network? auth?); re-run question answer"
+  fi
+  rm -f "$body"
+  say "item=$item"
+  say "question=$QK"
+  say "status=answered"
+  say "posted=true"
+}
+
+cmd_question_close() {
+  local item="" num="" acted=""
+  local usage="usage: gnadd question close <issue-or-pr> [<number>] --acted <what was done with the answer>"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --acted) acted="${2:-}"; shift ;;
+      [0-9]*) if [ -z "$item" ]; then item="$1"; elif [ -z "$num" ]; then num="$1"; else usage_die "$usage"; fi ;;
+      *) usage_die "$usage" ;;
+    esac
+    shift
+  done
+  [ -n "$item" ] || usage_die "$usage"
+  question_item_args "$item" "$num"
+  [ -n "$acted" ] || usage_die "question close needs --acted <text>: what was done with the answer"
+  question_load "$item"
+  question_pick "$item" "$num"
+  [ "$QSTATE" = "answered" ] || die_state QUESTION_UNANSWERED "question $QK on #$item has no answer on the record yet; record a chat answer first (question answer), or wait for one"
+  local body; body="$(mktemp)"
+  {
+    printf '<!-- gnadd:question-closed %s -->\n' "$QK"
+    printf '## Question %s acted on\n\n' "$QK"
+    printf '**Acted on:** %s\n' "$acted"
+  } > "$body"
+  if ! question_post "$item" "$body"; then
+    rm -f "$body"
+    die_state COMMENT_FAILED "could not post the closing comment on #$item (network? auth?); re-run question close"
+  fi
+  rm -f "$body"
+  # Other open questions on this item keep it, and its assignment, alive.
+  # A question issue (its body is question 1) closes with its last question,
+  # before the unassign, so a failed unassign never leaves it open.
+  local others; others="$(printf '%s\n' "$QSTATUS" | awk -F'\t' -v k="$QK" '$1!="" && $1!=k && $2!="closed"')"
+  local unassigned=false closed_issue=false close_failed=0 unassign_failed=0
+  if [ -z "$others" ] && printf '%s\n' "$QSTATUS" | awk -F'\t' '$4=="body" {f=1} END {exit !f}'; then
+    if "$GH" issue close "$item" >/dev/null; then closed_issue=true; else close_failed=1; fi
+  fi
+  if [ "$QASG" != existing ] \
+    && ! printf '%s\n' "$others" | awk -F'\t' -v to="$QTO" 'tolower($3)==tolower(to) {f=1} END {exit !f}'; then
+    if "$GH" api -X DELETE "repos/{owner}/{repo}/issues/$item/assignees" -f "assignees[]=$QTO" >/dev/null; then
+      unassigned=true
+    else
+      unassign_failed=1
+    fi
+  fi
+  if [ "$close_failed" -eq 1 ]; then
+    die_state ISSUE_CLOSE_FAILED "question $QK is closed on the record, but issue #$item could not be closed; close it by hand$([ "$unassign_failed" -eq 1 ] && printf ' and remove @%s from it' "$QTO")"
+  fi
+  [ "$unassign_failed" -eq 0 ] \
+    || die_state UNASSIGN_FAILED "question $QK on #$item is closed on the record, but @$QTO is still assigned; remove the assignment by hand"
+  say "item=$item"
+  say "question=$QK"
+  say "status=closed"
+  say "unassigned=$unassigned"
+  say "closed_issue=$closed_issue"
+}
+
+cmd_question_list() {
+  # Assignment is the index (every question's item is assigned), the markers
+  # are the truth: only assigned or question-labeled open items are read.
+  local items
+  items="$("$GH" api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
+    --jq '.[] | select((.assignees | length) > 0 or any(.labels[]; .name == "question")) | "\(.number)\t\(if .pull_request then "pr" else "issue" end)\t\(.title)"')" \
+    || die_state QUESTION_READ_FAILED "could not list open issues and PRs (network? auth?)"
+  local answered="" unanswered="" n kind title
+  while IFS="$(printf '\t')" read -r n kind title; do
+    [ -n "$n" ] || continue
+    question_load "$n"
+    local k st to _src _asg tx
+    while IFS="$(printf '\t')" read -r k st to _src _asg tx; do
+      case "$st" in
+        answered|unanswered) ;;
+        *) continue ;;
+      esac
+      local entry
+      entry="$(printf 'question item=%s number=%s status=%s to=%s kind=%s\n  %s\n  on: %s' "$n" "$k" "$st" "$to" "$kind" "$tx" "$title")"
+      if [ "$st" = answered ]; then answered="$answered$entry
+"; else unanswered="$unanswered$entry
+"; fi
+    done <<EOF
+$QSTATUS
+EOF
+  done <<EOF
+$items
+EOF
+  local na nu
+  na="$(printf '%s' "$answered" | grep -c '^question ' || true)"
+  nu="$(printf '%s' "$unanswered" | grep -c '^question ' || true)"
+  say "questions=$((na+nu))"
+  say "answered=$na"
+  say "unanswered=$nu"
+  printf '%s' "$answered"
+  printf '%s' "$unanswered"
+}
+
 # ---------------------------------------------------------------- phase
 #
 # A phase is the project's current development stage, held as one open
@@ -1832,6 +2119,15 @@ main() {
         list) cmd_round_list "$@" ;;
         *) usage_die "usage: gnadd round {post|feedback|list} ..." ;;
       esac ;;
+    question)
+      local qnsub="${1:-}"; shift || true
+      case "$qnsub" in
+        ask)    cmd_question_ask "$@" ;;
+        answer) cmd_question_answer "$@" ;;
+        close)  cmd_question_close "$@" ;;
+        list)   cmd_question_list "$@" ;;
+        *) usage_die "usage: gnadd question {ask|answer|close|list} ..." ;;
+      esac ;;
     phase)
       local psub="${1:-}"; shift || true
       case "$psub" in
@@ -1879,6 +2175,15 @@ gnadd: deterministic mechanics for the GNADD workflow
   round feedback (--feedback <text>|--feedback-file <f>|--no-feedback <why>)
                                   record the last round's feedback now, no commit needed
   round list [N]                  print the issue's round and feedback comments in order
+  question ask --to <login> (--on <N> | --title <t>) --question <q> --options <o> --recommend <r>
+                                  post a question on issue/PR N and assign it to <login>
+                                  (no related item: a new issue labeled question)
+  question answer <N> [K] (--answer <text>|--answer-file <f>)
+                                  record an answer given in chat, labeled as transcribed
+  question close <N> [K] --acted <text>
+                                  say the answer was acted on, close a question issue,
+                                  remove the assignment only if asking added it
+  question list                   open questions on open issues and PRs, answered first
   phase status                    the open milestone (title, counts, description) or none
   phase open <title> --description <text>
                                   open the next phase; refuses while one is open

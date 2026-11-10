@@ -24,6 +24,18 @@
 #   GH_STUB_API_INPUT     where `api --input -` writes the request body it read
 #   GH_STUB_RULESETS      existing ruleset names, one per line (unset = none)
 #   GH_STUB_RULESET_FAIL  set = creating a ruleset fails with this text on stderr
+#   GH_STUB_QROWS / _<N>  question rows for item N's comments, as gnadd's qrow jq
+#                         emits them ('comment\tq\t1\tlogin\ttext', \n-separated)
+#   GH_STUB_QBODY / _<N>  the same row for item N's body (unset = 'body\treply')
+#   GH_STUB_OPEN_ITEMS    open assigned items as 'num\tissue|pr\ttitle' rows
+#   GH_STUB_ASSIGN_IGNORED set = adding an assignee returns without them
+#   GH_STUB_OTHER_ASSIGNEES n other assignees listed after the added one (unset = 0)
+#   GH_STUB_ITEM_META     an item's state and assignees, 'open\tlogin login' (unset = open, none)
+#   GH_STUB_UNASSIGN_FAIL set = removing an assignee fails
+#   GH_STUB_ISSUE_NUMBER  number `issue create` reports (unset = 99)
+#   GH_STUB_ITEM_READ_FAIL set = reading an item's state and assignees fails (404)
+#   GH_STUB_QREAD_FAIL    set = reading an item's question rows fails (404)
+#   GH_STUB_ISSUE_CLOSE_FAIL set = `issue close` fails
 
 set -u
 
@@ -38,6 +50,12 @@ for a in "$@"; do
   [ "$prev" = "--jq" ] && jq_expr="$a"
   prev="$a"
 done
+
+not_found() { # what real `gh api` does on a 404: the error body on stdout, one line on stderr, exit 1
+  printf '%s\n' '{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+  printf 'gh: Not Found (HTTP 404)\n' >&2
+  exit 1
+}
 
 emit_or_missing() { # emit_or_missing <value>
   if [ -n "$1" ]; then
@@ -100,6 +118,35 @@ case "$1" in
     if [ "$has_input" = 1 ]; then
       if [ -n "${GH_STUB_API_INPUT:-}" ]; then cat > "$GH_STUB_API_INPUT"; else cat >/dev/null; fi
     fi
+    # Questions: comment posts copy their body; assignee adds echo the login
+    # back; reads that use gnadd's qrow jq return the fixture rows.
+    for a in "$@"; do
+      case "$a" in body=@*) [ -n "${GH_STUB_COMMENT_FILE:-}" ] && cp "${a#body=@}" "$GH_STUB_COMMENT_FILE" ;; esac
+    done
+    case "$*" in
+      *"-X POST"*/assignees*)
+        [ -n "${GH_STUB_ASSIGN_IGNORED:-}" ] && exit 0
+        for a in "$@"; do case "$a" in "assignees[]="*) printf '%s\n' "${a#assignees[]=}" ;; esac; done
+        i=0; while [ "$i" -lt "${GH_STUB_OTHER_ASSIGNEES:-0}" ]; do printf 'other-assignee-%s\n' "$i"; i=$((i+1)); done
+        exit 0 ;;
+      *"-X DELETE"*/assignees*) [ -n "${GH_STUB_UNASSIGN_FAIL:-}" ] && exit 1; exit 0 ;;
+    esac
+    case "$jq_expr" in
+      *'(.state)'*)
+        [ -n "${GH_STUB_ITEM_READ_FAIL:-}" ] && not_found
+        printf '%b\n' "${GH_STUB_ITEM_META:-open\t}"; exit 0 ;;
+      *qrow*)
+        [ -n "${GH_STUB_QREAD_FAIL:-}" ] && not_found
+        qn="${2#repos/\{owner\}/\{repo\}/issues/}"; qn="${qn%%/*}"
+        case "$2" in
+          */comments) v="GH_STUB_QROWS_$qn"; rows="${!v:-${GH_STUB_QROWS:-}}"; [ -n "$rows" ] && printf '%b\n' "$rows" ;;
+          *)          v="GH_STUB_QBODY_$qn"; printf '%b\n' "${!v:-${GH_STUB_QBODY:-body\treply}}" ;;
+        esac
+        exit 0 ;;
+    esac
+    case "$2" in
+      */issues\?*) [ -n "${GH_STUB_OPEN_ITEMS:-}" ] && printf '%b\n' "$GH_STUB_OPEN_ITEMS"; exit 0 ;;
+    esac
     # Milestones: list (count or rows), single GET (description), create (number + url).
     method=GET
     prev=""
@@ -148,6 +195,19 @@ case "$1" in
           [ "$prev" = "--body-file" ] && [ -n "${GH_STUB_COMMENT_FILE:-}" ] && cp "$a" "$GH_STUB_COMMENT_FILE"
           prev="$a"
         done
+        exit 0 ;;
+      create)
+        prev=""
+        for a in "$@"; do
+          [ "$prev" = "--body-file" ] && [ -n "${GH_STUB_COMMENT_FILE:-}" ] && cp "$a" "$GH_STUB_COMMENT_FILE"
+          prev="$a"
+        done
+        printf 'https://github.com/stub-owner/stub-repo/issues/%s\n' "${GH_STUB_ISSUE_NUMBER:-99}"
+        exit 0 ;;
+      close)
+        if [ -n "${GH_STUB_ISSUE_CLOSE_FAIL:-}" ]; then
+          printf 'failed to close issue: HTTP 502: Bad Gateway\n' >&2; exit 1
+        fi
         exit 0 ;;
       *) exit 0 ;;
     esac
