@@ -1285,10 +1285,36 @@ run state --no-fetch
 expect_contains "in_flight=issue-51/here folder=$WT"
 fi
 
+# A linked folder with nothing in it is named, so one left behind by a
+# finished build is seen at the next session start.
+if t wt_state_names_an_idle_folder; then setup_repo
+add_wt "wt one"
+run state --no-fetch
+expect_contains "idle_folder=$WT"
+cd "$WT"
+run state --no-fetch
+expect_not_contains "idle_folder="
+fi
+
+if t wt_state_does_not_call_a_folder_with_work_idle; then setup_repo
+add_wt wt1
+echo x > "$WT/untracked.txt"
+run state --no-fetch
+expect_not_contains "idle_folder="
+rm "$WT/untracked.txt"
+( cd "$WT" && echo y > c.txt && git_q add c.txt && git_q commit -m "detached work" )
+run state --no-fetch
+expect_not_contains "idle_folder="
+git_q -C "$WT" checkout -b issue-54/busy
+run state --no-fetch
+expect_not_contains "idle_folder="
+fi
+
 if t wt_state_in_single_checkout_has_no_worktree_lines; then setup_repo
 git_q branch issue-53/alone
 run state --no-fetch
 expect_not_contains "worktrees="
+expect_not_contains "idle_folder="
 expect_not_contains "in_flight="
 fi
 
