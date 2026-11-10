@@ -17,8 +17,10 @@ jobs:
           done
       - name: Test suite
         run: bash test/run.sh
+      # The suite above runs the same script as its lint case, but reports a
+      # skip when shellcheck is missing. This step fails on that skip (exit 77).
       - name: Shellcheck
-        run: shellcheck -S warning bin/gnadd scripts/*.sh
+        run: bash scripts/lint.sh
 
   # macOS default bash (3.2.57) is the primary environment where installed
   # skills actually run, and it has real behavioral differences (issue #38's
