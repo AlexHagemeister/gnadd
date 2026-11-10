@@ -695,6 +695,90 @@ expect_status 0 "$ST"
 expect_not_contains "setup"
 [ "$(setup_runs)" = "0" ] && ok || fail "setup ran in the primary checkout"
 
+# The SETUP_FAILED recipe must work as printed: fix the cause, rerun the
+# plain start. $SANDBOX/ok stands in for the fix.
+t wt_setup_retry_reaches_setup_on_a_tree_the_setup_dirtied; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; cp README.md .env; test -f $SANDBOX/ok"
+add_wt wt1
+cd "$WT"
+run start 46 dirty
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+touch "$SANDBOX/ok"
+run start 46 dirty
+expect_status 0 "$ST"
+expect_contains "setup=ran"
+expect_not_contains "DIRTY_TREE"
+[ "$(setup_runs)" = "2" ] && ok || fail "the rerun did not retry the setup"
+[ -f .env ] && ok || fail "the file the setup wrote was lost"
+
+t wt_setup_retry_after_carry_keeps_carried_change; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; test -f $SANDBOX/ok"
+git_q -C "$SANDBOX/work" checkout -b elsewhere
+git_q -C "$SANDBOX/work" worktree add "$SANDBOX/wtm" main
+cd "$SANDBOX/wtm"
+echo carried > carried.txt
+run start 47 carry --carry
+expect_status 2 "$ST"
+expect_contains "state=SETUP_FAILED"
+touch "$SANDBOX/ok"
+run start 47 carry
+expect_status 0 "$ST"
+expect_contains "setup=ran"
+[ "$(cat carried.txt 2>/dev/null)" = "carried" ] && ok || fail "the carried change was disturbed"
+[ "$(git symbolic-ref --short HEAD)" = "issue-47/carry" ] && ok || fail "left the issue branch"
+
+t wt_setup_failure_after_from_names_plain_start_that_retries; setup_repo
+commit_setup_line "pwd -P >> $SANDBOX/setup.log; test -f $SANDBOX/ok"
+add_wt wt1
+cd "$WT"
+git_q checkout -b rescue/x
+run start 48 rescued --from rescue/x
+expect_status 2 "$ST"
+expect_contains "start 48 rescued"
+touch "$SANDBOX/ok"
+run start 48 rescued
+expect_status 0 "$ST"
+expect_contains "setup=ran"
+
+t wt_setup_none_runs_nothing; setup_repo
+commit_setup_line "none"
+add_wt wt1
+cd "$WT"
+run start 49 none
+expect_status 0 "$ST"
+expect_not_contains "setup"
+
+t wt_setup_returns_when_the_command_exits; setup_repo
+commit_setup_line "sleep 8 & echo state=FAKE"
+add_wt wt1
+cd "$WT"
+T0=$SECONDS
+run start 50 bg
+expect_status 0 "$ST"
+[ $((SECONDS - T0)) -lt 5 ] && ok || fail "start waited on a process the setup left running"
+expect_contains "  | state=FAKE"
+printf '%s\n' "$OUT" | grep -q '^state=FAKE' && fail "setup output readable as a key=value line" || ok
+
+t wt_setup_strips_wrapping_backticks; setup_repo
+commit_setup_line '`echo Done`'
+add_wt wt1
+cd "$WT"
+run start 51 ticks
+expect_status 0 "$ST"
+expect_contains "  | Done"
+expect_contains "setup=ran"
+
+t wt_setup_reads_agents_md_only; setup_repo
+printf 'Worktree setup: echo claude >> %s/setup.log\n' "$SANDBOX" > CLAUDE.md
+git_q add CLAUDE.md && git_q commit -m "claude line"
+commit_setup_line "echo agents >> $SANDBOX/setup.log"
+add_wt wt1
+cd "$WT"
+run start 52 agents
+expect_status 0 "$ST"
+[ "$(cat "$SANDBOX/setup.log" 2>/dev/null)" = "agents" ] && ok || fail "setup line not read from AGENTS.md alone"
+
 t wt_quickfix_start_inside_linked_worktree; setup_repo
 add_wt wt1
 WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
@@ -1682,6 +1766,7 @@ run conventions --preview "npm run dev"
 run conventions --preview "http://localhost:3000"
 expect_status 0 "$ST"
 expect_contains "conventions=updated"
+case "$OUT" in *"conventions=updated"*"note: preview launch line changed"*) ok ;; *) fail "the note came before conventions=updated" ;; esac
 OUT="$(cat AGENTS.md)"
 expect_contains "keep me"
 expect_contains "Preview launch: http://localhost:3000"
@@ -1718,6 +1803,26 @@ run conventions --setup "make bootstrap"
 expect_contains "conventions=updated"
 [ "$(grep -c '^Worktree setup:' AGENTS.md)" = "1" ] && ok || fail "setup line duplicated"
 grep -q '^Worktree setup: make bootstrap$' AGENTS.md && ok || fail "setup line not replaced"
+
+t conventions_setup_none_writes_nothing_and_removes_line; setup_repo
+run conventions --setup none
+expect_status 0 "$ST"
+grep -q '^Worktree setup:' AGENTS.md && fail "--setup none wrote a line" || ok
+run conventions --setup "make setup"
+run conventions --setup none
+expect_contains "conventions=updated"
+expect_not_contains "setup=make setup"
+grep -q '^Worktree setup:' AGENTS.md && fail "--setup none left the line" || ok
+run conventions --setup none
+expect_contains "conventions=unchanged"
+
+t conventions_setup_without_end_marker_reports_unchanged; setup_repo
+printf '<!-- gnadd:conventions -->\nPreview launch: npm run dev\n' > AGENTS.md
+run conventions --setup "make setup"
+expect_not_contains "conventions=updated"
+expect_contains "conventions=unchanged"
+expect_contains "end marker"
+grep -q '^Worktree setup:' AGENTS.md && fail "line written outside a closed block" || ok
 
 t skill_copies_in_sync; CURRENT=skill_copies_in_sync
 for skill in prime-gnadd start-issue-gnadd commit-gnadd resolve-issue-gnadd quickfix-gnadd yolo-gnadd init-gnadd; do

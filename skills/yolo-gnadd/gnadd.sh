@@ -368,25 +368,50 @@ cmd_start() {
 
 # A fresh linked worktree holds only what git tracks, so the app usually
 # cannot run there. A project names the fix once, as a `Worktree setup:` line
-# in its conventions file, and start runs it the first time an issue starts
-# in a linked worktree. The line is read from the branch just checked out.
-# A marker in the worktree's own git dir (never the tree) records success, so
-# a folder is set up once. A failure writes no marker: rerunning start retries.
+# in its conventions file (AGENTS.md), and start runs it the first time an
+# issue starts in a linked worktree. The line is read from the branch just
+# checked out. A marker in the worktree's own git dir (never the tree) records
+# success, so a folder is set up once. A failure writes no marker, and a rerun
+# of the plain start on the same branch retries the setup without a checkout.
 # The primary checkout is never set up: whoever cloned it already did.
-worktree_setup() {
+
+setup_gitdir() { # prints a linked worktree's git dir while its setup is not done; fails otherwise
   local gitdir common
   gitdir="$(real_dir "$(git rev-parse --git-dir)")"
   common="$(real_dir "$(git rev-parse --git-common-dir)")"
-  [ "$gitdir" != "$common" ] || return 0
-  [ ! -f "$gitdir/gnadd-setup-done" ] || return 0
-  local top cmd
-  top="$(git rev-parse --show-toplevel)"
-  cmd="$(cd "$top" && grep -h '^Worktree setup:' CLAUDE.md AGENTS.md 2>/dev/null | head -1 | sed 's/^Worktree setup:[[:space:]]*//')" || true
+  [ "$gitdir" != "$common" ] && [ ! -f "$gitdir/gnadd-setup-done" ] && printf '%s\n' "$gitdir"
+}
+
+setup_command() { # the Worktree setup: value, one wrapping backtick pair stripped; empty for none
+  local f v
+  f="$(git rev-parse --show-toplevel)/$CONV_FILE"
+  [ -f "$f" ] || return 0
+  v="$(sed -n 's/^Worktree setup:[[:space:]]*//p' "$f" | head -1)" || true
+  v="${v%"${v##*[![:space:]]}"}"
+  case "$v" in \`*\`) v="${v#\`}"; v="${v%\`}" ;; esac
+  [ "$v" != "none" ] || v=""
+  printf '%s' "$v"
+}
+
+worktree_setup() {
+  local gitdir cmd
+  gitdir="$(setup_gitdir)" || return 0
+  cmd="$(setup_command)"
   [ -n "$cmd" ] || return 0
   say "setup_command=$cmd"
-  local rc=0
-  ( cd "$top" && sh -c "$cmd" ) </dev/null 2>&1 | sed 's/^/  | /' || rc=$?
-  [ "$rc" -eq 0 ] || die_state SETUP_FAILED "worktree setup failed (exit $rc): this folder is not ready, so no code should be written here yet. The branch is checked out. Fix the cause, then rerun start to retry the setup"
+  # Output goes to a file, never a pipe, so start returns when the command
+  # exits even if it leaves a process (a dev server) running. Each line is
+  # printed prefixed, so none of it reads as a key=value fact.
+  local top log rc=0
+  top="$(git rev-parse --show-toplevel)"
+  log="$gitdir/gnadd-setup.log"
+  ( cd "$top" && sh -c "$cmd" ) </dev/null >"$log" 2>&1 || rc=$?
+  sed 's/^/  | /' "$log"
+  if [ "$rc" -ne 0 ]; then
+    local br n slug
+    br="$(current_branch)"; n="${br#issue-}"; n="${n%%/*}"; slug="${br#*/}"
+    die_state SETUP_FAILED "worktree setup failed (exit $rc): this folder is not ready, so write no code here yet. $br is checked out. Fix the cause, then rerun 'start $n $slug' (no other flags) to retry the setup"
+  fi
   : > "$gitdir/gnadd-setup-done"
   say "setup=ran"
 }
@@ -406,6 +431,21 @@ start_branch() {
   [[ "$n" =~ ^[0-9]+$ ]] || usage_die "issue number must be numeric, got: $n"
   [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || usage_die "slug must be kebab-case, got: $slug"
   { [ "$carry" = 1 ] && [ -n "$from" ]; } && usage_die "--carry and --from are separate rescues; pick one"
+
+  # Setup retry: this folder is already on the issue's branch and its
+  # worktree setup has not completed (the rerun after SETUP_FAILED). No
+  # checkout is needed, so the tree is left exactly as it is, including what
+  # the failed setup wrote or a carry brought.
+  local cur; cur="$(current_branch)"
+  case "$cur" in
+    "issue-$n/"*)
+      if setup_gitdir >/dev/null && [ -n "$(setup_command)" ]; then
+        say "result=resumed"
+        say "branch=$cur"
+        note "already on $cur with its worktree setup not done; retrying the setup, the tree is left as it is"
+        return 0
+      fi ;;
+  esac
 
   local target="issue-$n/$slug"
   local existing
@@ -1622,12 +1662,15 @@ cmd_conventions() {
     case "$1" in
       --preview) preview="${2:-}"; shift ;;
       --setup) setup="${2:-}"; shift ;;
-      *) usage_die "usage: gnadd conventions [--preview <command or URL>] [--setup <command>]" ;;
+      *) usage_die "usage: gnadd conventions [--preview <command or URL>] [--setup <command> | none]" ;;
     esac
     shift
   done
   git rev-parse --show-toplevel >/dev/null 2>&1 || die_state NO_REPO "not inside a git repository"
   local f; f="$(git rev-parse --show-toplevel)/$CONV_FILE"
+  # "none" means no setup line: it is never written, and it removes one.
+  local remove_setup=0
+  [ "$setup" != "none" ] || { setup=""; remove_setup=1; }
   if [ ! -f "$f" ]; then
     conventions_block "$preview" "$setup" > "$f"
     say "conventions=created"
@@ -1636,28 +1679,44 @@ cmd_conventions() {
     say "conventions=updated"
     note "GNADD block appended to the existing $CONV_FILE; nothing else in it was touched"
   else
-    local changed=0 tmp
+    local changed=0 tmp msgs=""
     current="$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
     if [ -n "$preview" ] && [ "$current" != "$preview" ]; then
       tmp="$(mktemp)"
       awk -v p="$preview" 'BEGIN{done=0} /^Preview launch: / && !done {print "Preview launch: " p; done=1; next} {print}' "$f" > "$tmp"
       mv "$tmp" "$f"
       changed=1
-      note "preview launch line changed from '$current'"
+      msgs="${msgs}note: preview launch line changed from '$current'
+"
     fi
     current="$(sed -n 's/^Worktree setup: //p' "$f" | head -1)"
-    if [ -n "$setup" ] && [ "$current" != "$setup" ]; then
+    if [ "$remove_setup" = 1 ] && [ -n "$current" ]; then
+      tmp="$(mktemp)"
+      awk 'BEGIN{done=0} /^Worktree setup: / && !done {done=1; next} {print}' "$f" > "$tmp"
+      mv "$tmp" "$f"
+      changed=1
+      msgs="${msgs}note: worktree setup line removed (was '$current')
+"
+    elif [ -n "$setup" ] && [ "$current" != "$setup" ]; then
       # Replace the line in place, or add it as the block's last line.
       tmp="$(mktemp)"
       GNADD_SETUP="$setup" awk -v end="$CONV_END" 'BEGIN{done=0}
         /^Worktree setup: / && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1; next}
         $0 == end && !done {print "Worktree setup: " ENVIRON["GNADD_SETUP"]; done=1}
         {print}' "$f" > "$tmp"
-      mv "$tmp" "$f"
-      changed=1
-      [ -z "$current" ] || note "worktree setup line changed from '$current'"
+      if cmp -s "$f" "$tmp"; then
+        rm -f "$tmp"
+        msgs="${msgs}note: worktree setup line not written: the GNADD block has no end marker ($CONV_END); add it, then rerun
+"
+      else
+        mv "$tmp" "$f"
+        changed=1
+        [ -z "$current" ] || msgs="${msgs}note: worktree setup line changed from '$current'
+"
+      fi
     fi
     if [ "$changed" = 1 ]; then say "conventions=updated"; else say "conventions=unchanged"; fi
+    [ -z "$msgs" ] || printf '%s' "$msgs"
   fi
   say "file=$CONV_FILE"
   say "preview=$(sed -n 's/^Preview launch: //p' "$f" | head -1)"
@@ -1768,7 +1827,7 @@ gnadd: deterministic mechanics for the GNADD workflow
   test                            detect and run the project's test command
   init [--strict] [--ci]          server-side rails: squash-only + main ruleset
   init land                       commit, push, and PR init's own files (AGENTS.md, CI workflow)
-  conventions [--preview <cmd>] [--setup <cmd>]
+  conventions [--preview <cmd>] [--setup <cmd>|none]
                                   write or update the GNADD block in AGENTS.md (idempotent)
   trace [show|reset|note <text>]  per-invocation receipt log (.git/gnadd-trace.log);
                                   note records a step taken outside the script

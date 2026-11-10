@@ -112,14 +112,15 @@ so suggest that instead of a long chained line.
 ## 4. Write The Conventions File
 
 ```bash
-bash "<skill-dir>/gnadd.sh" conventions --preview "<confirmed command or URL>" --setup "<confirmed setup command>"
+bash "<skill-dir>/gnadd.sh" conventions --preview "<confirmed command or URL>" --setup "<confirmed setup command, or none>"
 ```
 
 Omit `--preview` when the user has no preview yet; the script writes a
-placeholder they can fill in later. Omit `--setup` when the user said none:
-no line is written, because `start` would run a placeholder. The script creates `AGENTS.md` if absent,
+placeholder they can fill in later. `--setup none` writes no setup line and
+removes one already there, because `start` runs whatever the line says.
+The script creates `AGENTS.md` if absent,
 appends a marked GNADD block to an existing one without touching its other
-content, and on rerun changes only a preview line that differs. Report the
+content, and on rerun changes only a preview or setup line that differs. Report the
 result from its output: `conventions=created`, `updated`, or `unchanged`.
 
 If the project's agent reads a differently named file (`CLAUDE.md`), tell the
