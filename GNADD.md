@@ -350,7 +350,8 @@ the person who owns the call. A question with no related item gets an
 ordinary issue of its own, labeled `question`. The person answers in the
 thread, or in chat, where the agent records the answer on the same thread
 and labels it as transcribed. Once the answer is acted on, the thread says
-so, the assignment comes off, and a question issue closes. `/prime-gnadd`
+so, the assignment comes off if asking added it, and a question issue
+closes. `/prime-gnadd`
 lists open questions with the answered ones first, read from the record, so
 nobody has to tell a session what was answered. A `yolo-gnadd` run that
 stops on a question leaves it there before it ends.

@@ -1858,6 +1858,16 @@ OUT="$(cat "$GH_STUB_COMMENT_FILE")"
 expect_contains "<!-- gnadd:question 2 to=alex assigned=added -->"
 expect_gh_not_called "X POST" "re-assigned someone the first question already assigned"
 
+# A follow-up after an answer: question 1 is answered but not closed, so it is
+# still open and still settles whose assignment this is.
+t question_ask_copies_added_from_an_answered_open_question; setup_repo; q_reset
+export GH_STUB_ITEM_META='open\talex'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tfirst\ncomment\treply'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 2 to=alex assigned=added -->"
+
 t question_ask_copies_existing_from_an_open_question_to_the_same_person; setup_repo; q_reset
 export GH_STUB_ITEM_META='open\talex'
 export GH_STUB_QROWS='comment\tq\t1\talex\texisting\tfirst\ncomment\treply'
