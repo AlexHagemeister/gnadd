@@ -783,6 +783,18 @@ expect_status 2 "$ST"
 expect_contains "state=BRANCH_IN_WORKTREE"
 expect_contains "git worktree prune"
 
+t wt_state_reports_a_parked_folder; setup_repo
+add_wt wt1
+cd "$WT"
+run sync-main
+run state --no-fetch
+expect_contains "detached=true"
+expect_contains "parked=true"
+git_q checkout --detach HEAD~0
+echo x > p.txt && git_q add p.txt && git_q commit -m "detached work"
+run state --no-fetch
+expect_not_contains "parked=true"
+
 t wt_doctor_accepts_a_parked_folder; setup_repo
 add_wt wt1
 cd "$WT"

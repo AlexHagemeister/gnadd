@@ -161,6 +161,10 @@ halt_held() { # halt_held <branch> <why the command needs it>: named halt for a 
   exit 2
 }
 
+folder_is_parked() { # detached on origin/main while another folder holds main: sync-main's resting state
+  held_elsewhere "$MAIN" && [ "$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 1)" = "0" ]
+}
+
 worktree_count() { git worktree list --porcelain 2>/dev/null | grep -c '^worktree ' || true; }
 
 # Fresh issue or quickfix branch off a verified-safe main. In an ordinary
@@ -275,6 +279,7 @@ cmd_state() {
   else
     say "branch="
     say "detached=true"
+    folder_is_parked && say "parked=true"
   fi
 
   if tree_dirty; then
@@ -883,7 +888,7 @@ cmd_doctor() {
   if [ -z "$br" ]; then
     # A folder sync-main parked (another folder holds main, and HEAD has
     # nothing beyond origin/main) is detached by design, not a bad state.
-    if held_elsewhere "$MAIN" && [ "$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 1)" = "0" ]; then
+    if folder_is_parked; then
       note "this folder is parked on origin/$MAIN ($MAIN is checked out in $HOLDER); ready to start an issue"
     else
       findings=$((findings+1))
