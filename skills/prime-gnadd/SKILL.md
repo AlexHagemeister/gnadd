@@ -105,7 +105,8 @@ From the `state` output, report:
 
 - Active branch and whether the working tree is clean. When it is dirty, name the files from the `dirty_files` listing.
 - Other local branches that may indicate in-progress work.
-- **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`."
+- **Several folders (`worktrees=` present):** the repo has linked worktrees, so several issues can be in flight at once. List every `in_flight=<branch> folder=<path>` line as an issue in flight and the folder that holds it. `folder=none` means the branch is not checked out anywhere. When `state` reports `parked=true` (detached on `origin/main` while another folder holds `main`), the folder is at rest between issues and ready to start the next one. That is not a problem.
+- **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`." In a folder that does not hold `main` (another `in_flight` or worktree folder does), say instead that `main` syncs from the folder that holds it, and that a new issue here is cut from `origin/main` regardless.
 - **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks (git calls this "ahead"; in GNADD every commit reaches `main` through a PR, so a local-only commit on `main` is divergence, not progress). **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix, then prints the rescued branch's exits (quickfix, `start --from`, or `drop`). Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 - **Unpushed checkpoints:** on an issue branch, `upstream=none` or a nonzero `ahead_of_upstream` means commits exist only on this machine. Say so: the round trail on GitHub is behind the branch until the next `round post` or `push`.
@@ -154,7 +155,7 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 <only if VISION.md exists: two or three lines on Core, invariants named>
 
 ## Current State
-<active branch, working tree status, local branches; flag if main is behind origin or stashes exist>
+<active branch, working tree status, local branches; with worktrees, each issue in flight and its folder; flag if main is behind origin or stashes exist>
 
 ## Recent Activity
 <what the last ~15 commits suggest>
@@ -188,7 +189,7 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 1. Open PR awaiting review → review or merge before starting new work.
 2. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
 3. On `issue-<N>/*`, clean → continue that issue's work.
-4. On clean `main` with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
+4. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
 5. No open issues → `/new-issue-gnadd`.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

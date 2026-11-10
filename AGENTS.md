@@ -5,7 +5,7 @@
 - Use `gh` for GitHub operations rather than the web portal.
 - Superseded (2026-07, "Server-side rails" decision in GNADD.md Part 5): direct commits to `main` for small doc-only changes. All changes route through the loop; trivial ones through `quickfix-gnadd` (the formerly deferred `quick` skill, now shipped).
 - Position shareable repos as agent-agnostic; personally develop with Cursor and Claude Code (`AGENTS="cursor claude-code"` default in `scripts/sync.sh`).
-- Solo, single-threaded GNADD usage; one active issue at a time is the normal pattern.
+- Solo GNADD usage. One active issue per folder; several at once is the user's choice in the moment, made by opening sessions in linked worktrees (no project setting).
 - Ask for critical-path confidence before large implementations; proceed when the user says go/proceed.
 - CodeRabbit check failures from rate limiting ("Review rate limited") are not merge blockers; the CI `test` check is the gate that matters.
 

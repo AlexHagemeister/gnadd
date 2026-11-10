@@ -382,6 +382,9 @@ each; it changes nothing on its own. The recipes:
 - **Leftover issue branches** from an interrupted cleanup: doctor identifies
   them; `gnadd.sh cleanup <pr> <branch>` deletes only after GitHub confirms the
   merge.
+- **A worktree folder deleted by hand** (`finding=WORKTREE_FOLDER_GONE`): git
+  still holds its branch, so no folder can check it out. `git worktree prune`
+  releases it, then cleanup or drop the branch as usual.
 
 Everything doctor does is additive: it creates branches, it never deletes or
 rewrites. The one deleting exit, `drop`, is a separate command that shows what
@@ -811,6 +814,41 @@ issue, or a confirm step before posting), not a stronger sentence in the
 skill. Revisit also if the comment-per-commit cadence becomes noise on issues
 with many small checkpoints (a `--quiet` for mechanical commits would be the
 first thing to try).
+
+### The loop works inside worktrees before it creates them (2026-11, #115)
+
+**Decision:** every loop command works from inside a linked git worktree, so
+several issues can be in flight at once, one per folder. Working in parallel
+is a choice the user makes in the moment by opening sessions in worktrees.
+There is no project setting. Git lets only one folder check out a branch, so
+the script asks first whether another folder holds the branch it needs. When
+another folder holds `main`, `start` and `quickfix start` cut the new branch
+from `origin/main` without touching local `main`, and `sync-main` parks the
+folder on `origin/main` as a detached HEAD. Every other refusal halts with
+`state=BRANCH_IN_WORKTREE` and the folder that holds the branch, including a
+folder stopped mid-rebase or mid-bisect and a folder that is gone. `state`
+lists each issue in flight and its folder whenever linked worktrees exist,
+and `doctor` reports worktrees whose folder is gone but whose branch git
+still holds. GNADD never creates or removes a folder: whoever made one
+removes it.
+
+**Why:** coding agents already make worktrees on their own (Claude Code's
+worktree option and its isolated subagents), and the script failed inside
+them, so running agents side by side meant leaving the workflow. Working
+inside worktrees is the smallest change that buys parallelism, and it keeps
+the script ignorant of any one agent's way of making folders. Parking a
+folder detached keeps the rules intact: local `main` only ever moves by
+fast-forward in the folder that holds it, so no folder changes another's
+files. In a single ordinary checkout no branch is ever held elsewhere, so
+none of the new paths fire there.
+
+**Hypothesis, and what would revise it:** having GNADD create folders is
+deferred until the workflow is used with an agent that cannot make its own
+worktrees, or until starting several issues from one session proves clumsy
+without it. Revisit parking if a parked detached folder confuses a session
+more than once (a named resting branch would be the first thing to try), and
+revisit the doctor finding if left-behind branches turn up that a deleted
+folder does not explain.
 
 ### Skills deferred (not built speculatively)
 - **`update-issue`**: superseded (2026-09) by the round comment above. The

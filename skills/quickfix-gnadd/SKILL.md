@@ -91,7 +91,7 @@ Derive `<slug>` from the change: short kebab-case (e.g. `readme-typo`).
   commits it holds are the change; go to step 3.
 
 - **Dirty tree elsewhere, or any `state=` halt** (`DIVERGED_MAIN`,
-  `QF_BRANCH_EXISTS`, `FF_REFUSED`): stop and resolve with the user;
+  `QF_BRANCH_EXISTS`, `FF_REFUSED`, `BRANCH_IN_WORKTREE`): stop and resolve with the user;
   `gnadd.sh doctor` is the recovery path for bad states.
 
 ## 3. Verify, Commit, Ship
@@ -179,7 +179,7 @@ bash "<skill-dir>/gnadd.sh" sync-main
 bash "<skill-dir>/gnadd.sh" cleanup <PR> quickfix/<slug>
 ```
 
-The script deletes only when GitHub confirms the PR merged, the branch is that PR's head, and nothing was committed after the merged head. `state=BRANCH_MISMATCH` or `state=UNMERGED_COMMITS` means nothing was deleted: stop and report which.
+The script deletes only when GitHub confirms the PR merged, the branch is that PR's head, and nothing was committed after the merged head. `state=BRANCH_MISMATCH`, `state=UNMERGED_COMMITS`, or `state=DELETE_REFUSED` means nothing was deleted: stop and report which.
 
 Report the merge commit hash — the one-command undo (`git revert <hash>`).
 
