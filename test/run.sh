@@ -592,6 +592,205 @@ run doctor --rescue-main rescue/nothing
 expect_status 2 "$ST"
 expect_contains "state=NOT_DIVERGED"
 
+# ---------------------------------------------------------------- worktrees
+#
+# Issue #115: the loop works from inside a linked worktree. Each linked
+# folder is added detached, the way an agent's own worktree usually starts.
+
+add_wt() { # add_wt <name>: linked worktree at $SANDBOX/<name>, detached at main; sets WT
+  git_q -C "$SANDBOX/work" worktree add --detach "$SANDBOX/$1"
+  WT="$(cd "$SANDBOX/$1" && pwd -P)"
+  git -C "$WT" config user.email test@test
+}
+
+folder_snapshot() { # folder_snapshot <dir>: HEAD, branch, and status of one folder
+  printf '%s %s %s' "$(git -C "$1" rev-parse HEAD)" "$(git -C "$1" symbolic-ref --quiet --short HEAD || echo detached)" "$(git -C "$1" status --porcelain | tr '\n' ' ')"
+}
+
+t wt_start_inside_linked_worktree_builds_from_origin_main; setup_repo
+add_wt wt1
+advance_origin_main
+MAIN_BEFORE="$(git -C "$SANDBOX/work" rev-parse main)"
+WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
+cd "$WT"
+run start 30 alpha
+expect_status 0 "$ST"
+expect_contains "result=created"
+expect_contains "branch=issue-30/alpha"
+[ "$(git symbolic-ref --short HEAD)" = "issue-30/alpha" ] && ok || fail "not on the issue branch in the worktree"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] && ok || fail "issue branch not built from current origin/main"
+git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 && fail "fresh branch tracks something before its first push" || ok
+[ "$(git rev-parse main)" = "$MAIN_BEFORE" ] && ok || fail "local main moved from inside the worktree"
+[ "$(folder_snapshot "$SANDBOX/work")" = "$WORK_BEFORE" ] && ok || fail "the main checkout changed"
+
+t wt_start_inside_linked_worktree_still_halts_on_diverged_main; setup_repo
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+add_wt wt1
+cd "$WT"
+run start 30 alpha
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
+git show-ref --verify --quiet refs/heads/issue-30/alpha && fail "branch created on a diverged main" || ok
+
+t wt_quickfix_start_inside_linked_worktree; setup_repo
+add_wt wt1
+WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
+cd "$WT"
+run quickfix start tidy
+expect_status 0 "$ST"
+expect_contains "branch=quickfix/tidy"
+[ "$(git symbolic-ref --short HEAD)" = "quickfix/tidy" ] && ok || fail "not on the quickfix branch"
+[ "$(folder_snapshot "$SANDBOX/work")" = "$WORK_BEFORE" ] && ok || fail "the main checkout changed"
+
+t wt_sync_main_inside_linked_worktree_parks_the_folder; setup_repo
+add_wt wt1
+cd "$WT"
+run start 31 park
+advance_origin_main
+MAIN_BEFORE="$(git rev-parse main)"
+run sync-main
+expect_status 0 "$ST"
+expect_contains "synced=true"
+expect_contains "parked=true"
+git symbolic-ref --quiet HEAD >/dev/null && fail "folder still on a branch after sync-main" || ok
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] && ok || fail "folder not parked on origin/main"
+[ "$(git rev-parse main)" = "$MAIN_BEFORE" ] && ok || fail "local main moved from inside the worktree"
+git show-ref --verify --quiet refs/heads/issue-31/park && ok || fail "sync-main deleted the issue branch"
+
+t wt_sync_main_inside_linked_worktree_halts_on_diverged_main; setup_repo
+add_wt wt1
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+cd "$WT"
+run sync-main
+expect_status 2 "$ST"
+expect_contains "state=DIVERGED_MAIN"
+
+t wt_start_resume_of_branch_held_elsewhere_halts_naming_folder; setup_repo
+add_wt wt1
+git_q -C "$WT" checkout -b issue-32/held
+cd "$SANDBOX/work"
+run start 32 held
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+expect_contains "worktree=$WT"
+[ "$(git symbolic-ref --short HEAD)" = "main" ] && ok || fail "main checkout moved off main"
+
+t wt_start_from_branch_held_elsewhere_halts; setup_repo
+add_wt wt1
+git_q -C "$WT" checkout -b rescue/there
+cd "$SANDBOX/work"
+run start 33 rescued --from rescue/there
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+expect_contains "worktree=$WT"
+[ "$(git -C "$WT" symbolic-ref --short HEAD)" = "rescue/there" ] && ok || fail "the other folder's branch was renamed"
+
+t wt_cleanup_and_drop_of_branch_held_elsewhere_halt; setup_repo
+add_wt wt1
+git_q -C "$WT" checkout -b issue-34/busy
+( cd "$WT" && echo w > w.txt && git_q add w.txt && git_q commit -m w )
+cd "$SANDBOX/work"
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-11-09T00:00:00Z
+export GH_STUB_PR_HEAD=issue-34/busy GH_STUB_PR_HEAD_OID="$(git rev-parse issue-34/busy)"
+run cleanup 70 issue-34/busy
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+expect_contains "worktree=$WT"
+run drop issue-34/busy --yes
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+git show-ref --verify --quiet refs/heads/issue-34/busy && ok || fail "deleted a branch another folder holds"
+
+t wt_rescue_main_from_linked_worktree_halts_before_touching_anything; setup_repo
+add_wt wt1
+echo x > local.txt && git_q add local.txt && git_q commit -m "stray"
+WT_BEFORE="$(folder_snapshot "$WT")"
+cd "$WT"
+run doctor --rescue-main rescue/stray
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+expect_contains "worktree=$(cd "$SANDBOX/work" && pwd -P)"
+git show-ref --verify --quiet refs/heads/rescue/stray && fail "rescue branch created before the halt" || ok
+[ "$(folder_snapshot "$WT")" = "$WT_BEFORE" ] && ok || fail "the worktree changed before the halt"
+
+t wt_two_issues_in_two_worktrees_run_start_to_cleanup; setup_repo
+add_wt wt1; WT1="$WT"
+add_wt wt2; WT2="$WT"
+WORK_BEFORE="$(folder_snapshot "$SANDBOX/work")"
+cd "$WT1"; run start 41 one; expect_status 0 "$ST"
+cd "$WT2"; run start 42 two; expect_status 0 "$ST"
+cd "$WT1"; echo one > one.txt && git_q add one.txt && git_q commit -m "one"
+run round post --changed "slice one" --no-feedback "test"; expect_status 0 "$ST"
+WT2_MID="$(folder_snapshot "$WT2")"
+run ship push; expect_status 0 "$ST"
+export GH_STUB_PR_STATE=OPEN GH_STUB_MERGEABLE=MERGEABLE GH_STUB_CHECKS='test\tpass\t1s\turl'
+run ship merge 81; expect_status 0 "$ST"; expect_contains "merged=true"
+# Simulate GitHub's squash merge landing on origin/main.
+advance_origin_main
+run sync-main; expect_status 0 "$ST"; expect_contains "parked=true"
+export GH_STUB_PR_STATE=MERGED GH_STUB_MERGED_AT=2026-11-09T00:00:00Z
+export GH_STUB_PR_HEAD=issue-41/one GH_STUB_PR_HEAD_OID="$(git rev-parse issue-41/one)"
+run cleanup 81 issue-41/one; expect_status 0 "$ST"; expect_contains "local_deleted=true"
+[ "$(folder_snapshot "$WT2")" = "$WT2_MID" ] && ok || fail "issue 41's run changed issue 42's folder"
+[ -d "$WT1" ] && ok || fail "cleanup removed the folder"
+WT1_DONE="$(folder_snapshot "$WT1")"
+cd "$WT2"; echo two > two.txt && git_q add two.txt && git_q commit -m "two"
+run round post --changed "slice two" --no-feedback "test"; expect_status 0 "$ST"
+run ship push; expect_status 0 "$ST"
+export GH_STUB_PR_STATE=OPEN
+run ship merge 82; expect_status 0 "$ST"
+advance_origin_main
+run sync-main; expect_status 0 "$ST"
+export GH_STUB_PR_STATE=MERGED GH_STUB_PR_HEAD=issue-42/two GH_STUB_PR_HEAD_OID="$(git rev-parse issue-42/two)"
+run cleanup 82 issue-42/two; expect_status 0 "$ST"; expect_contains "local_deleted=true"
+[ "$(folder_snapshot "$WT1")" = "$WT1_DONE" ] && ok || fail "issue 42's run changed issue 41's folder"
+[ "$(folder_snapshot "$SANDBOX/work")" = "$WORK_BEFORE" ] && ok || fail "the main checkout changed"
+# The cleaned-up folder is ready for the next issue.
+cd "$WT1"; run start 43 next; expect_status 0 "$ST"; expect_contains "result=created"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] && ok || fail "next issue not built from current origin/main"
+
+t wt_state_lists_every_issue_in_flight_with_its_folder; setup_repo
+add_wt wt1
+git_q -C "$WT" checkout -b issue-51/here
+git_q branch issue-52/parked-branch
+run state --no-fetch
+expect_contains "worktrees=2"
+expect_contains "in_flight=issue-51/here folder=$WT"
+expect_contains "in_flight=issue-52/parked-branch folder=none"
+cd "$WT"
+run state --no-fetch
+expect_contains "in_flight=issue-51/here folder=$WT"
+
+t wt_state_in_single_checkout_has_no_worktree_lines; setup_repo
+git_q branch issue-53/alone
+run state --no-fetch
+expect_not_contains "worktrees="
+expect_not_contains "in_flight="
+
+t wt_doctor_reports_branches_worktrees_left_behind; setup_repo
+add_wt wt1
+git_q -C "$WT" checkout -b issue-61/live
+add_wt wt2; GONE="$WT"
+git_q -C "$GONE" checkout -b issue-62/orphan
+rm -rf "$GONE"
+run doctor
+expect_contains "finding=WORKTREE_FOLDER_GONE"
+expect_contains "branch=issue-62/orphan"
+expect_contains "git worktree prune"
+expect_not_contains "'issue-61/live' has no commits"
+run start 62 orphan
+expect_status 2 "$ST"
+expect_contains "state=BRANCH_IN_WORKTREE"
+expect_contains "git worktree prune"
+
+t wt_doctor_accepts_a_parked_folder; setup_repo
+add_wt wt1
+cd "$WT"
+run sync-main
+run doctor
+expect_not_contains "finding=DETACHED_HEAD"
+expect_contains "parked on origin/main"
+
 # ---------------------------------------------------------------- test / misc
 
 t test_detects_makefile; setup_repo

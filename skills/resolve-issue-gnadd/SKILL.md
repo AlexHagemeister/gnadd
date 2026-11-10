@@ -180,7 +180,7 @@ bash "<skill-dir>/gnadd.sh" ship merge <PR>
 bash "<skill-dir>/gnadd.sh" sync-main
 ```
 
-`ship merge` squash-merges only when the PR is OPEN, MERGEABLE, and every reported check passed. It halts with `state=CHECKS_PENDING` (wait and re-run), `state=CHECK_FAILED` (stop and discuss), or `state=NO_CHECKS` (nothing automated ran; `--no-check` is the human's explicit acceptance). Never add `--no-check` on your own. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
+`ship merge` squash-merges only when the PR is OPEN, MERGEABLE, and every reported check passed. It halts with `state=CHECKS_PENDING` (wait and re-run), `state=CHECK_FAILED` (stop and discuss), or `state=NO_CHECKS` (nothing automated ran; `--no-check` is the human's explicit acceptance). Never add `--no-check` on your own. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. In a linked worktree whose `main` another folder holds, it reports `parked=true` instead: the folder now sits on `origin/main` as a detached HEAD, ready for the next issue, and `main` itself syncs from the folder that holds it. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
 
 If the user leaves the PR open: stop here. Next session, `/resolve-issue-gnadd` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
 
@@ -227,6 +227,7 @@ The script confirms via GitHub that the PR actually merged (`state=MERGED` with 
 - **`state=NOT_MERGED`:** the PR didn't merge (left open, or merge failed) — the branch is **not** deleted. Stop and report.
 - **`state=BRANCH_MISMATCH`:** the branch named is not the merged PR's head, so the merge proves nothing about it. Nothing is deleted. Check which PR the branch belongs to and rerun with the matching pair.
 - **`state=UNMERGED_COMMITS`:** the branch has commits after the head GitHub merged. Nothing is deleted. Those commits never shipped: push them as a new PR, or the user drops them by hand. Never delete around this.
+- **`state=BRANCH_IN_WORKTREE`:** another folder has the branch checked out, and `worktree=` names it. Nothing is deleted. Run `sync-main` in that folder, then rerun cleanup. The folder itself stays: whoever made it removes it.
 - **Never run `git reset` on `main` to discard commits** — in any form, for any reason. If anything about main looks wrong here, `gnadd.sh doctor` is the sanctioned path.
 
 Report what was cleaned up, and give the user the merge commit hash — their one-command undo for the whole feature (`git revert <hash>`).

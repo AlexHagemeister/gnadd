@@ -106,6 +106,7 @@ The script resumes an existing `issue-<N>/*` branch (with a fast-forward-only pu
 | `state=DIVERGED_MAIN` | Local main has commits origin lacks | **Stop.** Show the listed commits, explain, offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Do not pull, reset, or reconcile yourself |
 | `state=BRANCH_DIVERGED_FROM_REMOTE` | Issue branch and its remote diverged | **Stop and report.** Do not merge or rebase autonomously |
 | `state=FF_REFUSED` | Main could not fast-forward | **Stop and report.** Never retry without `--ff-only` |
+| `state=BRANCH_IN_WORKTREE` | Another folder (`worktree=`) has the branch checked out | **Stop and report.** Resume the issue in that folder; never remove or move a folder yourself |
 
 A halt is the system working, not breaking. When halted, skip steps 5–6 (blocker-first) and resolve the blocker with the user.
 

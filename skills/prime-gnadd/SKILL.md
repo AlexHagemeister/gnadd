@@ -105,6 +105,7 @@ From the `state` output, report:
 
 - Active branch and whether the working tree is clean. When it is dirty, name the files from the `dirty_files` listing.
 - Other local branches that may indicate in-progress work.
+- **Several folders (`worktrees=` present):** the repo has linked worktrees, so several issues can be in flight at once. List every `in_flight=<branch> folder=<path>` line as an issue in flight and the folder that holds it. `folder=none` means the branch is not checked out anywhere. A detached HEAD in a linked folder right after `sync-main` (`parked=true`) is the normal resting state between issues, not a problem.
 - **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`."
 - **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks (git calls this "ahead"; in GNADD every commit reaches `main` through a PR, so a local-only commit on `main` is divergence, not progress). **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix, then prints the rescued branch's exits (quickfix, `start --from`, or `drop`). Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
@@ -154,7 +155,7 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 <only if VISION.md exists: two or three lines on Core, invariants named>
 
 ## Current State
-<active branch, working tree status, local branches; flag if main is behind origin or stashes exist>
+<active branch, working tree status, local branches; with worktrees, each issue in flight and its folder; flag if main is behind origin or stashes exist>
 
 ## Recent Activity
 <what the last ~15 commits suggest>

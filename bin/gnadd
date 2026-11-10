@@ -128,6 +128,86 @@ gh_json() { # gh_json <field> <gh args...>: single field via --jq
   "$GH" "$@" --json "$field" --jq ".$field"
 }
 
+# ---------------------------------------------------------------- worktrees
+#
+# Several issues can be in flight at once when each lives in its own linked
+# worktree. Git lets only one folder check out a given branch, so every
+# command that checks out, renames, or deletes a branch first asks whether
+# another folder holds it. When one does, the command either takes a route
+# that leaves that folder alone or halts naming it. A single ordinary
+# checkout never has a branch held elsewhere, so these paths never fire there.
+
+real_dir() { # real_dir <path>: physical path, or the path as given if the folder is gone
+  (cd "$1" 2>/dev/null && pwd -P) || printf '%s\n' "$1"
+}
+
+here_dir() { real_dir "$(git rev-parse --show-toplevel 2>/dev/null)"; }
+
+held_elsewhere() { # held_elsewhere <branch>: true if another folder has it checked out; sets HOLDER
+  HOLDER="$(git for-each-ref --format='%(worktreepath)' "refs/heads/$1" 2>/dev/null | head -1)"
+  [ -n "$HOLDER" ] || return 1
+  [ "$(real_dir "$HOLDER")" != "$(here_dir)" ]
+}
+
+halt_held() { # halt_held <branch> <why the command needs it>: named halt for a branch another folder holds
+  say "state=BRANCH_IN_WORKTREE"
+  say "branch=$1"
+  say "worktree=$HOLDER"
+  if [ -d "$HOLDER" ]; then
+    err "'$1' is checked out in another folder ($HOLDER); $2"
+  else
+    err "'$1' is held by a worktree whose folder is gone ($HOLDER); 'git worktree prune' releases it, then re-run"
+  fi
+  exit 2
+}
+
+worktree_count() { git worktree list --porcelain 2>/dev/null | grep -c '^worktree ' || true; }
+
+# Fresh issue or quickfix branch off a verified-safe main. In an ordinary
+# checkout that means: check out main, fast-forward it, branch. When another
+# folder holds main, this folder cannot check it out and must not move it, so
+# the branch is cut from origin/main directly (no upstream until its first
+# push). The divergence halt applies the same either way: main is one ref.
+branch_off_synced_main() { # branch_off_synced_main <target>
+  local target="$1"
+  if held_elsewhere "$MAIN"; then
+    local base="$MAIN"
+    if fetch_origin >/dev/null; then
+      main_counts
+      if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
+        say "state=DIVERGED_MAIN"
+        err "local $MAIN has commits origin lacks; refusing to build on it"
+        show_divergence
+        note "run 'gnadd doctor' from $HOLDER for the sanctioned recovery path"
+        exit 2
+      fi
+      git rev-parse --verify --quiet "origin/$MAIN" >/dev/null && base="origin/$MAIN"
+    fi
+    git checkout --no-track -b "$target" "$base" >/dev/null 2>&1 || usage_die "cannot create $target from $base"
+    say "result=created"
+    say "branch=$target"
+    say "base=$base"
+    note "$MAIN is checked out in $HOLDER, so it was left untouched; $target was cut from $base"
+    return 0
+  fi
+  git checkout "$MAIN" >/dev/null 2>&1 || usage_die "cannot check out $MAIN"
+  if fetch_origin >/dev/null; then
+    main_counts
+    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
+      say "state=DIVERGED_MAIN"
+      err "local $MAIN has commits origin lacks; refusing to build on it"
+      show_divergence
+      note "run 'gnadd doctor' for the sanctioned recovery path"
+      exit 2
+    fi
+    git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
+      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report. Never merge, rebase, or reset here"
+  fi
+  git checkout -b "$target" >/dev/null 2>&1
+  say "result=created"
+  say "branch=$target"
+}
+
 # ---------------------------------------------------------------- trace
 #
 # Every subcommand leaves a receipt: one line per invocation (UTC time,
@@ -210,6 +290,19 @@ cmd_state() {
   issue_from_branch "$br"
   say "issue=${ISSUE_NUM:-none}"
 
+  # With linked worktrees, several issues can be in flight at once. List
+  # every issue and quickfix branch with the folder that holds it (none =
+  # not checked out anywhere), so any folder sees the whole picture.
+  local wts; wts="$(worktree_count)"
+  if [ "${wts:-0}" -gt 1 ]; then
+    say "worktrees=$wts"
+    local fb fpath
+    while IFS="$(printf '\t')" read -r fb fpath; do
+      case "$fb" in issue-[0-9]*/*|quickfix/*) ;; *) continue ;; esac
+      say "in_flight=$fb folder=${fpath:-none}"
+    done < <(git for-each-ref --format='%(refname:short)%09%(worktreepath)' refs/heads/)
+  fi
+
   if has_remote; then
     say "remote=origin"
     [ "$do_fetch" = 1 ] && fetch_origin >/dev/null
@@ -253,6 +346,9 @@ cmd_start() {
     [ "$from" != "$MAIN" ] || die_state FROM_IS_MAIN "--from $MAIN makes no sense; a fresh issue branch already starts from $MAIN"
     git show-ref --verify --quiet "refs/heads/$from" || die_state FROM_NOT_FOUND "no local branch '$from' to start from"
     [ -z "$existing" ] || die_state FROM_HAS_EXISTING_BRANCH "branch '$existing' already exists for issue #$n; --from cannot merge two branches. Resume it, or drop one"
+    # A rename of a branch another folder holds would silently rename that
+    # folder's branch too, so it halts instead.
+    held_elsewhere "$from" && halt_held "$from" "renaming it would change that folder too. Run start --from there"
     require_clean_tree
     git branch -m "$from" "$target" >/dev/null 2>&1 || usage_die "cannot rename '$from' to '$target'"
     git checkout "$target" >/dev/null 2>&1
@@ -295,8 +391,10 @@ cmd_start() {
   fi
 
   if [ -n "$existing" ]; then
-    # Resume. Tree is clean, so the checkout is safe.
-    git checkout "$existing" >/dev/null 2>&1
+    # Resume. Tree is clean, so the checkout is safe, unless another folder
+    # holds the branch, which git refuses: resume it in that folder instead.
+    held_elsewhere "$existing" && halt_held "$existing" "resume issue #$n in that folder"
+    git checkout "$existing" >/dev/null 2>&1 || usage_die "cannot check out $existing"
     if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
       fetch_origin >/dev/null || true
       if ! git merge --ff-only '@{u}' >/dev/null 2>&1; then
@@ -309,22 +407,7 @@ cmd_start() {
   fi
 
   # Fresh start: build on a verified-safe main.
-  git checkout "$MAIN" >/dev/null 2>&1 || usage_die "cannot check out $MAIN"
-  if fetch_origin >/dev/null; then
-    main_counts
-    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
-      say "state=DIVERGED_MAIN"
-      err "local $MAIN has commits origin lacks; refusing to build on it"
-      show_divergence
-      note "run 'gnadd doctor' for the sanctioned recovery path"
-      exit 2
-    fi
-    git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
-      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report. Never merge, rebase, or reset here"
-  fi
-  git checkout -b "$target" >/dev/null 2>&1
-  say "result=created"
-  say "branch=$target"
+  branch_off_synced_main "$target"
 }
 
 # ---------------------------------------------------------------- push
@@ -497,6 +580,10 @@ squash_merge() { # squash_merge <pr> <gate: full|none>: mergeability, then the C
 
 cmd_sync_main() {
   require_clean_tree
+  if held_elsewhere "$MAIN"; then
+    sync_main_parked
+    return 0
+  fi
   git checkout "$MAIN" >/dev/null 2>&1 || usage_die "cannot check out $MAIN"
   fetch_origin >/dev/null || { say "synced=false"; note "no remote; nothing to sync"; return 0; }
   main_counts
@@ -511,6 +598,31 @@ cmd_sync_main() {
     die_state FF_REFUSED "fast-forward refused; stop and report. Never retry without --ff-only"
   say "synced=true"
   say "main_commit=$(git rev-parse HEAD)"
+}
+
+# sync-main from a folder that cannot hold main (another folder has it checked
+# out): the same divergence halt, then this folder parks on origin/main as a
+# detached HEAD. That releases the issue branch for cleanup and leaves the
+# folder ready to start the next issue. Local main itself is never moved from
+# here; it syncs from the folder that holds it.
+sync_main_parked() {
+  local base="$MAIN" synced=false
+  if fetch_origin >/dev/null; then
+    main_counts
+    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
+      say "state=DIVERGED_MAIN"
+      err "local $MAIN has commits origin lacks; will not build on them"
+      show_divergence
+      note "run 'gnadd doctor' from $HOLDER for the sanctioned recovery path"
+      exit 2
+    fi
+    git rev-parse --verify --quiet "origin/$MAIN" >/dev/null && { base="origin/$MAIN"; synced=true; }
+  fi
+  git checkout --detach "$base" >/dev/null 2>&1 || usage_die "cannot park this folder on $base"
+  say "synced=$synced"
+  say "parked=true"
+  say "main_commit=$(git rev-parse HEAD)"
+  note "$MAIN is checked out in $HOLDER, so this folder is parked on $base (detached HEAD) and $MAIN was left untouched"
 }
 
 cmd_cleanup() {
@@ -541,6 +653,7 @@ cmd_cleanup() {
   [ "$br" != "$branch" ] || die_state ON_TARGET_BRANCH "cannot delete the branch you are standing on; run 'gnadd sync-main' first"
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
+    held_elsewhere "$branch" && halt_held "$branch" "run 'gnadd sync-main' in that folder, then re-run cleanup"
     local tip; tip="$(git rev-parse "refs/heads/$branch")"
     if [ -n "$head_oid" ] && [ "$tip" != "$head_oid" ]; then
       local after; after="$(git rev-list --count "$head_oid..$tip" 2>/dev/null || echo "?")"
@@ -591,6 +704,7 @@ cmd_drop() {
   git show-ref --verify --quiet "refs/heads/$branch" || die_state DROP_NOT_FOUND "no local branch '$branch'"
   local br; br="$(current_branch)"
   [ "$br" != "$branch" ] || die_state ON_TARGET_BRANCH "cannot drop the branch you are standing on; run 'gnadd sync-main' first"
+  held_elsewhere "$branch" && halt_held "$branch" "run 'gnadd sync-main' in that folder, then re-run drop"
 
   local base="origin/$MAIN"
   git rev-parse --verify --quiet "$base" >/dev/null || base="$MAIN"
@@ -656,22 +770,7 @@ cmd_quickfix_start() {
   fi
 
   require_clean_tree
-  git checkout "$MAIN" >/dev/null 2>&1 || usage_die "cannot check out $MAIN"
-  if fetch_origin >/dev/null; then
-    main_counts
-    if [ "$MAIN_AHEAD" != "?" ] && [ "$MAIN_AHEAD" -gt 0 ]; then
-      say "state=DIVERGED_MAIN"
-      err "local $MAIN has commits origin lacks; refusing to build on it"
-      show_divergence
-      note "run 'gnadd doctor' for the sanctioned recovery path"
-      exit 2
-    fi
-    git merge --ff-only "origin/$MAIN" >/dev/null 2>&1 || \
-      die_state FF_REFUSED "fast-forward of $MAIN from origin/$MAIN refused; stop and report. Never merge, rebase, or reset here"
-  fi
-  git checkout -b "$target" >/dev/null 2>&1
-  say "result=created"
-  say "branch=$target"
+  branch_off_synced_main "$target"
 }
 
 cmd_quickfix_guard() {
@@ -782,9 +881,15 @@ cmd_doctor() {
   local br; br="$(current_branch)"
 
   if [ -z "$br" ]; then
-    findings=$((findings+1))
-    say "finding=DETACHED_HEAD"
-    note "recipe: git switch -c rescue/<desc>  (turns the detached commits into a real branch; nothing is lost)"
+    # A folder sync-main parked (another folder holds main, and HEAD has
+    # nothing beyond origin/main) is detached by design, not a bad state.
+    if held_elsewhere "$MAIN" && [ "$(git rev-list --count "origin/$MAIN..HEAD" 2>/dev/null || echo 1)" = "0" ]; then
+      note "this folder is parked on origin/$MAIN ($MAIN is checked out in $HOLDER); ready to start an issue"
+    else
+      findings=$((findings+1))
+      say "finding=DETACHED_HEAD"
+      note "recipe: git switch -c rescue/<desc>  (turns the detached commits into a real branch; nothing is lost)"
+    fi
   fi
 
   if has_remote; then
@@ -815,11 +920,32 @@ cmd_doctor() {
     note "recipe: git stash branch rescue/<desc>  (materializes the newest stash as a visible branch)"
   fi
 
+  # A worktree whose folder was deleted without 'git worktree remove' still
+  # holds its branch: no folder can check that branch out, and cleanup and
+  # drop refuse it. Pruning releases the branch and touches no files.
+  local wt_path="" wt_branch="" line
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt_path="${line#worktree }"; wt_branch="" ;;
+      "branch refs/heads/"*) wt_branch="${line#branch refs/heads/}" ;;
+      prunable*)
+        findings=$((findings+1))
+        say "finding=WORKTREE_FOLDER_GONE"
+        say "worktree=$wt_path"
+        say "branch=${wt_branch:-(detached)}"
+        note "recipe: git worktree prune  (releases the branch; the folder is already gone, nothing else changes)"
+        [ -n "$wt_branch" ] && note "  then, if its PR merged: gnadd cleanup <pr> $wt_branch   otherwise: gnadd drop $wt_branch"
+        ;;
+    esac
+  done < <(git worktree list --porcelain 2>/dev/null)
+
   # Issue branches whose work already landed (0 commits beyond main) are
-  # likely leftovers from an interrupted cleanup.
+  # likely leftovers from an interrupted cleanup. A branch another folder
+  # holds is in flight there, not left over (a fresh one has 0 commits too).
   while IFS= read -r ib; do
     [ -n "$ib" ] || continue
     [ "$ib" = "$br" ] && continue
+    held_elsewhere "$ib" && continue
     local extra
     extra=$(git rev-list --count "$MAIN..$ib" 2>/dev/null || echo "?")
     if [ "$extra" = "0" ]; then
@@ -845,6 +971,9 @@ doctor_rescue_main() {
   [ "$MAIN_AHEAD" != "?" ] || die_state NO_ORIGIN_MAIN "origin/$MAIN not found"
   [ "$MAIN_AHEAD" -gt 0 ] || die_state NOT_DIVERGED "local $MAIN is not ahead of origin/$MAIN; nothing to rescue"
   git show-ref --verify --quiet "refs/heads/$rescue" && die_state RESCUE_EXISTS "branch '$rescue' already exists; pick another name"
+  # Realigning moves the main ref, which git refuses while another folder has
+  # main checked out. Halt before touching anything.
+  held_elsewhere "$MAIN" && halt_held "$MAIN" "rescue-main realigns $MAIN, so run it from that folder"
 
   # Lossless by construction, and never uses reset:
   #   1. bookmark the stray commits on a rescue branch
@@ -1537,7 +1666,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   phase close [title] --verdict <text>
                                   close the phase; the verdict lands in its description
                                   (title defaults to the one open milestone)
-  sync-main                       return to main and fast-forward it (ff-only)
+  sync-main                       return to main and fast-forward it (ff-only); in a
+                                  worktree whose main another folder holds, park on origin/main
   cleanup <pr> <branch>           delete branch only after GitHub confirms the PR merged,
                                   that <branch> is its head, and nothing was committed after
   doctor [--rescue-main <name>]   diagnose bad states; lossless main rescue
