@@ -183,6 +183,14 @@ Each round:
 
    (`--feedback "<text>"` for a short line, `--no-feedback "<reason>"` when they gave none.) The record now holds the feedback before the next build, so a session that stops here leaves nothing only in chat. The user's answer drives the next round's slice. The next checkpoint's `round post` cites this comment instead of carrying the feedback again (the script refuses a duplicate).
 
+**Questions on the record.** When the work needs a call from someone who is not in the chat, or the user wants a question to wait for them on GitHub, post it on the issue (or its PR) instead of stalling in chat. Name the person who owns the call, never a default:
+
+```bash
+bash "<skill-dir>/gnadd.sh" question ask --to <login> --on <N> --question "<one line>" --options "<the choices>" --recommend "<the one you would take, and why>"
+```
+
+With no related issue or PR, pass `--title "<short title>"` in place of `--on`, and the script opens a `question`-labeled issue for it. An answer typed in the thread counts on its own. When the person answers in chat instead, record it on the same thread the moment it is given, as typed: `question answer <N> --answer-file <path outside the repo>`. Once the answer has been acted on, say so on the thread with `question close <N> --acted "<what was done>"`, which removes the assignment and closes a question issue. Never close a question nobody answered (the script refuses).
+
 Never start `resolve-issue-gnadd` on your own. Enter it only when the user says the work is done. Report at each round whether the issue looks complete, partial, or blocked, with what was verified and what remains, so the user can decide.
 
 `resolve-issue-gnadd` owns final acceptance verification, push, PR creation, merge decision, issue/PR sync, and branch cleanup.

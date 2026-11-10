@@ -76,6 +76,7 @@ gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.nu
 gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
 gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
 bash "<skill-dir>/gnadd.sh" phase status
+bash "<skill-dir>/gnadd.sh" question list
 ```
 
 If `state` reported an active issue N (`issue=<N>`), also run both (the issue view prints a comment count, never the comments, so the round trail needs its own read):
@@ -126,6 +127,10 @@ as uncluttered as before.
 
 From `phase status`: when a milestone is open, report its title, its description (what the phase is trying to find out and what ends it), and the open and closed issue counts. When it reports `phase=none`, say plainly that no phase is open. If more than one milestone is open, report them all and repeat the script's note: the phase rule wants exactly one. Never open or close a phase from this skill.
 
+### Open Questions
+
+From `question list`: report answered questions first (each is ready to act on), then unanswered ones (each waits on the person named in `to=`). Give the item number, the question line, and who it is for. The status comes from the record: nobody has to say which were answered. When `questions=0`, omit the section. Do not record or close anything from this skill. A session that acts on an answer does that (`start-issue-gnadd`, step 7).
+
 ### Open Issues
 
 Summarize pending work from the issue listing. Group by label when present;
@@ -163,6 +168,9 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 ## Phase
 <open milestone: title, what it is trying to find out and what ends it, open/closed counts; or "no open phase">
 
+## Open Questions
+<only if questions=N is nonzero: answered first, then unanswered, each with item, question, and who it is for>
+
 ## Open Work
 <open issues grouped by label if useful; external ones annotated "— by @login">
 
@@ -186,10 +194,11 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 
 **Infer one primary suggestion** from repo state, plus at least one alternative when ambiguous:
 
-1. Open PR awaiting review → review or merge before starting new work.
-2. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
-3. On `issue-<N>/*`, clean → continue that issue's work.
-4. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
-5. No open issues → `/new-issue-gnadd`.
+1. Answered question → act on it (`/start-issue-gnadd <N>` on its item) before starting new work. Unanswered questions wait on their person and do not block other work.
+2. Open PR awaiting review → review or merge before starting new work.
+3. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
+4. On `issue-<N>/*`, clean → continue that issue's work.
+5. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
+6. No open issues → `/new-issue-gnadd`.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

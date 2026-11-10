@@ -334,6 +334,20 @@ Three things follow:
   verifies every criterion against the actual diff at the end and ticks the
   boxes then.
 
+### Questions on the record
+
+A question the agent cannot settle itself does not have to wait in chat. The
+agent posts it as a comment on the issue or PR it is about (`gnadd question
+ask`), with the options and the one it recommends, and assigns that item to
+the person who owns the call. A question with no related item gets an
+ordinary issue of its own, labeled `question`. The person answers in the
+thread, or in chat, where the agent records the answer on the same thread
+and labels it as transcribed. Once the answer is acted on, the thread says
+so, the assignment comes off, and a question issue closes. `/prime-gnadd`
+lists open questions with the answered ones first, read from the record, so
+nobody has to tell a session what was answered. A `yolo-gnadd` run that
+stops on a question leaves it there before it ends.
+
 ---
 
 ## Part 3: Rules of the Road
@@ -814,6 +828,40 @@ issue, or a confirm step before posting), not a stronger sentence in the
 skill. Revisit also if the comment-per-commit cadence becomes noise on issues
 with many small checkpoints (a `--quiet` for mechanical commits would be the
 first thing to try).
+
+### Questions live on the item they are about (2026-11, #117)
+
+**Decision:** `gnadd question ask|answer|close|list` carries a question for a
+person. Asking posts one marked comment on the related issue or PR and
+assigns that item to the named person (`--to` is required, never inferred).
+A question with no related item opens an issue with GitHub's default
+`question` label. Questions are numbered per item from the record. A
+question counts as answered when an answer comment transcribed by the agent
+follows it, or when any later comment carries no gnadd marker and is not
+from a bot. Closing posts an "acted on" comment, removes the assignment
+unless another open question on the item names the same person, and closes
+a question issue. `list` reads only open items that are assigned or labeled
+`question`, and reports answered questions before unanswered ones.
+
+**Why:** a question that exists only in chat stalls any work running without
+the human watching, and a `yolo-gnadd` run that hit one just ended. An issue
+per question, named after one person, made the human tell the orchestrating
+session what they had answered, and does not suit a shared repo. The item the
+question is about already has a thread and an assignee field, so the
+question needs no new place. Markers decide who wrote what because the
+author cannot: the agent and the human often post through one account. The
+assignment is the index that keeps `list` cheap, and the markers are the
+truth.
+
+**Hypothesis, and what would revise it:** this has not been used yet. The
+weak point is the answered rule. Any comment the agent posts without a
+gnadd marker (for example the dated comment when a criterion changes) reads
+as an answer on a shared account. If that misfires in practice, the first
+fix to try is a marker on every comment an agent posts, then requiring a
+reply to quote or name the question. Revisit `list`'s index if questions
+turn up on items whose assignment someone removed by hand, and revisit
+closing a question issue if a closed question needs reopening more than
+once.
 
 ### The loop works inside worktrees before it creates them (2026-11, #115)
 

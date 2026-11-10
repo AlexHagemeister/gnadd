@@ -173,6 +173,16 @@ leash.
 
 A halt is the system working. When escalating, leave everything in place (the
 branch and PR are the recoverable state), summarize precisely, and hand back
-to the human. Never work around a `state=` halt, never resolve conflicts
+to the human. When the stop is a question for the human (the spec looks
+wrong, the scope moved, a choice only they can make), put it on the record
+before the run ends, on the PR if one exists and on the issue otherwise,
+addressed to the person who invoked the run:
+
+```bash
+bash "<skill-dir>/gnadd.sh" question ask --to <login> --on <PR or issue> --question "<one line>" --options "<the choices>" --recommend "<the one you would take, and why>"
+```
+
+The answer can then arrive in the thread while no session is running, and
+the next `/prime-gnadd` lists it as answered. Never work around a `state=` halt, never resolve conflicts
 autonomously, never `--no-check`, and never relax the guard or the protected
 paths — those decisions belong to the human in every mode, YOLO included.
