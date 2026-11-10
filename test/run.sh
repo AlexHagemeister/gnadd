@@ -1400,7 +1400,7 @@ expect_contains "rounds=0"
 
 q_reset() { # the question fixtures, cleared per test (setup_repo predates them)
   unset GH_STUB_QROWS GH_STUB_QROWS_5 GH_STUB_QROWS_6 GH_STUB_QROWS_7 GH_STUB_QBODY \
-        GH_STUB_OPEN_ITEMS GH_STUB_ASSIGN_IGNORED GH_STUB_ISSUE_NUMBER 2>/dev/null || true
+        GH_STUB_OPEN_ITEMS GH_STUB_ASSIGN_IGNORED GH_STUB_ISSUE_NUMBER GH_STUB_OTHER_ASSIGNEES 2>/dev/null || true
   export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
 }
 
@@ -1419,6 +1419,15 @@ expect_gh_called "api repos/{owner}/{repo}/issues/5/comments -F body=@" "questio
 expect_gh_called "api -X POST repos/{owner}/{repo}/issues/5/assignees -f assignees\[\]=alex" "item not assigned to the named person"
 expect_gh_not_called "issue create" "an issue was created for a question that has an item"
 expect_gh_not_called "label" "a label was used for a question that has an item"
+
+# Enough other assignees after the named one to outlast a pipe buffer: a
+# check that stops reading at the first match makes gh's writes fail.
+t question_ask_with_other_assignees; setup_repo; q_reset
+export GH_STUB_OTHER_ASSIGNEES=6000
+run question ask --to alex --on 5 --question q --options o --recommend r
+expect_status 0 "$ST"
+expect_contains "posted=true"
+expect_not_contains "ASSIGN_FAILED"
 
 t question_ask_numbers_from_the_record; setup_repo; q_reset
 export GH_STUB_QROWS='comment\tq\t1\talex\tfirst\ncomment\tc\t1\ncomment\tq\t2\talex\tsecond'

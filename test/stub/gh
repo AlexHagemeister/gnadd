@@ -29,6 +29,7 @@
 #   GH_STUB_QBODY / _<N>  the same row for item N's body (unset = 'body\treply')
 #   GH_STUB_OPEN_ITEMS    open assigned items as 'num\tissue|pr\ttitle' rows
 #   GH_STUB_ASSIGN_IGNORED set = adding an assignee returns without them
+#   GH_STUB_OTHER_ASSIGNEES n other assignees listed after the added one (unset = 0)
 #   GH_STUB_ISSUE_NUMBER  number `issue create` reports (unset = 99)
 
 set -u
@@ -115,6 +116,7 @@ case "$1" in
       *"-X POST"*/assignees*)
         [ -n "${GH_STUB_ASSIGN_IGNORED:-}" ] && exit 0
         for a in "$@"; do case "$a" in "assignees[]="*) printf '%s\n' "${a#assignees[]=}" ;; esac; done
+        i=0; while [ "$i" -lt "${GH_STUB_OTHER_ASSIGNEES:-0}" ]; do printf 'other-assignee-%s\n' "$i"; i=$((i+1)); done
         exit 0 ;;
       *"-X DELETE"*/assignees*) exit 0 ;;
     esac

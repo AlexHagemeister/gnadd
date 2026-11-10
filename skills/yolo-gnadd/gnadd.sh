@@ -1547,7 +1547,10 @@ cmd_question_ask() {
       die_state COMMENT_FAILED "could not post question $k on #$on (network? auth?); nothing was assigned, re-run question ask"
     fi
     rm -f "$body"
-    if ! "$GH" api -X POST "repos/{owner}/{repo}/issues/$on/assignees" -f "assignees[]=$to" --jq '.assignees[].login' 2>/dev/null | grep -qix -- "$to"; then
+    # Read the whole reply before matching: a reader that stops at the first
+    # match breaks gh's later writes, and pipefail would call that a failure.
+    local assigned; assigned="$("$GH" api -X POST "repos/{owner}/{repo}/issues/$on/assignees" -f "assignees[]=$to" --jq '.assignees[].login' 2>/dev/null || true)"
+    if ! printf '%s\n' "$assigned" | grep -ix -- "$to" >/dev/null; then
       die_state ASSIGN_FAILED "question $k is posted on #$on, but @$to was not assigned (not a collaborator? wrong login?); do not re-ask, assign the item by hand"
     fi
   else
