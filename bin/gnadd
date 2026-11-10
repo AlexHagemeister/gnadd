@@ -1490,7 +1490,7 @@ question_load() { # question_load <item>: sets QSTATUS (question_status output) 
   QSTATUS="$(printf '%s\n' "$rows" | question_status)"
 }
 
-question_pick() { # question_pick <item> [<number>]: sets QK, QSTATE, QTO, QSRC, QASG from QSTATUS; open questions only
+question_pick() { # question_pick <item> [<number>]: sets QK, QSTATE, QTO, QASG from QSTATUS; open questions only
   local open; open="$(printf '%s\n' "$QSTATUS" | awk -F'\t' '$2!="" && $2!="closed"')"
   if [ -n "${2:-}" ]; then
     open="$(printf '%s\n' "$open" | awk -F'\t' -v k="$2" '$1==k')"
@@ -1500,7 +1500,7 @@ question_pick() { # question_pick <item> [<number>]: sets QK, QSTATE, QTO, QSRC,
   [ "$(printf '%s\n' "$open" | grep -c .)" -eq 1 ] \
     || usage_die "#$1 has several open questions ($(printf '%s\n' "$open" | cut -f1 | tr '\n' ' ')); name one: <item> <number>"
   QK="$(printf '%s' "$open" | cut -f1)"; QSTATE="$(printf '%s' "$open" | cut -f2)"
-  QTO="$(printf '%s' "$open" | cut -f3)"; QSRC="$(printf '%s' "$open" | cut -f4)"
+  QTO="$(printf '%s' "$open" | cut -f3)"
   QASG="$(printf '%s' "$open" | cut -f5)"
 }
 
