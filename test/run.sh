@@ -1402,6 +1402,7 @@ q_reset() { # the question fixtures, cleared per test (setup_repo predates them)
   unset GH_STUB_QROWS GH_STUB_QROWS_5 GH_STUB_QROWS_6 GH_STUB_QROWS_7 GH_STUB_QBODY \
         GH_STUB_OPEN_ITEMS GH_STUB_ASSIGN_IGNORED GH_STUB_ISSUE_NUMBER GH_STUB_OTHER_ASSIGNEES 2>/dev/null || true
   unset GH_STUB_ITEM_META GH_STUB_UNASSIGN_FAIL 2>/dev/null || true
+  unset GH_STUB_ITEM_READ_FAIL GH_STUB_QREAD_FAIL GH_STUB_ISSUE_CLOSE_FAIL 2>/dev/null || true
   export GH_STUB_COMMENT_FILE="$SANDBOX/comment.md"
 }
 
@@ -1442,6 +1443,73 @@ t question_ask_records_an_added_assignment; setup_repo; q_reset
 run question ask --to alex --on 5 --question q --options o --recommend r
 OUT="$(cat "$GH_STUB_COMMENT_FILE")"
 expect_contains "<!-- gnadd:question 1 to=alex assigned=added -->"
+
+# The first question's ask assigned alex, so the second finds him assigned.
+# It must not read that as an assignment that was there before the questions.
+t question_ask_copies_added_from_an_open_question_to_the_same_person; setup_repo; q_reset
+export GH_STUB_ITEM_META='open\tAlex'
+export GH_STUB_QROWS='comment\tq\t1\tALEX\tadded\tfirst'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+expect_contains "question=2"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 2 to=alex assigned=added -->"
+expect_gh_not_called "X POST" "re-assigned someone the first question already assigned"
+
+t question_ask_copies_existing_from_an_open_question_to_the_same_person; setup_repo; q_reset
+export GH_STUB_ITEM_META='open\talex'
+export GH_STUB_QROWS='comment\tq\t1\talex\texisting\tfirst\ncomment\treply'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 2 to=alex assigned=existing -->"
+
+# The owner was assigned before question 1, someone took the assignment off by
+# hand, and question 2 puts it back: it is still not the questions' to remove.
+t question_ask_reassigns_but_copies_existing; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\texisting\tfirst'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 2 to=alex assigned=existing -->"
+expect_gh_called "api -X POST repos/{owner}/{repo}/issues/5/assignees -f assignees\[\]=alex" "item not assigned to the named person"
+
+# A closed question settles nothing for a later one, and neither does an open
+# question to somebody else: alex is assigned and no open question put him there.
+t question_ask_copies_nothing_from_closed_or_other_peoples_questions; setup_repo; q_reset
+export GH_STUB_ITEM_META='open\talex bob'
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tfirst\ncomment\treply\ncomment\tc\t1\ncomment\tq\t2\tbob\tadded\tsecond'
+run question ask --to alex --on 5 --question "third?" --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 3 to=alex assigned=existing -->"
+
+# After question 1 closed and took the assignment with it, a later ask adds it again.
+t question_ask_adds_again_after_an_unassigning_close; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tfirst\ncomment\treply\ncomment\tc\t1'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+OUT="$(cat "$GH_STUB_COMMENT_FILE")"
+expect_contains "<!-- gnadd:question 2 to=alex assigned=added -->"
+expect_gh_called "api -X POST repos/{owner}/{repo}/issues/5/assignees -f assignees\[\]=alex" "item not assigned again"
+
+t question_ask_halts_when_the_item_cannot_be_read; setup_repo; q_reset
+export GH_STUB_ITEM_READ_FAIL=1
+run question ask --to alex --on 5 --question q --options o --recommend r
+expect_status 2 "$ST"
+expect_contains "state=QUESTION_READ_FAILED"
+expect_contains "could not read #5"
+expect_gh_not_called "comments -F" "asked on an item that could not be read"
+expect_gh_not_called "X POST" "assigned an item that could not be read"
+
+t question_ask_halts_when_the_comments_cannot_be_read; setup_repo; q_reset
+export GH_STUB_QREAD_FAIL=1
+run question ask --to alex --on 5 --question q --options o --recommend r
+expect_status 2 "$ST"
+expect_contains "state=QUESTION_READ_FAILED"
+expect_contains "could not read the comments on #5"
+expect_gh_not_called "comments -F" "asked without the record to number the question from"
+expect_gh_not_called "X POST" "assigned an item whose comments could not be read"
 
 t question_ask_halts_on_a_closed_item; setup_repo; q_reset
 export GH_STUB_ITEM_META='closed\t'
@@ -1620,6 +1688,49 @@ run question close 31 --acted "licensed MIT"
 expect_status 2 "$ST"
 expect_contains "state=UNASSIGN_FAILED"
 expect_gh_called "issue close 31" "the unassign halt left the question issue open"
+
+# Two questions to one person, both from asks that own the assignment, closed
+# in ask order: the second close is the last one and removes it.
+t question_close_unassigns_with_the_last_of_several_in_ask_order; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tq\t2\talex\tadded\tB?\ncomment\treply\ncomment\tc\t1'
+run question close 5 2 --acted "did B"
+expect_status 0 "$ST"
+expect_contains "unassigned=true"
+expect_gh_called "api -X DELETE repos/{owner}/{repo}/issues/5/assignees -f assignees\[\]=alex" "assignment left behind by the last question"
+
+t question_close_unassigns_with_the_last_of_several_in_reverse_order; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tq\t2\talex\tadded\tB?\ncomment\treply\ncomment\tc\t2'
+run question close 5 1 --acted "did A"
+expect_status 0 "$ST"
+expect_contains "unassigned=true"
+
+t question_close_keeps_another_persons_assignment; setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tA?\ncomment\tq\t2\tbob\tadded\tB?\ncomment\treply'
+run question close 5 1 --acted "did A"
+expect_status 0 "$ST"
+expect_contains "unassigned=true"
+expect_gh_called "api -X DELETE repos/{owner}/{repo}/issues/5/assignees -f assignees\[\]=alex" "alex kept though his only question closed"
+expect_gh_not_called "assignees\[\]=bob" "bob unassigned while his question is open"
+
+t question_close_halts_when_the_issue_will_not_close; setup_repo; q_reset
+export GH_STUB_QBODY='body\tq\t1\talex\tadded\tMIT?' GH_STUB_QROWS='comment\treply' GH_STUB_ISSUE_CLOSE_FAIL=1
+run question close 31 --acted "licensed MIT"
+expect_status 2 "$ST"
+expect_contains "state=ISSUE_CLOSE_FAILED"
+expect_contains "close it by hand"
+expect_not_contains "remove @alex"
+expect_not_contains "status=closed"
+expect_gh_called "issues/31/comments -F body=@" "the closing comment was not posted"
+expect_gh_called "api -X DELETE repos/{owner}/{repo}/issues/31/assignees -f assignees\[\]=alex" "the failed issue close skipped the unassign"
+
+t question_close_halts_once_when_close_and_unassign_both_fail; setup_repo; q_reset
+export GH_STUB_QBODY='body\tq\t1\talex\tadded\tMIT?' GH_STUB_QROWS='comment\treply' GH_STUB_ISSUE_CLOSE_FAIL=1 GH_STUB_UNASSIGN_FAIL=1
+run question close 31 --acted "licensed MIT"
+expect_status 2 "$ST"
+expect_contains "state=ISSUE_CLOSE_FAILED"
+expect_contains "close it by hand and remove @alex from it"
+expect_not_contains "state=UNASSIGN_FAILED"
+expect_not_contains "status=closed"
 
 t question_answer_and_close_refuse_non_numeric_items; setup_repo; q_reset
 run question answer "5/../6" --answer x

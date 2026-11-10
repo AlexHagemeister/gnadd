@@ -189,7 +189,7 @@ Each round:
 bash "<skill-dir>/gnadd.sh" question ask --to <login> --on <N> --question "<one line>" --options "<the choices>" --recommend "<the one you would take, and why>"
 ```
 
-With no related issue or PR, pass `--title "<short title>"` in place of `--on`, and the script opens a `question`-labeled issue for it. An answer typed in the thread counts on its own. When the person answers in chat instead, record it on the same thread the moment it is given, as typed: `question answer <N> --answer-file <path outside the repo>`. Once the answer has been acted on, say so on the thread with `question close <N> --acted "<what was done>"`, which removes the assignment and closes a question issue. Never close a question nobody answered (the script refuses).
+With no related issue or PR, pass `--title "<short title>"` in place of `--on`, and the script opens a `question`-labeled issue for it. An answer typed in the thread counts on its own. When the person answers in chat instead, record it on the same thread the moment it is given, as typed: `question answer <N> --answer-file <path outside the repo>`. Once the answer has been acted on, say so on the thread with `question close <N> --acted "<what was done>"`, which closes a question issue with its last open question, and removes the assignment only if asking added it and no other open question on the item is for the same person (an assignment that was there before the question stays). Never close a question nobody answered (the script refuses).
 
 Never start `resolve-issue-gnadd` on your own. Enter it only when the user says the work is done. Report at each round whether the issue looks complete, partial, or blocked, with what was verified and what remains, so the user can decide.
 

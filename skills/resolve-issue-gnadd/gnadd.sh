@@ -1453,11 +1453,13 @@ cmd_round_list() {
 # post through one GitHub account. A marker counts only as a comment's whole
 # first line, where the script writes it, so quoting one changes nothing. A
 # later comment with no marker (and not from a bot) answers every question
-# still waiting. The question marker records whether ask added the assignment
-# (assigned=added) or found it there (assigned=existing), so close removes
-# only what ask added. Append only: answers
-# and closings are new comments. Questions are numbered per item from the
-# record, the same way rounds are.
+# still waiting. The question marker records whether asking added the
+# assignment (assigned=added) or found it there (assigned=existing), so close
+# removes only what asking added. The first open question to a person on an
+# item decides that, and each later one copies it, so every open question to
+# one person carries the same answer and the close order cannot matter.
+# Append only: answers and closings are new comments. Questions are numbered
+# per item from the record, the same way rounds are.
 
 QUESTION_JQ_DEF='def qrow: (.body // "") as $b
   | (($b | split("\n") | .[0]) // "" | rtrimstr("\r")) as $l
@@ -1537,17 +1539,22 @@ cmd_question_ask() {
   [ -n "$options" ] || usage_die "question ask needs --options <text>: the choices the person is picking between"
   [ -n "$recommend" ] || usage_die "question ask needs --recommend <text>: the option the agent would take, and why"
 
-  local k=1 asg=added
+  local k=1 asg=added assign=1
   if [ -n "$on" ]; then
     # A closed item never shows in list, and an assignment already there is
     # not ask's to remove later.
-    local meta tab; tab="$(printf '\t')"
+    local meta tab earlier; tab="$(printf '\t')"
     meta="$("$GH" api "repos/{owner}/{repo}/issues/$on" --jq '"\(.state)\t\([.assignees[].login] | join(" "))"')" \
       || die_state QUESTION_READ_FAILED "could not read #$on (network? auth? no such issue or PR?)"
     [ "${meta%%"$tab"*}" = open ] \
       || die_state ITEM_CLOSED "#$on is not open, and question list reads open items only, so a question there would never show; reopen it, or ask with --title"
-    if printf '%s\n' "${meta#*"$tab"}" | tr ' ' '\n' | grep -ix -- "$to" >/dev/null; then asg=existing; fi
+    if printf '%s\n' "${meta#*"$tab"}" | tr ' ' '\n' | grep -ix -- "$to" >/dev/null; then asg=existing; assign=0; fi
     question_load "$on"
+    # An earlier open question to the same person already settled whether the
+    # assignment is ask's to remove: copy it, whoever is assigned right now.
+    # (awk reads every row: an early exit could break the pipe under pipefail.)
+    earlier="$(printf '%s\n' "$QSTATUS" | awk -F'\t' -v to="$to" '!f && $1!="" && $2!="closed" && tolower($3)==tolower(to) {print $5; f=1}')"
+    case "$earlier" in "") ;; existing) asg=existing ;; *) asg=added ;; esac
     k=$(( $(printf '%s\n' "$QSTATUS" | awk -F'\t' '$1+0>m{m=$1+0} END{print m+0}') + 1 ))
   fi
   local body; body="$(mktemp)"
@@ -1567,7 +1574,7 @@ cmd_question_ask() {
     fi
     rm -f "$body"
   fi
-  if [ -n "$on" ] && [ "$asg" = added ]; then
+  if [ -n "$on" ] && [ "$assign" -eq 1 ]; then
     # Read the whole reply before matching: a reader that stops at the first
     # match breaks gh's later writes, and pipefail would call that a failure.
     local assigned; assigned="$("$GH" api -X POST "repos/{owner}/{repo}/issues/$on/assignees" -f "assignees[]=$to" --jq '.assignees[].login' 2>/dev/null || true)"
@@ -2003,7 +2010,8 @@ gnadd: deterministic mechanics for the GNADD workflow
   question answer <N> [K] (--answer <text>|--answer-file <f>)
                                   record an answer given in chat, labeled as transcribed
   question close <N> [K] --acted <text>
-                                  say the answer was acted on, unassign, close a question issue
+                                  say the answer was acted on, close a question issue,
+                                  remove the assignment only if asking added it
   question list                   open questions on open issues and PRs, answered first
   phase status                    the open milestone (title, counts, description) or none
   phase open <title> --description <text>

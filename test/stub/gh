@@ -33,6 +33,9 @@
 #   GH_STUB_ITEM_META     an item's state and assignees, 'open\tlogin login' (unset = open, none)
 #   GH_STUB_UNASSIGN_FAIL set = removing an assignee fails
 #   GH_STUB_ISSUE_NUMBER  number `issue create` reports (unset = 99)
+#   GH_STUB_ITEM_READ_FAIL set = reading an item's state and assignees fails (404)
+#   GH_STUB_QREAD_FAIL    set = reading an item's question rows fails (404)
+#   GH_STUB_ISSUE_CLOSE_FAIL set = `issue close` fails
 
 set -u
 
@@ -47,6 +50,12 @@ for a in "$@"; do
   [ "$prev" = "--jq" ] && jq_expr="$a"
   prev="$a"
 done
+
+not_found() { # what real `gh api` does on a 404: the error body on stdout, one line on stderr, exit 1
+  printf '%s\n' '{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+  printf 'gh: Not Found (HTTP 404)\n' >&2
+  exit 1
+}
 
 emit_or_missing() { # emit_or_missing <value>
   if [ -n "$1" ]; then
@@ -123,8 +132,11 @@ case "$1" in
       *"-X DELETE"*/assignees*) [ -n "${GH_STUB_UNASSIGN_FAIL:-}" ] && exit 1; exit 0 ;;
     esac
     case "$jq_expr" in
-      *'(.state)'*) printf '%b\n' "${GH_STUB_ITEM_META:-open\t}"; exit 0 ;;
+      *'(.state)'*)
+        [ -n "${GH_STUB_ITEM_READ_FAIL:-}" ] && not_found
+        printf '%b\n' "${GH_STUB_ITEM_META:-open\t}"; exit 0 ;;
       *qrow*)
+        [ -n "${GH_STUB_QREAD_FAIL:-}" ] && not_found
         qn="${2#repos/\{owner\}/\{repo\}/issues/}"; qn="${qn%%/*}"
         case "$2" in
           */comments) v="GH_STUB_QROWS_$qn"; rows="${!v:-${GH_STUB_QROWS:-}}"; [ -n "$rows" ] && printf '%b\n' "$rows" ;;
@@ -191,6 +203,11 @@ case "$1" in
           prev="$a"
         done
         printf 'https://github.com/stub-owner/stub-repo/issues/%s\n' "${GH_STUB_ISSUE_NUMBER:-99}"
+        exit 0 ;;
+      close)
+        if [ -n "${GH_STUB_ISSUE_CLOSE_FAIL:-}" ]; then
+          printf 'failed to close issue: HTTP 502: Bad Gateway\n' >&2; exit 1
+        fi
         exit 0 ;;
       *) exit 0 ;;
     esac
