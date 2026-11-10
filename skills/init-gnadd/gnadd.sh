@@ -344,6 +344,24 @@ cmd_state() {
       [ -n "$fpath" ] || fpath="$(holder_of "$fb" || true)"
       say "in_flight=$fb folder=${fpath:-none}"
     done < <(git for-each-ref --format='%(refname:short)%09%(worktreepath)' refs/heads/)
+    # A linked folder that is detached on the park base with a clean tree
+    # holds no work. One left behind by a finished build would sit unnoticed,
+    # so each is named. Never the primary checkout, never this folder, and
+    # never one stopped mid-rebase or mid-bisect.
+    local here base wh wp wst wgd
+    here="$(git rev-parse --show-toplevel)"; base="$(park_base)"
+    while IFS="$(printf '\t')" read -r wh wp; do
+      [ "$wp" != "$here" ] && [ -d "$wp" ] || continue
+      [ "$(git rev-list --count "$base..$wh" 2>/dev/null || echo 1)" = "0" ] || continue
+      wst="$(git -C "$wp" status --porcelain 2>/dev/null)" || continue
+      [ -z "$wst" ] || continue
+      wgd="$(git -C "$wp" rev-parse --absolute-git-dir 2>/dev/null)" || continue
+      { [ -d "$wgd/rebase-merge" ] || [ -d "$wgd/rebase-apply" ] || [ -f "$wgd/BISECT_START" ]; } && continue
+      say "idle_folder=$wp"
+    done < <(git worktree list --porcelain | awk '
+      /^worktree /{n++; p=substr($0, 10); h=""; next}
+      /^HEAD /{h=$2; next}
+      /^detached$/{if (n > 1) print h "\t" p}')
   fi
 
   if has_remote; then
