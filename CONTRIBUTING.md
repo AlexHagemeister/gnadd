@@ -32,13 +32,14 @@ pull requests from outside are welcome, on the terms below.
    name the issue it resolves if there is one.
 
 The maintainer works the same loop (issue, branch, PR, see
-[GNADD.md](GNADD.md)), so your PR lands the same way theirs do: green CI, a
-human reads the diff, one squash commit on `main`.
+[GNADD.md](GNADD.md)), so your PR lands the same way theirs do: green CI, the
+maintainer checks that it does what it says, one squash commit on `main`.
 
 ## The maintainer's terms
 
-- **Every diff gets read before it merges.** CI passing is necessary, not
-  sufficient.
+- **Every outside PR gets the maintainer's review before it merges.** How they
+  review it (reading the diff, trying it, an agent review) is their call. CI
+  passing is necessary, not sufficient.
 - **A first PR waits for approval before CI runs.** That is a GitHub default
   for first-time contributors and it stays on.
 - **No response-time promises.** This is a side project. Issues and PRs get

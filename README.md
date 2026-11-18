@@ -71,7 +71,7 @@ Two other common models, for contrast:
 | Model | Long-lived branches | How change lands | Where GNADD differs |
 |---|---|---|---|
 | [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/) (Driessen, 2010) | `master` and `develop`, plus release and hotfix branches | Merge commits with `--no-ff`, so every branch's history stays in the graph | One branch, no release or hotfix branches, and the history of a feature lives in the PR rather than in the graph |
-| [Trunk-based development](https://trunkbaseddevelopment.com/) | One trunk | Commits straight to trunk, or branches that live a day or less, with feature flags for longer work | Same short-lived branches, but every change passes through a PR that a human reads before it lands |
+| [Trunk-based development](https://trunkbaseddevelopment.com/) | One trunk | Commits straight to trunk, or branches that live a day or less, with feature flags for longer work | Same short-lived branches, but every change passes through a PR that a human checks and merges |
 
 ## What a session looks like
 
@@ -82,7 +82,7 @@ Two other common models, for contrast:
 1. `/start-issue-gnadd <N>` branches off `main`, loads the issue as the working spec, and proposes a plan. You say go.
 2. The work runs in rounds. The agent builds a slice, checkpoints it with `/commit-gnadd`, and hands you a running preview to try. You try it and say what you think. That drives the next slice. Each checkpoint posts a comment on the issue with what changed and your feedback, so a branch that spans sessions picks up where it left off.
 3. When the work is done, `/resolve-issue-gnadd` checks the diff against the issue's acceptance criteria, runs the project's tests, opens the PR, and gives you the link.
-4. You check the PR against what you asked for: the criteria table, the test plan, and CI. The diff is there to read when you want it. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
+4. You check the PR against what you asked for: the criteria table, the test plan, and CI. The diff is there to read when you want it, and you can ask an agent or a review tool to review the PR first. GNADD does not run that review for you. How you check is your call. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
 
 ```mermaid
 flowchart LR
@@ -133,6 +133,8 @@ Two pieces sit alongside the cycle:
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | Verifies the work against the criteria, runs tests, opens the PR, waits for your merge decision, cleans up |
 | `quickfix-gnadd` | `/quickfix-gnadd` | One trivial change through a CI-gated PR, no issue. Refuses large or mechanics-touching diffs |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` | Runs one decided issue or quickfix through the full loop autonomously, with a review pass and a trace-backed report |
+
+Every skill except `yolo-gnadd` can also be picked up by the agent when what you ask matches it, and most of them ask before acting when they are. `yolo-gnadd` runs only when you invoke it by name.
 
 ## Quickstart
 

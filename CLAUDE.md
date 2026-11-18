@@ -6,7 +6,7 @@ This is the source repo of GNADD, Alex's published agent-driven development work
 
 ## The repo runs on its own loop
 
-Dogfood it. Start every session with `/prime-gnadd`. Every change lands through an issue, a branch, and a PR that Alex reads before merge, or through `/quickfix-gnadd` for a trivial one. No direct commits to `main`, no markdown task or progress files, no design doc the agent is expected to keep current. Edit `bin/gnadd`, run `scripts/build.sh`, and let `test/run.sh` prove the per-skill copies match. When the guide and a skill disagree on a mechanic, fix the guide.
+Dogfood it. Start every session with `/prime-gnadd`. Every change lands through an issue, a branch, and a PR that Alex checks and merges, or through `/quickfix-gnadd` for a trivial one. No direct commits to `main`, no markdown task or progress files, no design doc the agent is expected to keep current. Edit `bin/gnadd`, run `scripts/build.sh`, and let `test/run.sh` prove the per-skill copies match. When the guide and a skill disagree on a mechanic, fix the guide.
 
 ## How Alex works with agents
 

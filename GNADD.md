@@ -45,7 +45,8 @@ GitHub is the entire project-management system: **issues** say what to build,
 **branches** are where work happens, **PRs** record what shipped. You don't need
 to know git: the skills run every git operation and stop to ask you
 whenever a decision matters. Your job is to describe work well, answer the skills'
-questions deliberately, and read diffs before merging.
+questions deliberately, and check that each PR does what you meant before you
+merge it.
 
 **Prerequisites:** A coding agent that supports [Agent Skills](https://agentskills.io)
 with the GNADD skills installed (the README's skills table is the list),
@@ -314,9 +315,12 @@ If you leave the PR open instead of merging, that's fine: running
 `/resolve-issue-gnadd` on the branch later picks up at the merge gate automatically.
 It will never try to create a second PR.
 
-**This is the moment that matters most: read the diff before you say "merge
-now."** AI-written changes read as confident and can hide subtle errors; the
-entire system's safety rests on a human actually looking at what's about to land.
+**This is the moment that matters most: check that the PR does what you meant
+before you say "merge now."** AI-written changes read as confident and can hide
+subtle errors, and the merge call is yours. How you check is your choice: the
+criteria table, the test plan, CI, trying the running preview, asking an agent
+or a review tool to review the PR, or reading the diff. An agent review is one
+you ask for: only `/yolo-gnadd` runs a review pass of its own.
 
 Two more habits at this gate:
 
@@ -431,9 +435,10 @@ for help, not to accept an improvised `reset`/`force` fix.
 ### The short version
 
 Prime first. Describe what, not how. Slice thin and don't front-load the backlog.
-Commit often. Read the diff. Treat every skill warning as real. Keep files that
-describe; kill files that track. The rails catch nearly every mistake you can make
-inside them. The one they can't catch is merging without looking.
+Commit often. Check each PR against the goal. Treat every skill warning as
+real. Keep files that describe. Kill files that track. The rails catch nearly
+every mistake you can make inside them. The one they can't catch is merging a
+PR that does not do what you meant.
 
 ---
 
@@ -449,7 +454,7 @@ the harder the guarantee:
 | **GitHub server** (`gnadd.sh init`) | Squash-only merges, PR required on `main`, no force pushes, no branch deletion, auto-delete merged branches | Server rejects the operation |
 | **Script** (`gnadd.sh`, bundled in skills, canonical `bin/gnadd`, tested by `test/run.sh`) | Working-tree protection before checkout, ff-only syncs, divergence halts, the CI gate before merge, cleanup that verifies the merge and the merged head, halts for a branch held in another folder, conflict refusal | Command exits with `state=<NAME>`. Nothing unsafe was done, and the state says what did happen |
 | **Skills** | Judgment gates: scope questions, plan approval, staging choices, merge confirmation | Agent asks instead of acting |
-| **Human** | Reading the diff before merge | No layer below can catch this |
+| **Human** | The merge call: checking the PR does what was meant, by whatever review they choose | No layer below can catch this |
 
 The script speaks a fixed protocol: `key=value` facts on success, `state=<NAME>`
 plus context and exit code 2 whenever a human decision is needed. A `state=` halt
@@ -577,8 +582,10 @@ recoverable, not catastrophic:
 Not catchable by skills: these live with you (though after `gnadd.sh init`,
 the server catches the worst versions):
 
-- **Merging without reading the diff.** Still the load-bearing human habit; nothing
-  below the human can replace it.
+- **Merging a PR that does not do what you meant.** Checking it against the goal
+  is still the load-bearing human habit (the criteria table, CI, the preview,
+  an agent review, or the diff: the method is yours). Nothing below the human
+  can replace it.
 - **Running raw git commands outside the skills**, including ones an agent suggests
   mid-conversation. The script and server rails still stand, but judgment gates
   don't. If a git operation seems needed and no skill covers it, prefer asking
@@ -770,6 +777,8 @@ its own (each phase is executed by loading the sibling skill) and every
 `gnadd.sh` invocation leaves a receipt line in `.git/gnadd-trace.log` (`gnadd
 trace show`). The closing report must include the trace and call out any gaps;
 a freewheeled run is visible, not deniable.
+**Amended (2026-11, #127):** the default path's human check is no longer framed
+as a diff read: the human checks the PR against the goal, by any method.
 
 ### VISION.md is the intent document (2026-09)
 
@@ -934,6 +943,14 @@ more than once (a named resting branch would be the first thing to try), and
 revisit the doctor finding if left-behind branches turn up that a deleted
 folder does not explain.
 
+**Amended (2026-11, #120, #125):** a project can name a `Worktree setup:`
+command in its conventions file, and `start` runs it once, the first time an
+issue starts in a fresh linked worktree. A failure halts with
+`state=SETUP_FAILED` before any code is written, and the next `start` in that
+folder retries it. `state` also prints `idle_folder=` for each other linked
+folder that is detached with no commits beyond `origin/main` and a clean tree,
+so a folder left behind by finished work does not sit unnoticed.
+
 ### Skills deferred (not built speculatively)
 - **`update-issue`**: superseded (2026-09) by the round comment above. The
   mid-work record is append-only comments, so the body-editing practice this
@@ -948,8 +965,9 @@ folder does not explain.
   `scripts/`, `.github/`, or `gnadd.sh` copies) and a CI-gated squash merge
   enforced in the script. A fast path *through* the safety rails, not around them.
 - **Hard CI gate** in `resolve-issue-gnadd`: landed. `gnadd.sh ship merge`
-  refuses unless every check GitHub reports has passed (pending, failed, and
-  not-started-yet each halt with their own state), and `--no-check` is the
+  refuses unless every check GitHub reports has passed (pending or not
+  started yet halts with `CHECKS_PENDING`, a failure with `CHECK_FAILED`, a
+  project with no CI at all with `NO_CHECKS`), and `--no-check` is the
   human's explicit acceptance when a project has no CI. `gnadd.sh test` still
   runs the suite locally before the PR, and `gnadd.sh init --ci` bootstraps
   the workflow.

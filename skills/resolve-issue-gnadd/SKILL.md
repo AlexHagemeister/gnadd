@@ -24,7 +24,7 @@ If this skill was auto-selected from context rather than explicitly invoked with
 - Resolve verifies the issue contract against actual changes before anything ships.
 - The PR records what shipped, including descopes, divergences, and non-obvious decisions.
 - GitHub computes mergeability; do not locally rebase or resolve conflicts autonomously.
-- The human must review the diff before merge. Tests, CI, and mergeability checks support that decision; they do not replace it.
+- The human owns the merge call and checks that the PR does what was meant, by whatever review they choose (the criteria table, the test plan, CI, the preview, an agent review they ask for, or the diff). Tests, CI, and mergeability checks support that decision. They do not replace it.
 - For broader workflow or file-hygiene guidance, use `help-gnadd`.
 
 ## Mechanics
@@ -63,7 +63,7 @@ Then run the project's tests:
 bash "<skill-dir>/gnadd.sh" test
 ```
 
-It auto-detects the test command (npm/make/cargo/go/pytest). Report the result alongside the criteria assessment. `state=NO_TESTS` means nothing automated verified this work — say so; the diff review is then the only safeguard. A failing suite is a stop-and-discuss, not something to wave past.
+It auto-detects the test command (npm/make/cargo/go/pytest). Report the result alongside the criteria assessment. `state=NO_TESTS` means nothing automated verified this work. Say so: the review before merge is then the only safeguard. A failing suite is a stop-and-discuss, not something to wave past.
 
 ## 3. Stage And Commit
 
@@ -139,7 +139,7 @@ evaporates and PRs are permanent>
 ## Test Plan
 
 - [ ] Automated tests pass (<runner from step 2, or "none configured">)
-- [ ] Diff reviewed by a human before merge
+- [ ] A human checked the PR against the goal before merge
 
 Closes #<N>
 ```
@@ -171,7 +171,7 @@ bash "<skill-dir>/gnadd.sh" ship status <PR>
 - **`checks=failed`** — say which check is red. A red CI is a stop-and-discuss. The user can override with `--no-check` at the merge below, and that decision is theirs, said out loud.
 - **`checks=none`** — no checks and no workflow in the tree, so nothing automated verified this PR beyond the local test run. Say so. Merging needs `--no-check`, which records that the human accepted that.
 
-> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human reading the diff. Do not let "merge now" become reflexive. Give the files-changed link again at this gate (`.../pull/<PR>/files`) so reading the diff is one click, never an instruction.
+> AI-authored PRs read as authoritative and can hide subtle logic errors. The merge gate is only as good as the human's check that the PR does what was meant. How they check is theirs (the criteria table, CI, the preview, an agent review they ask for, or the diff), so never tell them which. Do not let "merge now" become reflexive. Give the files-changed link again at this gate (`.../pull/<PR>/files`) so the diff is one click away if they want it.
 
 If — and only if — the user confirms:
 
@@ -254,7 +254,7 @@ Offer a brief next-step nudge only at natural completion — not at intermediate
 **Natural completion:**
 
 - Merged and cleanup finished → nudge toward `/prime-gnadd` for the next session.
-- PR created but left open → nudge toward reviewing the diff or addressing feedback — not `/start-issue-gnadd` for new work.
+- PR created but left open → nudge toward checking the PR or addressing feedback, not `/start-issue-gnadd` for new work.
 
 **Stopped on a blocker:** nudge only toward resolving that blocker.
 

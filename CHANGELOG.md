@@ -74,6 +74,12 @@ change skill names, script subcommands, or workflow behavior.
 
 ### Changed
 
+- The docs and skills no longer make reading the diff the required human
+  step before merge. The human owns the merge call and checks that the PR
+  does what was meant, by whatever review they choose: the criteria table,
+  the test plan, CI, the preview, an agent review they ask for, or the diff.
+  The PR body's checkbox now reads "A human checked the PR against the goal
+  before merge". The merge confirmation gate itself is unchanged (#127).
 - `init` and `conventions` end with an `uncommitted=` line naming init's
   files not yet committed. `ruleset=failed` now prints gh's first error line
   as `ruleset_error=`, and the skill covers the private free-plan case. The

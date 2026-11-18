@@ -31,7 +31,8 @@ skills.
 - Enforcement is layered, lowest layer that can hold each invariant: GitHub
   server rules (`gnadd init` — squash-only merges, PR-required main), the
   script (ff-only syncs, divergence halts, gated cleanup), the skills
-  (judgment and conversation), and the human (reading the diff before merge).
+  (judgment and conversation), and the human (the merge call: checking the PR
+  does what was meant, by whatever review they choose).
 - Recovery from bad states has a sanctioned path: `gnadd.sh doctor` (bundled
   with `prime-gnadd`) diagnoses and offers lossless fixes, and a rescued
   branch has scripted exits (`/quickfix-gnadd`, `start --from`, `drop`).
@@ -41,7 +42,9 @@ skills.
   `.git/gnadd-trace.log`), and `gnadd.sh round list <N>` prints an issue's
   round trail from any branch, not only its own.
 - The user's load-bearing job is to describe desired behavior, answer scope
-  questions, and read diffs before merge.
+  questions, and check that each PR does what they meant before merge. How
+  they check is theirs: the criteria table, CI, the preview, an agent review
+  they ask for, or the diff.
 
 ## Describe vs Track
 

@@ -1211,7 +1211,7 @@ cmd_test() {
   else
     say "runner=none"
     say "state=NO_TESTS"
-    note "no test command detected; the diff review is the only safeguard"
+    note "no test command detected. The review before merge is the only safeguard"
     return 0
   fi
 }

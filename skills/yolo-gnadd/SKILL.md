@@ -18,8 +18,8 @@ The consent being delegated is the *gates*, never the *what*: YOLO only ever
 executes an existing open issue or an explicitly described trivial change,
 and never chooses its own work. One invocation = one issue or one quickfix.
 
-**What this trades, honestly:** the human's pre-merge diff review is replaced
-by (a) the pre-approved spec as the contract, (b) an independent fresh-context
+**What this trades, honestly:** the human's pre-merge check on the PR is
+replaced by (a) the pre-approved spec as the contract, (b) an independent fresh-context
 review pass, (c) the CI gate, and (d) post-merge revertability via the squash
 commit. The run ends with a report built for skim-and-revert.
 
@@ -136,9 +136,9 @@ write under **## Autonomous review**.
 
 **Phase 7 — Finalize and merge.** In one write, update the PR body with the
 acceptance-criteria table and the **## Autonomous review** record, then mark
-the draft ready. Leave resolve-issue's "Diff reviewed by a human before
-merge" checkbox unticked, with a note beside it pointing at the review
-record: no human read this diff, and the body must say so. Resume
+the draft ready. Leave resolve-issue's "A human checked the PR against the
+goal before merge" checkbox unticked, with a note beside it pointing at the
+review record: no human checked this PR, and the body must say so. Resume
 `../resolve-issue-gnadd/SKILL.md` at its merge gate with the merge
 confirmation auto-approved — **except**:
 
