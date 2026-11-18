@@ -93,7 +93,7 @@ flowchart LR
     T -->|feedback| R
   end
   B --> R
-  T -->|done| PR[PR: criteria, tests]
+  T -->|done| PR[PR: criteria, tests, CI]
   PR --> D[human reads the diff]
   D --> M[one squash commit on main]
 ```
@@ -101,6 +101,22 @@ flowchart LR
 Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your diff read. You invoke it on purpose or not at all.
 
 **When a skill stops with a warning, that is the system working.** Read what it says and pick from the options it offers. The guide's Part 3 covers the few states you can land in and the one safe path out of each.
+
+## The lifecycle, from intent to merge
+
+The session above is one turn of a longer cycle. Each layer lives in one place, and none of them is a file the agent has to keep current.
+
+1. **Intent: `VISION.md`.** One file at the repo root, in three sections. **Core** is what is true no matter what gets built: the experience at the center, numbered invariants with their reasons, non-goals, and the constraints reality imposes. **Possibility space** is everything else from the brain dump, and none of it is a commitment. A thread from it becomes work only when someone pulls it into an issue. **Open tensions** are the places where possibilities fight or the answer is not known yet, named so an agent stops there instead of picking a side. The file holds no status, order, or plan. When an implementation choice fights an invariant, the agent stops and says so rather than working around it. The guide's Part 1, "The intent document", has the full shape.
+2. **Phase: one open GitHub milestone.** Its description says what this stretch of work is trying to find out and what ends it. There are no due dates. A phase ends when you close it with a verdict, and the next one opens after. `/prime-gnadd` reports it, `/new-issue-gnadd` defaults new issues into it, and `/resolve-issue-gnadd` asks whether the phase is done once its issues run out. Phases are opt-in: a project with no milestones works the same.
+3. **Issues: the spec.** Each issue describes behavior, with acceptance criteria written as behavior rather than implementation, and can cite the invariant it serves. A branch exists only because an issue does.
+4. **Rounds on the branch: build, try, feedback.** The agent builds a slice and checkpoints it. Each checkpoint pushes the branch and posts a round comment on the issue with what changed and your feedback as you gave it. You try the running preview, and what you say drives the next round. The issue body is never edited mid-work.
+5. **Verification.** `/resolve-issue-gnadd` checks the diff against every acceptance criterion and reports each one as met, not met, or descoped. It runs the project's tests and writes the PR body: what was done, the decisions and divergences, and the test plan.
+6. **The CI-gated merge.** The script's `ship merge` squash-merges only when the PR is open, mergeable, and every check GitHub reports has passed. Checks still running halt with `CHECKS_PENDING`, a red check halts with `CHECK_FAILED`, and a repo with no CI at all halts with `NO_CHECKS`. Getting past any of them takes `--no-check`, which only you can ask for. The agent never adds it. `/quickfix-gnadd` gates its PR on one named check instead. After the merge, the branch is deleted, local `main` fast-forwards, and the issue closes with its record synced.
+
+Two pieces sit alongside the cycle:
+
+- **Questions on the record.** A question the agent cannot settle itself goes on the issue or PR it is about, as a comment with the options and a recommendation, and that item is assigned to the person who owns the call (`gnadd question ask`). `/prime-gnadd` lists open questions, answered ones first, so a new session knows what was decided without being told. See the guide's Part 2, "Questions on the record".
+- **Worktrees.** Every loop command works inside a linked git worktree, so several issues can be in flight at once, one folder each, if you open your sessions that way. GNADD never creates or removes a folder. The conventions file can name a `Worktree setup:` command that `start` runs once in a fresh folder. See the guide's Part 5, "The loop works inside worktrees before it creates them".
 
 ## The skills
 
@@ -226,16 +242,23 @@ The rails make GitHub itself enforce the core rules: squash-only merges with the
 | `skills/<name>/SKILL.md` | The skills: judgment and conversation around the script |
 | `skills/<name>/gnadd.sh` | Generated copies of `bin/gnadd`. Never edit these |
 | `scripts/build.sh` | Copies `bin/gnadd` into the operational skills |
+| `scripts/lint.sh` | The one shellcheck definition. CI runs it, and so does the full test run |
+| `scripts/sync.sh` | Rebuilds the copies and installs the skills from a local checkout |
 | `test/run.sh` | Test suite (bash and git only, `gh` is stubbed) |
+| `test/stub/gh` | The fake `gh` the suite runs against |
+| `test/TESTBED.md` | Procedure for an agent to run the whole loop end to end on a throwaway GitHub repo |
 | `scripts/release.sh` | Stamps the version and repins guide URLs to the release tag |
 | `.claude-plugin/` | Plugin and marketplace manifests that make the repo installable through the Claude Code plugin manager |
 | `GNADD.md` | The workflow guide and design rationale |
+| `CHANGELOG.md` | What changed in each release |
 
 ## Authoring (repo maintainers)
 
 - Skill behavior: edit `skills/<name>/SKILL.md`.
 - Git mechanics: edit `bin/gnadd`, then run `./scripts/build.sh`. `test/run.sh` fails if the copies drift.
 - Always run `bash test/run.sh` before committing. Every safety guarantee is a test.
+- Run one case with `bash test/run.sh <name>`, or a set with a quoted glob (`bash test/run.sh 'question_*'`).
+- Install `shellcheck`. Without it the full run prints `lint SKIPPED`, which is not a pass: a lint error that run never saw still fails CI.
 
 Refresh your local install after changes:
 
@@ -245,4 +268,4 @@ Refresh your local install after changes:
 
 It installs to Cursor and Claude Code by default. Override the agent list with a space-separated `AGENTS` variable ([supported agents](https://github.com/vercel-labs/skills#supported-agents)): `AGENTS="cursor" ./scripts/sync.sh`.
 
-Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd` and `audit-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y` (or the project scope if that is how they installed), or with `claude plugin update gnadd@gnadd` for plugin installs.
+Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd`, `audit-gnadd`, and `vision-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y` (or the project scope if that is how they installed), or with `claude plugin marketplace update gnadd` and then `claude plugin update gnadd@gnadd` for plugin installs.

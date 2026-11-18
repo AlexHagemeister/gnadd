@@ -30,7 +30,7 @@ What in the vault bears on work here, and when to fetch it:
 
 - `wiki/craft/software-design-practice.md`: the 21 practices the list above is distilled from, each with its reasoning. Fetch before any design or workflow change, not for routine issue work.
 - `wiki/craft/idea-to-first-version.md`: Alex's position on specs, PRDs, and plan mode, the VISION.md shape, and milestones as phases. Fetch before touching the startup sequence, the thin-README rule, or anything about phases or milestones.
-- `wiki/projects/gnadd.md`: the vault's own record of this project, including proposals discussed with Alex but not yet filed as issues. Fetch when a session starts on a design question, to see what has already been decided or floated.
+- `wiki/projects/gnadd/index.md`: the vault's own record of this project, including proposals discussed with Alex but not yet filed as issues. Its satellites in the same folder are `adoption.md`, `releases.md`, and `design-extensions.md`. Fetch when a session starts on a design question, to see what has already been decided or floated.
 - `wiki/craft/dev-stack.md`: his tooling defaults. Fetch only if the work reaches outside this repo's shell-and-gh world.
 - `query_wiki` for anything else: a past ruling, a term he uses, a person or project a task mentions.
 

@@ -28,7 +28,7 @@ body:
     attributes:
       label: gnadd version
       description: Output of `bash <skill-dir>/gnadd.sh version`
-      placeholder: gnadd 0.2.0
+      placeholder: gnadd 0.5.0
   - type: textarea
     id: state
     attributes:

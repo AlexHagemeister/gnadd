@@ -25,6 +25,9 @@ pull requests from outside are welcome, on the terms below.
    mechanics live in [`bin/gnadd`](bin/gnadd) only: never edit the per-skill
    `gnadd.sh` copies, run `scripts/build.sh` to regenerate them.
 3. Run `bash test/run.sh`. It must pass, and it fails if the copies drift.
+   Install [shellcheck](https://www.shellcheck.net) first: without it the run
+   prints `lint SKIPPED` and still exits 0, but CI fails on the same lint.
+   `bash test/run.sh <name>` runs one case while you work.
 4. Open a pull request against `main`. Say what the change does and why, and
    name the issue it resolves if there is one.
 
