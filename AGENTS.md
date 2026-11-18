@@ -18,7 +18,7 @@
 - Git mechanics are canonical in `bin/gnadd`; `scripts/build.sh` copies it into the operational skills as `gnadd.sh` (never edit the copies); `test/run.sh` is the zero-dependency test suite (gh stubbed at `test/stub/gh`) and fails if copies drift.
 - Run one case with `bash test/run.sh <name>` (the name after `if t` in the file), or a set with a glob in quotes (`bash test/run.sh 'question_*'`). A filter that matches nothing exits nonzero. The full run (no argument) also runs `scripts/lint.sh`, the same lint CI runs. Without shellcheck it prints `lint SKIPPED`, which is not a pass.
 - Author local sync: `./scripts/sync.sh` (runs build.sh first); post-push refresh: `npx skills update` with the same scope (`-g` or project) used at install.
-- Releases: `./scripts/release.sh vX.Y.Z` stamps the version and repins the canonical-guide URLs in `help-gnadd`/`audit-gnadd` to the tag.
+- Releases: `./scripts/release.sh vX.Y.Z` stamps the version and repins the canonical-guide URLs in `help-gnadd`/`audit-gnadd`/`vision-gnadd` to the tag.
 - `.gitignore` excludes `.cursor/`.
 - When `GNADD.md` and a skill disagree on mechanics, the skill wins; when a skill and `bin/gnadd` disagree, the script wins.
 

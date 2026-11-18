@@ -70,7 +70,10 @@ bash test/run.sh
 echo
 echo "Release $TAG prepared. Ship it through the loop:"
 echo "  1. review the diff (changelog + version stamp + repinned URLs + skill copies)"
-echo "  2. commit:   git commit -am \"chore: release $TAG\""
+echo "  2. land it through the full loop: the diff touches bin/ and the gnadd.sh copies,"
+echo "     so quickfix refuses it. Open a release issue, then move these changes onto"
+echo "     its branch (from a dirty main: gnadd start <N> <slug> --carry), commit"
+echo "     \"chore: release $TAG\", and ship it to a PR with /resolve-issue-gnadd"
 echo "  3. after the PR merges to main:"
 echo "       git tag $TAG <merge-commit> && git push origin $TAG"
 echo "  4. publish the GitHub Release with the changelog entry as notes:"

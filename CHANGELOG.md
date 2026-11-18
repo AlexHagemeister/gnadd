@@ -20,13 +20,106 @@ change skill names, script subcommands, or workflow behavior.
   on a `quickfix/gnadd-init` branch, pushes, and opens the PR, so a fresh
   init ends with a clean tree without a chore issue. Refuses to sweep up any
   other change in the tree (`INIT_LAND_FOREIGN_FILES`) (#98).
+- `gnadd question ask|answer|close|list`: a question for a person lives on
+  the issue or PR it is about. `ask` posts one marked comment (question,
+  options, recommendation) and assigns the item to `--to <login>`. With no
+  related item it opens an issue labeled `question`. `answer` records a
+  chat answer on the thread, labeled as transcribed. `close --acted` says
+  the answer was acted on, closes a question issue with its last open
+  question, and removes the assignment only when asking added it. `list`
+  reads markers, never authors, so it works when agent and human share one
+  account. prime lists open questions, start-issue owns the procedure, and
+  yolo posts its stopping question before the run ends (#117).
+- The loop works from inside a linked git worktree, one issue per folder.
+  When another folder holds `main`, `start` and `quickfix start` branch
+  from `origin/main` and `sync-main` parks the folder detached on
+  `origin/main` (`parked=true`). Any command that would check out, rename,
+  or delete a branch another folder holds halts with
+  `state=BRANCH_IN_WORKTREE` naming the folder, including a folder stopped
+  mid-rebase or mid-bisect. `state` prints `worktrees=` and one
+  `in_flight=` line per issue or quickfix branch, and `doctor` reports
+  `finding=WORKTREE_FOLDER_GONE`. A single ordinary checkout behaves as
+  before (#115).
+- `Worktree setup: <command>` in `AGENTS.md`: `gnadd start` runs it once in
+  each fresh linked worktree after checkout, prints its output prefixed
+  `  | `, and prints `setup=ran`. A failure halts with
+  `state=SETUP_FAILED` and names the `start` to rerun. The primary checkout
+  is never set up. `gnadd conventions --setup <command>|none` writes or
+  removes the line, and `init-gnadd` offers it (#116).
+- `state` prints `idle_folder=<path>` for each other linked worktree folder
+  that holds no work (parked, clean, not mid-rebase or mid-bisect), and
+  prime names each one with the command that removes it. GNADD removes
+  nothing (#124).
+- A rescued branch has three scripted exits. `doctor --rescue-main` now
+  recommends a `quickfix/<slug>` name and prints them: land it with
+  `quickfix ship`, rename it into an issue branch with `start <N> <slug>
+  --from <branch>`, or discard it with the new `gnadd drop <branch>`, which
+  lists the commits origin lacks and deletes only with `--yes` (#101).
+- `gnadd push`: the railed checkpoint push (sets upstream on first push,
+  never forces). `ship push` shares it. `state` prints `upstream=` and
+  `ahead_of_upstream=` on any branch, and `start <N>` resumes an
+  `issue-<N>/*` branch that exists only on origin (#97).
+- `gnadd trace note <text>` records a step taken outside the script.
+  `yolo-gnadd` notes each gh call it makes, and maps every auto-approved
+  gate to its sibling skill's step (#100).
+- `ship status` prints `checks=pass|pending|failed|not_started|none`, with
+  `not_started` when a workflow file exists and nothing has reported (#95).
+- `test/run.sh <name-or-glob>` runs only the matching cases and the summary
+  says how many ran. A filter that matches nothing exits 2. The full run
+  ends with a `lint` case that runs `scripts/lint.sh`, the one lint
+  definition CI now runs too. A missing shellcheck prints a skip line, never
+  a pass (#122).
+- `test/TESTBED.md`: the procedure for running the whole loop end to end on
+  a throwaway repo. `AGENTS.md` points at it (#105).
 
 ### Changed
 
+- The docs and skills no longer make reading the diff the required human
+  step before merge. The human owns the merge call and checks that the PR
+  does what was meant, by whatever review they choose: the criteria table,
+  the test plan, CI, the preview, an agent review they ask for, or the diff.
+  The PR body's checkbox now reads "A human checked the PR against the goal
+  before merge". The merge confirmation gate itself is unchanged (#127).
 - `init` and `conventions` end with an `uncommitted=` line naming init's
-  files not yet on main; `ruleset=failed` now prints gh's first error line
+  files not yet committed. `ruleset=failed` now prints gh's first error line
   as `ruleset_error=`, and the skill covers the private free-plan case. The
   preview lookup also greps README.md (#98).
+- `ship merge` refuses unless every check GitHub reports passed or was
+  skipped: `CHECKS_PENDING`, `NO_CHECKS`, or `CHECK_FAILED` naming the
+  check. `--no-check` overrides, matching quickfix (#95).
+- `round post` pushes the branch before it comments, so every round cites
+  a commit GitHub holds. A moved remote halts with `state=PUSH_FAILED`. A
+  repo with no remote reports `pushed=false` and still posts (#97).
+- `quickfix guard` leaves a newly added `VISION.md` out of the line budget
+  and says so (`exempt=VISION.md`). A modified one still counts.
+  `quickfix-gnadd` names `GNADD_QF_MAX_FILES` and `GNADD_QF_MAX_LINES`
+  beside the check override, and the PR footer states any override used.
+  `release.sh` now also repins vision-gnadd's GNADD.md URL (#99).
+- Testbed frictions from the v0.5.0 run: `state` prints `dirty_files=` and
+  lists them, divergence lists print only when non-empty, and `phase close`
+  takes its title from the one open milestone. Seven skills (prime,
+  new-issue, start-issue, commit, resolve-issue, audit, help) each gained
+  the sentence the testbed agent was missing (#102).
+- `test/run.sh` asserts gh calls through `expect_gh_called` and
+  `expect_gh_not_called` over a stub log every test creates, so a missing
+  log fails instead of passing (#108).
+- Every em dash is gone from `bin/gnadd`, `scripts/`, and `test/run.sh`,
+  including the heading `release.sh` drafts. `mechanics_have_no_em_dash`
+  keeps them out (#91).
+
+### Fixed
+
+- `cleanup <pr> <branch>` refuses to delete a branch the merged PR did not
+  land: `BRANCH_MISMATCH` when the branch is not the PR's head (or GitHub
+  returns none), `UNMERGED_COMMITS` when the local tip is past the merged
+  head (#94).
+- `new-issue-gnadd` ran `phase status` from its own folder, which has no
+  script copy, so it failed on every install route. It now runs prime's
+  copy, and `skill_self_refs_have_a_copy` catches the pattern (#90).
+- A git refusal at the resume checkout, or at the branch delete in
+  `cleanup` or `drop`, now halts with `state=CHECKOUT_REFUSED` or
+  `state=DELETE_REFUSED` and git's message. It used to exit 1, and cleanup
+  printed nothing (#115).
 
 ## [0.5.0] - 2026-09-06
 
@@ -152,6 +245,7 @@ no published tags; this entry summarizes the project as first released.
   `help-gnadd`; `gnadd-audit` became `audit-gnadd`).
 - Author-local sync installs to both Cursor and Claude Code by default.
 
-[Unreleased]: https://github.com/AlexHagemeister/gnadd/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AlexHagemeister/gnadd/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AlexHagemeister/gnadd/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AlexHagemeister/gnadd/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AlexHagemeister/gnadd/releases/tag/v0.3.0

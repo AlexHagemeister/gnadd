@@ -34,7 +34,7 @@ Working with a coding agent tends to produce three kinds of mess. GNADD is built
 
 3. **Improvised git.** An agent that runs raw git commands will eventually reset the wrong branch or force-push over a commit. In GNADD every git sequence runs through one script that halts and asks whenever a decision could lose work. The sanctioned way out of a bad state is a diagnosis command, never a clever fix.
 
-The one thing no layer can catch: merging without reading the diff. That part stays yours.
+The one thing no layer can catch: merging a PR that does not do what you meant. That call stays yours.
 
 ## Where it sits among git workflows
 
@@ -71,7 +71,7 @@ Two other common models, for contrast:
 | Model | Long-lived branches | How change lands | Where GNADD differs |
 |---|---|---|---|
 | [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/) (Driessen, 2010) | `master` and `develop`, plus release and hotfix branches | Merge commits with `--no-ff`, so every branch's history stays in the graph | One branch, no release or hotfix branches, and the history of a feature lives in the PR rather than in the graph |
-| [Trunk-based development](https://trunkbaseddevelopment.com/) | One trunk | Commits straight to trunk, or branches that live a day or less, with feature flags for longer work | Same short-lived branches, but every change passes through a PR that a human reads before it lands |
+| [Trunk-based development](https://trunkbaseddevelopment.com/) | One trunk | Commits straight to trunk, or branches that live a day or less, with feature flags for longer work | Same short-lived branches, but every change passes through a PR that a human checks and merges |
 
 ## What a session looks like
 
@@ -82,7 +82,7 @@ Two other common models, for contrast:
 1. `/start-issue-gnadd <N>` branches off `main`, loads the issue as the working spec, and proposes a plan. You say go.
 2. The work runs in rounds. The agent builds a slice, checkpoints it with `/commit-gnadd`, and hands you a running preview to try. You try it and say what you think. That drives the next slice. Each checkpoint posts a comment on the issue with what changed and your feedback, so a branch that spans sessions picks up where it left off.
 3. When the work is done, `/resolve-issue-gnadd` checks the diff against the issue's acceptance criteria, runs the project's tests, opens the PR, and gives you the link.
-4. You read the diff. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
+4. You check the PR against what you asked for: the criteria table, the test plan, and CI. The diff is there to read when you want it, and you can ask an agent or a review tool to review the PR first. GNADD does not run that review for you. How you check is your call. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
 
 ```mermaid
 flowchart LR
@@ -93,14 +93,30 @@ flowchart LR
     T -->|feedback| R
   end
   B --> R
-  T -->|done| PR[PR: criteria, tests]
-  PR --> D[human reads the diff]
+  T -->|done| PR[PR: criteria, tests, CI]
+  PR --> D[human checks the PR against the goal]
   D --> M[one squash commit on main]
 ```
 
-Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your diff read. You invoke it on purpose or not at all.
+Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your check on the PR. You invoke it on purpose or not at all.
 
 **When a skill stops with a warning, that is the system working.** Read what it says and pick from the options it offers. The guide's Part 3 covers the few states you can land in and the one safe path out of each.
+
+## The lifecycle, from intent to merge
+
+The session above is one turn of a longer cycle. Each layer lives in one place, and none of them is a file the agent has to keep current.
+
+1. **Intent: `VISION.md`.** One file at the repo root, in three sections. **Core** is what is true no matter what gets built: the experience at the center, numbered invariants with their reasons, non-goals, and the constraints reality imposes. **Possibility space** is everything else from the brain dump, and none of it is a commitment. A thread from it becomes work only when someone pulls it into an issue. **Open tensions** are the places where possibilities fight or the answer is not known yet, named so an agent stops there instead of picking a side. The file holds no status, order, or plan. When an implementation choice fights an invariant, the agent stops and says so rather than working around it. The guide's Part 1, "The intent document", has the full shape.
+2. **Phase: one open GitHub milestone.** Its description says what this stretch of work is trying to find out and what ends it. There are no due dates. A phase ends when you close it with a verdict, and the next one opens after. `/prime-gnadd` reports it, `/new-issue-gnadd` defaults new issues into it, and `/resolve-issue-gnadd` asks whether the phase is done once its issues run out. Phases are opt-in: a project with no milestones works the same.
+3. **Issues: the spec.** Each issue describes behavior, with acceptance criteria written as behavior rather than implementation, and can cite the invariant it serves. A branch exists only because an issue does.
+4. **Rounds on the branch: build, try, feedback.** The agent builds a slice and checkpoints it. Each checkpoint pushes the branch and posts a round comment on the issue with what changed and your feedback as you gave it. You try the running preview, and what you say drives the next round. The issue body is never edited mid-work.
+5. **Verification.** `/resolve-issue-gnadd` checks the diff against every acceptance criterion and reports each one as met, not met, or descoped. It runs the project's tests and writes the PR body: what was done, the decisions and divergences, and the test plan.
+6. **The CI-gated merge.** The script's `ship merge` squash-merges only when the PR is open, mergeable, and every check GitHub reports has passed. Checks still running halt with `CHECKS_PENDING`, a red check halts with `CHECK_FAILED`, and a repo with no CI at all halts with `NO_CHECKS`. Getting past any of them takes `--no-check`, which only you can ask for. The agent never adds it. `/quickfix-gnadd` gates its PR on one named check instead. After the merge, the branch is deleted, local `main` fast-forwards, and the issue closes with its record synced.
+
+Two pieces sit alongside the cycle:
+
+- **Questions on the record.** A question the agent cannot settle itself goes on the issue or PR it is about, as a comment with the options and a recommendation, and that item is assigned to the person who owns the call (`gnadd question ask`). `/prime-gnadd` lists open questions, answered ones first, so a new session knows what was decided without being told. See the guide's Part 2, "Questions on the record".
+- **Worktrees.** Every loop command works inside a linked git worktree, so several issues can be in flight at once, one folder each, if you open your sessions that way. GNADD never creates or removes a folder. The conventions file can name a `Worktree setup:` command that `start` runs once in a fresh folder. See the guide's Part 5, "The loop works inside worktrees before it creates them".
 
 ## The skills
 
@@ -117,6 +133,8 @@ Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | Verifies the work against the criteria, runs tests, opens the PR, waits for your merge decision, cleans up |
 | `quickfix-gnadd` | `/quickfix-gnadd` | One trivial change through a CI-gated PR, no issue. Refuses large or mechanics-touching diffs |
 | `yolo-gnadd` | `/yolo-gnadd <N or description>` | Runs one decided issue or quickfix through the full loop autonomously, with a review pass and a trace-backed report |
+
+Every skill except `yolo-gnadd` can also be picked up by the agent when what you ask matches it, and most of them ask before acting when they are. `yolo-gnadd` runs only when you invoke it by name.
 
 ## Quickstart
 
@@ -206,7 +224,7 @@ If you make a change you think belongs upstream, [CONTRIBUTING.md](CONTRIBUTING.
 
 **Versioning.** Releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Before 1.0, a minor version may rename a skill or change its behavior, so read the release notes before updating. To be told about releases: **Watch, then Custom, then Releases** on the repo.
 
-**Distribution channel.** `main` is the channel for every route. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
+**Distribution channel.** `main` is the channel for every route. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human saying merge. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
 
 ## Per-project setup
 
@@ -226,16 +244,23 @@ The rails make GitHub itself enforce the core rules: squash-only merges with the
 | `skills/<name>/SKILL.md` | The skills: judgment and conversation around the script |
 | `skills/<name>/gnadd.sh` | Generated copies of `bin/gnadd`. Never edit these |
 | `scripts/build.sh` | Copies `bin/gnadd` into the operational skills |
+| `scripts/lint.sh` | The one shellcheck definition. CI runs it, and so does the full test run |
+| `scripts/sync.sh` | Rebuilds the copies and installs the skills from a local checkout |
 | `test/run.sh` | Test suite (bash and git only, `gh` is stubbed) |
+| `test/stub/gh` | The fake `gh` the suite runs against |
+| `test/TESTBED.md` | Procedure for an agent to run the whole loop end to end on a throwaway GitHub repo |
 | `scripts/release.sh` | Stamps the version and repins guide URLs to the release tag |
 | `.claude-plugin/` | Plugin and marketplace manifests that make the repo installable through the Claude Code plugin manager |
 | `GNADD.md` | The workflow guide and design rationale |
+| `CHANGELOG.md` | What changed in each release |
 
 ## Authoring (repo maintainers)
 
 - Skill behavior: edit `skills/<name>/SKILL.md`.
 - Git mechanics: edit `bin/gnadd`, then run `./scripts/build.sh`. `test/run.sh` fails if the copies drift.
 - Always run `bash test/run.sh` before committing. Every safety guarantee is a test.
+- Run one case with `bash test/run.sh <name>`, or a set with a quoted glob (`bash test/run.sh 'question_*'`).
+- Install `shellcheck`. Without it the full run prints `lint SKIPPED`, which is not a pass: a lint error that run never saw still fails CI.
 
 Refresh your local install after changes:
 
@@ -245,4 +270,4 @@ Refresh your local install after changes:
 
 It installs to Cursor and Claude Code by default. Override the agent list with a space-separated `AGENTS` variable ([supported agents](https://github.com/vercel-labs/skills#supported-agents)): `AGENTS="cursor" ./scripts/sync.sh`.
 
-Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd` and `audit-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y` (or the project scope if that is how they installed), or with `claude plugin update gnadd@gnadd` for plugin installs.
+Releases: `./scripts/release.sh vX.Y.Z`, then follow its printed steps. It stamps the version, repins the canonical-guide URLs in `help-gnadd`, `audit-gnadd`, and `vision-gnadd` to the tag, and reruns the tests. After the push, consumers refresh with `npx skills update -g -y` (or the project scope if that is how they installed), or with `claude plugin marketplace update gnadd` and then `claude plugin update gnadd@gnadd` for plugin installs.
