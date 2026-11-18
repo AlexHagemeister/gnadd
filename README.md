@@ -34,7 +34,7 @@ Working with a coding agent tends to produce three kinds of mess. GNADD is built
 
 3. **Improvised git.** An agent that runs raw git commands will eventually reset the wrong branch or force-push over a commit. In GNADD every git sequence runs through one script that halts and asks whenever a decision could lose work. The sanctioned way out of a bad state is a diagnosis command, never a clever fix.
 
-The one thing no layer can catch: merging without reading the diff. That part stays yours.
+The one thing no layer can catch: merging a PR that does not do what you meant. That call stays yours.
 
 ## Where it sits among git workflows
 
@@ -82,7 +82,7 @@ Two other common models, for contrast:
 1. `/start-issue-gnadd <N>` branches off `main`, loads the issue as the working spec, and proposes a plan. You say go.
 2. The work runs in rounds. The agent builds a slice, checkpoints it with `/commit-gnadd`, and hands you a running preview to try. You try it and say what you think. That drives the next slice. Each checkpoint posts a comment on the issue with what changed and your feedback, so a branch that spans sessions picks up where it left off.
 3. When the work is done, `/resolve-issue-gnadd` checks the diff against the issue's acceptance criteria, runs the project's tests, opens the PR, and gives you the link.
-4. You read the diff. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
+4. You check the PR against what you asked for: the criteria table, the test plan, and CI. The diff is there to read when you want it. Then you say merge. The PR body becomes the commit on `main`, the branch is deleted, and the issue closes.
 
 ```mermaid
 flowchart LR
@@ -94,11 +94,11 @@ flowchart LR
   end
   B --> R
   T -->|done| PR[PR: criteria, tests, CI]
-  PR --> D[human reads the diff]
+  PR --> D[human checks the PR against the goal]
   D --> M[one squash commit on main]
 ```
 
-Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your diff read. You invoke it on purpose or not at all.
+Two shortcuts sit beside the loop. `/quickfix-gnadd` lands one trivial change (a typo, a one-line doc fix) through a PR with no issue. `/yolo-gnadd` runs one already-decided issue through the whole loop without stopping at the mid-loop gates, with an independent review pass in place of your check on the PR. You invoke it on purpose or not at all.
 
 **When a skill stops with a warning, that is the system working.** Read what it says and pick from the options it offers. The guide's Part 3 covers the few states you can land in and the one safe path out of each.
 
@@ -222,7 +222,7 @@ If you make a change you think belongs upstream, [CONTRIBUTING.md](CONTRIBUTING.
 
 **Versioning.** Releases follow [semver](https://semver.org/) and are listed on the [releases page](https://github.com/AlexHagemeister/gnadd/releases) with a [changelog](CHANGELOG.md). Before 1.0, a minor version may rename a skill or change its behavior, so read the release notes before updating. To be told about releases: **Watch, then Custom, then Releases** on the repo.
 
-**Distribution channel.** `main` is the channel for every route. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human reading the diff. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
+**Distribution channel.** `main` is the channel for every route. The skills CLI installs from the default branch and cannot pin a tag, and the plugin marketplace entry points at `main` on purpose, so every install and update pulls the latest `main`. The workflow keeps `main` always releasable: nothing lands without a PR, green CI, and a human saying merge. Tags mark the tested snapshots and document what changed between updates. For that reason `gnadd version` reports a release baseline: the installed copy is that release plus whatever merged since, and it says so.
 
 ## Per-project setup
 
