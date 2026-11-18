@@ -375,6 +375,20 @@ lists open questions with the answered ones first, read from the record, so
 nobody has to tell a session what was answered. A `yolo-gnadd` run that
 stops on a question leaves it there before it ends.
 
+Only people the repo trusts can ask or answer on the record: the repo's
+owner, members of the organization that owns it, and its collaborators
+(GitHub's `author_association` of OWNER, MEMBER, or COLLABORATOR). Any of
+them can answer any question, not only the person it is for. When the agent
+and the person post through one account, that account is the owner or a
+collaborator, so nothing changes. A bot's comment never counts, as before.
+A comment from any other account still shows on the thread, and nothing
+edits or deletes it, but it does not count: a question marker from an
+outside account opens no question, and an outside reply answers nothing.
+`gnadd question list` names each outside comment that would otherwise have
+counted, with the item and the login, so the person can see it and decide
+what to do. The note on an outside reply goes once the questions it would
+have answered are closed.
+
 ---
 
 ## Part 3: Rules of the Road
@@ -907,6 +921,30 @@ reply to quote or name the question. Revisit `list`'s index if questions
 turn up on items whose assignment someone removed by hand, and revisit
 closing a question issue if a closed question needs reopening more than
 once.
+
+### Only trusted authors count on the question record (2026-11, #131)
+
+**Decision:** a question marker, an answer (marked or a plain reply), and a
+closing comment count only when GitHub reports the comment's
+`author_association` as OWNER, MEMBER, or COLLABORATOR. Any trusted author
+can answer any question. A comment from anyone else is left on the thread
+untouched and does not count, and `question list` names it with the item
+and the login. A comment with no `author_association` counts as outside.
+There is no setting.
+
+**Why:** markers alone let anyone who can comment on an assigned item plant
+an open question, or answer every waiting one with a plain reply. Authors
+still do not tell the agent from the person (they often share an account),
+so the check is trust, not identity. Limiting answers to the person named in
+`--to` was weighed and not taken: on a team repo another maintainer often
+gives the call, and the shared-account case could not tell them apart
+anyway. GitHub always sends the field, so failing closed costs nothing on
+real data.
+
+**Hypothesis, and what would revise it:** MEMBER means a member of the
+owning organization, which is not always write access. If an organization
+member without write access misuses the record, narrow the trusted set or
+check permissions directly.
 
 ### The loop works inside worktrees before it creates them (2026-11, #115)
 

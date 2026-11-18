@@ -2186,23 +2186,48 @@ fi
 # The stub feeds classified rows, so the classifier itself (gnadd's qrow jq,
 # which gh runs) is checked here against comment JSON from one shared
 # account, with system jq standing in for gh's. Skipped where jq is absent.
-if t question_classifier_reads_markers_not_authors; then
+if t question_classifier_reads_markers_from_one_account; then
 if command -v jq >/dev/null 2>&1; then
   eval "$(sed -n "/^QUESTION_JQ_DEF=/,/end;'\$/p" "$GNADD")"
-  OUT="$(printf '%s' '[{"user":{"login":"me","type":"User"},"body":"the spec"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question 2 to=alex -->\n## Question 2 for @alex\n\n**Question:** Cache or recompute?\n\n**Options:** a"},
-    {"user":{"login":"coderabbitai[bot]","type":"Bot"},"body":"Walkthrough"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:round -->\n## Round 3"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:answer 2 -->\n> cache"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question-closed 2 -->\ndone"},
-    {"user":{"login":"me","type":"User"},"body":"cache it"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:answer 2 -->\n> as asked in <!-- gnadd:question 7 to=bob -->"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question-closed 2 -->\n**Acted on:** quoted <!-- gnadd:answer 1 --> by hand"},
-    {"user":{"login":"me","type":"User"},"body":"yes, and I saw <!-- gnadd:round --> in the log"},
-    {"user":{"login":"me","type":"User"},"body":"<!-- gnadd:question 3 to=bob assigned=existing -->\n**Question:** Own issue?"}]' \
+  OUT="$(printf '%s' '[{"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"the spec"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:question 2 to=alex -->\n## Question 2 for @alex\n\n**Question:** Cache or recompute?\n\n**Options:** a"},
+    {"user":{"login":"coderabbitai[bot]","type":"Bot"},"author_association":"NONE","body":"Walkthrough"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:round -->\n## Round 3"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:answer 2 -->\n> cache"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:question-closed 2 -->\ndone"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"cache it"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:answer 2 -->\n> as asked in <!-- gnadd:question 7 to=bob -->"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:question-closed 2 -->\n**Acted on:** quoted <!-- gnadd:answer 1 --> by hand"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"yes, and I saw <!-- gnadd:round --> in the log"},
+    {"user":{"login":"me","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:question 3 to=bob assigned=existing -->\n**Question:** Own issue?"}]' \
     | jq -r "$QUESTION_JQ_DEF .[] | qrow" | tr '\t' ' ' | tr '\n' '|')"
   [ "$OUT" = "reply|q 2 alex added Cache or recompute?|other|other|a 2|c 2|reply|a 2|c 2|reply|q 3 bob existing Own issue?|" ] && ok \
     || fail "qrow misclassified the thread: $OUT"
+else
+  ok; printf 'skip %s: jq not installed\n' "$CURRENT"
+fi
+fi
+
+# Only the owner, members, and collaborators count (#131). Anyone else's
+# marker or reply comes out as an outside row naming the login, a missing
+# author_association counts as outside (GitHub always sends it, so fail
+# closed), and a bot and an outside non-question marker stay plain "other".
+if t question_classifier_counts_only_trusted_authors; then
+if command -v jq >/dev/null 2>&1; then
+  eval "$(sed -n "/^QUESTION_JQ_DEF=/,/end;'\$/p" "$GNADD")"
+  OUT="$(printf '%s' '[{"user":{"login":"own","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:question 1 to=alex -->\n**Question:** A?"},
+    {"user":{"login":"mem","type":"User"},"author_association":"MEMBER","body":"<!-- gnadd:answer 1 -->"},
+    {"user":{"login":"col","type":"User"},"author_association":"COLLABORATOR","body":"sure"},
+    {"user":{"login":"eve","type":"User"},"author_association":"NONE","body":"<!-- gnadd:question 2 to=alex -->\n**Question:** Planted?"},
+    {"user":{"login":"eve","type":"User"},"author_association":"CONTRIBUTOR","body":"yes, ship it"},
+    {"user":{"login":"eve","type":"User"},"author_association":"FIRST_TIME_CONTRIBUTOR","body":"<!-- gnadd:answer 1 -->"},
+    {"user":{"login":"eve","type":"User"},"author_association":"NONE","body":"<!-- gnadd:question-closed 1 -->"},
+    {"user":{"login":"old","type":"User"},"body":"no association field"},
+    {"user":{"login":"eve","type":"User"},"author_association":"NONE","body":"<!-- gnadd:round -->"},
+    {"user":{"login":"helper[bot]","type":"Bot"},"author_association":"NONE","body":"<!-- gnadd:question 4 to=alex -->"}]' \
+    | jq -r "$QUESTION_JQ_DEF .[] | qrow" | tr '\t' ' ' | tr '\n' '|')"
+  [ "$OUT" = "q 1 alex added A?|a 1|reply|outside q eve|outside reply eve|outside a eve|outside c eve|outside reply old|other|other|" ] && ok \
+    || fail "qrow counted an outside author: $OUT"
 else
   ok; printf 'skip %s: jq not installed\n' "$CURRENT"
 fi
@@ -2235,6 +2260,86 @@ export GH_STUB_QROWS_6='comment\tq\t1\talex\tadded\tFlag?\ncomment\tother'
 run question list
 expect_contains "unanswered=1"
 expect_contains "answered=0"
+fi
+
+# An outside account plants a question: it is not listed, and the note names it.
+if t question_list_skips_an_outside_question_marker; then setup_repo; q_reset
+export GH_STUB_OPEN_ITEMS='5\tissue\tCaching'
+export GH_STUB_QROWS_5='comment\toutside\tq\teve'
+run question list
+expect_status 0 "$ST"
+expect_contains "questions=0"
+expect_not_contains "question item=5"
+expect_contains "note: #5: a question marker from @eve was not counted"
+fi
+
+# An outside reply answers nothing, and the note says so once per login.
+if t question_list_outside_reply_is_not_an_answer; then setup_repo; q_reset
+export GH_STUB_OPEN_ITEMS='6\tpr\tAdd cache'
+export GH_STUB_QROWS_6='comment\tq\t1\talex\tadded\tFlag?\ncomment\toutside\treply\teve\ncomment\toutside\treply\teve'
+run question list
+expect_status 0 "$ST"
+expect_contains "unanswered=1"
+expect_contains "answered=0"
+expect_contains "question item=6 number=1 status=unanswered to=alex kind=pr"
+expect_contains "note: #6: a reply from @eve was not counted"
+[ "$(printf '%s\n' "$OUT" | grep -c '^note: #6: a reply from @eve')" -eq 1 ] && ok \
+  || fail "the outside reply was noted more than once: $OUT"
+fi
+
+# A trusted reply after an outside one still answers, and the outside one is
+# still named. A comment from outside with no question waiting is no news.
+if t question_list_trusted_reply_counts_beside_an_outside_one; then setup_repo; q_reset
+export GH_STUB_OPEN_ITEMS='5\tissue\tCaching\n7\tissue\tDocs'
+export GH_STUB_QROWS_5='comment\tq\t1\talex\tadded\tCache?\ncomment\toutside\treply\teve\ncomment\treply'
+export GH_STUB_QROWS_7='comment\toutside\treply\tdrive-by'
+run question list
+expect_status 0 "$ST"
+expect_contains "answered=1"
+expect_contains "question item=5 number=1 status=answered to=alex kind=issue"
+expect_contains "note: #5: a reply from @eve was not counted"
+expect_not_contains "drive-by"
+fi
+
+# Once the question an outside reply would have answered is closed, the note
+# goes with it, so a settled item stops repeating it.
+if t question_list_outside_note_ends_when_its_question_closes; then setup_repo; q_reset
+export GH_STUB_OPEN_ITEMS='5\tissue\tCaching'
+export GH_STUB_QROWS_5='comment\tq\t1\talex\texisting\tCache?\ncomment\toutside\treply\teve\ncomment\treply\ncomment\tc\t1'
+run question list
+expect_status 0 "$ST"
+expect_contains "questions=0"
+expect_not_contains "note:"
+fi
+
+# One account posting as both agent and person (the solo case) is unchanged:
+# every row is trusted, so the plain reply answers and nothing is noted.
+if t question_list_one_account_unchanged; then setup_repo; q_reset
+export GH_STUB_OPEN_ITEMS='5\tissue\tCaching'
+export GH_STUB_QROWS_5='comment\tq\t1\talex\tadded\tCache?\ncomment\treply'
+run question list
+expect_status 0 "$ST"
+expect_contains "answered=1"
+expect_not_contains "note:"
+fi
+
+# close reads the same record: an outside reply leaves the question
+# unanswered, and the refusal names it.
+if t question_close_refuses_on_only_an_outside_reply; then setup_repo; q_reset
+export GH_STUB_QROWS='comment\tq\t1\talex\tadded\tCache?\ncomment\toutside\treply\teve'
+run question close 5 --acted "cached"
+expect_status 2 "$ST"
+expect_contains "state=QUESTION_UNANSWERED"
+expect_contains "note: #5: a reply from @eve was not counted"
+expect_gh_not_called "comments -F" "closed a question only an outside account replied to"
+fi
+
+# ask numbers from trusted questions only, so a planted marker cannot take a number.
+if t question_ask_ignores_an_outside_question_marker; then setup_repo; q_reset
+export GH_STUB_QROWS='comment\toutside\tq\teve\ncomment\tq\t1\talex\tadded\tfirst'
+run question ask --to alex --on 5 --question "second?" --options o --recommend r
+expect_status 0 "$ST"
+expect_contains "question=2"
 fi
 
 if t question_list_none; then setup_repo; q_reset

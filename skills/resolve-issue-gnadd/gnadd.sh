@@ -1587,29 +1587,39 @@ cmd_round_list() {
 # ---------------------------------------------------------------- question
 #
 # A question for a person lives on the issue or PR it is about, as one marked
-# comment, and the item is assigned to that person. Markers, never authors,
-# tell the agent's comments from a person's reply, so this works when both
-# post through one GitHub account. A marker counts only as a comment's whole
-# first line, where the script writes it, so quoting one changes nothing. A
-# later comment with no marker (and not from a bot) answers every question
-# still waiting. The question marker records whether asking added the
-# assignment (assigned=added) or found it there (assigned=existing), so close
-# removes only what asking added. The first open question to a person on an
-# item decides that, and each later one copies it, so every open question to
-# one person carries the same answer and the close order cannot matter.
-# Append only: answers and closings are new comments. Questions are numbered
-# per item from the record, the same way rounds are.
+# comment, and the item is assigned to that person. Markers tell the agent's
+# comments from a person's reply, so this works when both post through one
+# GitHub account. A marker counts only as a comment's whole first line, where
+# the script writes it, so quoting one changes nothing. A later comment with
+# no marker answers every question still waiting. Authors decide only whether
+# a comment counts at all: a bot's never does, and neither does one whose
+# author_association is not OWNER, MEMBER, or COLLABORATOR (a missing field
+# counts as outside, since GitHub always sends it). Otherwise anyone who can
+# comment could plant a question or answer one (#131). An outside comment
+# stays on the thread untouched, and list names it as not counted. The
+# question marker records whether asking added the assignment
+# (assigned=added) or found it there (assigned=existing), so close removes
+# only what asking added. The first open question to a person on an item
+# decides that, and each later one copies it, so every open question to one
+# person carries the same answer and the close order cannot matter. Append
+# only: answers and closings are new comments. Questions are numbered per
+# item from the record, the same way rounds are.
 
 QUESTION_JQ_DEF='def qrow: (.body // "") as $b
   | (($b | split("\n") | .[0]) // "" | rtrimstr("\r")) as $l
+  | (.author_association // "") as $as
+  | ($as == "OWNER" or $as == "MEMBER" or $as == "COLLABORATOR") as $trusted
   | if ((.user.type // "") == "Bot") then "other"
-    elif ($l | test("^<!-- gnadd:question [0-9]+ to=[^ ]+( assigned=[a-z]+)? -->$")) then
+    else (if ($l | test("^<!-- gnadd:question [0-9]+ to=[^ ]+( assigned=[a-z]+)? -->$")) then
       ($l | capture("^<!-- gnadd:question (?<k>[0-9]+) to=(?<to>[^ ]+)( assigned=(?<a>[a-z]+))? -->$")) as $m
       | "q\t\($m.k)\t\($m.to)\t\($m.a // "added")\t" + (((($b | split("\n") | map(select(startswith("**Question:** "))) | first) // "")) | ltrimstr("**Question:** "))
     elif ($l | test("^<!-- gnadd:answer [0-9]+ -->$")) then "a\t" + ($l | capture("^<!-- gnadd:answer (?<k>[0-9]+) -->$").k)
     elif ($l | test("^<!-- gnadd:question-closed [0-9]+ -->$")) then "c\t" + ($l | capture("^<!-- gnadd:question-closed (?<k>[0-9]+) -->$").k)
     elif ($l | startswith("<!-- gnadd:")) then "other"
-    else "reply" end;'
+    else "reply" end) as $r
+    | if $trusted or $r == "other" then $r
+      else "outside\t" + ($r | split("\t") | .[0]) + "\t" + ((.user.login // "") | if . == "" then "unknown" else . end) end
+    end;'
 
 question_rows() { # question_rows <item>: tab rows "source kind ...", body first, then comments in order
   "$GH" api "repos/{owner}/{repo}/issues/$1" --jq "$QUESTION_JQ_DEF \"body\t\" + qrow" \
@@ -1617,18 +1627,39 @@ question_rows() { # question_rows <item>: tab rows "source kind ...", body first
 }
 
 question_status() { # stdin: question_rows; stdout per question: number, status, login, source, assigned, text
+  # An outside row never touches a question. It prints as "outside login
+  # kind source" when it would have counted: always for a marker (it names no
+  # question to tie it to), and for a reply only when a question waiting at
+  # that point is still open at the end, so the note goes once that closes.
   awk -F'\t' '
+    $2=="outside" { m++; ol[m]=$4; ok[m]=$3; os[m]=$1; ow[m]=""
+                    if ($3=="reply") for (i=1; i<=n; i++) if (st[order[i]]=="unanswered") ow[m]=ow[m] " " order[i]
+                    next }
     $2=="q" { k=$3; if (!(k in st)) order[++n]=k; st[k]="unanswered"; to[k]=$4; src[k]=$1; asg[k]=$5; tx[k]=$6; next }
     $2=="a" { if (($3 in st) && st[$3]=="unanswered") st[$3]="answered"; next }
     $2=="reply" { for (i=1; i<=n; i++) if (st[order[i]]=="unanswered") st[order[i]]="answered"; next }
     $2=="c" { if ($3 in st) st[$3]="closed"; next }
-    END { for (i=1; i<=n; i++) { k=order[i]; printf "%s\t%s\t%s\t%s\t%s\t%s\n", k, st[k], to[k], src[k], asg[k], tx[k] } }'
+    END { for (i=1; i<=n; i++) { k=order[i]; printf "%s\t%s\t%s\t%s\t%s\t%s\n", k, st[k], to[k], src[k], asg[k], tx[k] }
+          for (j=1; j<=m; j++) { w=(ok[j]!="reply"); c=split(ow[j], ks, " ")
+            for (i=1; i<=c && !w; i++) if (st[ks[i]]!="closed") w=1
+            if (w) printf "outside\t%s\t%s\t%s\n", ol[j], ok[j], os[j] } }'
 }
 
-question_load() { # question_load <item>: sets QSTATUS (question_status output) or halts
-  local rows
+question_load() { # question_load <item>: sets QSTATUS (question_status output) and QOUTSIDE, or halts
+  # QOUTSIDE holds the outside rows apart, so every reader of QSTATUS can keep
+  # parsing it by position. awk splits them: grep exits 1 on no match.
+  local rows out
   rows="$(question_rows "$1")" || die_state QUESTION_READ_FAILED "could not read the comments on #$1 (network? auth? no such issue or PR?)"
-  QSTATUS="$(printf '%s\n' "$rows" | question_status)"
+  out="$(printf '%s\n' "$rows" | question_status)"
+  QSTATUS="$(printf '%s\n' "$out" | awk -F'\t' '$1!="outside"')"
+  QOUTSIDE="$(printf '%s\n' "$out" | awk -F'\t' '$1=="outside"')"
+}
+
+question_outside_notes() { # question_outside_notes <item>: one note per outside login and kind in QOUTSIDE
+  printf '%s\n' "$QOUTSIDE" | awk -F'\t' -v item="$1" '
+    $1=="outside" && !seen[$2 FS $3]++ {
+      what = ($3=="q") ? "a question marker" : ($3=="a") ? "an answer marker" : ($3=="c") ? "a closing marker" : "a reply"
+      printf "note: #%s: %s from @%s was not counted (an outside account: not the owner, a member, or a collaborator)\n", item, what, $2 }'
 }
 
 question_pick() { # question_pick <item> [<number>]: sets QK, QSTATE, QTO, QASG from QSTATUS; open questions only
@@ -1793,7 +1824,11 @@ cmd_question_close() {
   [ -n "$acted" ] || usage_die "question close needs --acted <text>: what was done with the answer"
   question_load "$item"
   question_pick "$item" "$num"
-  [ "$QSTATE" = "answered" ] || die_state QUESTION_UNANSWERED "question $QK on #$item has no answer on the record yet; record a chat answer first (question answer), or wait for one"
+  if [ "$QSTATE" != "answered" ]; then
+    # An outside reply is no answer: name it when it is why close refuses.
+    question_outside_notes "$item"
+    die_state QUESTION_UNANSWERED "question $QK on #$item has no answer on the record yet; record a chat answer first (question answer), or wait for one"
+  fi
   local body; body="$(mktemp)"
   {
     printf '<!-- gnadd:question-closed %s -->\n' "$QK"
@@ -1835,15 +1870,18 @@ cmd_question_close() {
 
 cmd_question_list() {
   # Assignment is the index (every question's item is assigned), the markers
-  # are the truth: only assigned or question-labeled open items are read.
+  # from trusted authors are the truth: only assigned or question-labeled
+  # open items are read.
   local items
   items="$("$GH" api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
     --jq '.[] | select((.assignees | length) > 0 or any(.labels[]; .name == "question")) | "\(.number)\t\(if .pull_request then "pr" else "issue" end)\t\(.title)"')" \
     || die_state QUESTION_READ_FAILED "could not list open issues and PRs (network? auth?)"
-  local answered="" unanswered="" n kind title
+  local answered="" unanswered="" outside="" n kind title
   while IFS="$(printf '\t')" read -r n kind title; do
     [ -n "$n" ] || continue
     question_load "$n"
+    [ -z "$QOUTSIDE" ] || outside="$outside$(question_outside_notes "$n")
+"
     local k st to _src _asg tx
     while IFS="$(printf '\t')" read -r k st to _src _asg tx; do
       case "$st" in
@@ -1869,6 +1907,9 @@ EOF
   say "unanswered=$nu"
   printf '%s' "$answered"
   printf '%s' "$unanswered"
+  # Outside comments stay on the thread and out of the counts above: say so,
+  # so nobody reads their silence as the record missing a reply.
+  printf '%s' "$outside"
 }
 
 # ---------------------------------------------------------------- phase

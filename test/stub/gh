@@ -25,7 +25,8 @@
 #   GH_STUB_RULESETS      existing ruleset names, one per line (unset = none)
 #   GH_STUB_RULESET_FAIL  set = creating a ruleset fails with this text on stderr
 #   GH_STUB_QROWS / _<N>  question rows for item N's comments, as gnadd's qrow jq
-#                         emits them ('comment\tq\t1\tlogin\ttext', \n-separated)
+#                         emits them ('comment\tq\t1\tlogin\ttext', \n-separated;
+#                         an outside account's comment is 'comment\toutside\t<kind>\t<login>')
 #   GH_STUB_QBODY / _<N>  the same row for item N's body (unset = 'body\treply')
 #   GH_STUB_OPEN_ITEMS    open assigned items as 'num\tissue|pr\ttitle' rows
 #   GH_STUB_ASSIGN_IGNORED set = adding an assignee returns without them

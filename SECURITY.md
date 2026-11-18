@@ -35,3 +35,9 @@ runs in a linked worktree that has not been set up yet, it runs the
 `Worktree setup:` line from the AGENTS.md of the branch it just checked out,
 as a shell command, with no review step. Read that line on any branch you
 start, as you would read a build script.
+
+Questions on the record (`gnadd question`) count a question or an answer
+only from the repo's owner, members, and collaborators. A comment from any
+other account stays on the thread but is not counted, and `question list`
+names it, so a stranger's comment cannot pose or answer a question an agent
+will act on.
