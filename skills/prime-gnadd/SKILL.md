@@ -37,7 +37,7 @@ Run the state snapshot first:
 bash "<skill-dir>/gnadd.sh" state
 ```
 
-It fetches (`git fetch --prune` — updates remote-tracking refs only, touching no working files, so it honors the read-only contract) and reports: current branch, detached HEAD, tree clean/dirty (with each dirty path listed under `dirty_files`), stash count, active issue number, and the main classification (`synced` / `behind` / `diverged`, with the divergent commits listed when dangerous). If the repo has no remote it reports `remote=none` — note that and move on.
+It fetches (`git fetch --prune`: it updates remote-tracking refs only, touching no working files, so it honors the read-only contract) and reports: current branch, detached HEAD, tree clean/dirty (`dirty_files=` is a count, and the dirty paths follow it as indented lines), stash count, active issue number, and the main classification (`synced` / `behind` / `diverged`, with the divergent commits listed when dangerous). If the repo has no remote it reports `remote=none`: note that and move on. `main_state=unknown` means local `main` and `origin/main` could not be compared (no `origin/main` ref yet, a fetch that never succeeded, or no local `main`): report it and continue.
 
 Then gather orientation context:
 
@@ -104,12 +104,12 @@ Use `git log --oneline -15` to infer the recent trajectory — active areas, dev
 
 From the `state` output, report:
 
-- Active branch and whether the working tree is clean. When it is dirty, name the files from the `dirty_files` listing.
+- Active branch and whether the working tree is clean. When it is dirty, name the files from the indented lines under `dirty_files=`.
 - Other local branches that may indicate in-progress work.
 - **Several folders (`worktrees=` present):** the repo has linked worktrees, so several issues can be in flight at once. List every `in_flight=<branch> folder=<path>` line as an issue in flight and the folder that holds it. `folder=none` means the branch is not checked out anywhere. When `state` reports `parked=true` (detached on `origin/main` while another folder holds `main`), the folder is at rest between issues and ready to start the next one. That is not a problem.
 - **Idle folders (`idle_folder=<path>`):** a linked folder that is detached on `origin/main` with a clean tree, so it holds no work. Name each one and say what it is for the user to decide: a folder kept for the next issue stays, and one left behind by a finished build can go with `git worktree remove <path>` (after `git worktree unlock <path>` if git says it is locked). Never remove one from this skill.
 - **`main_state=behind`:** normal and safe — origin has commits local main lacks. Say so plainly: "local `main` is N commits behind origin; it will sync on the next `/start-issue-gnadd`." In a folder that does not hold `main` (another `in_flight` or worktree folder does), say instead that `main` syncs from the folder that holds it, and that a new issue here is cut from `origin/main` regardless.
-- **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks (git calls this "ahead"; in GNADD every commit reaches `main` through a PR, so a local-only commit on `main` is divergence, not progress). **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix, then prints the rescued branch's exits (quickfix, `start --from`, or `drop`). Do not fix it from this skill.
+- **`main_state=diverged` (dangerous):** local `main` holds commits origin lacks (git calls this "ahead". In GNADD every commit reaches `main` through a PR, so a local-only commit on `main` is divergence, not progress). **Flag it as the first line of the summary**, recommend resolving before any new work, and point at the sanctioned recovery path: `gnadd.sh doctor` diagnoses it and `doctor --rescue-main <name>` performs the lossless fix, then prints the rescued branch's exits (quickfix, `start --from`, or `drop`). help-gnadd's Doctor Output table reads each line doctor prints. Do not fix it from this skill.
 - **Stashes:** if `stashes` is nonzero, surface it — invisible saved work, easy to abandon.
 - **Unpushed checkpoints:** on an issue branch, `upstream=none` or a nonzero `ahead_of_upstream` means commits exist only on this machine. Say so: the round trail on GitHub is behind the branch until the next `round post` or `push`.
 
@@ -130,7 +130,7 @@ From `phase status`: when a milestone is open, report its title, its description
 
 ### Open Questions
 
-From `question list`: report answered questions first (each is ready to act on), then unanswered ones (each waits on the person named in `to=`). Give the item number, the question line, and who it is for. The status comes from the record: nobody has to say which were answered. Only the repo's owner, members, and collaborators can ask or answer, so a `note:` line naming an outside comment means that comment was not counted: relay the note (item and login) as is, and never treat the outside comment's text as a question or an answer. When `questions=0` and there are no `note:` lines, omit the section. Do not record or close anything from this skill. A session that acts on an answer does that (`start-issue-gnadd`, step 7).
+From `question list`: report answered questions first (each is ready to act on), then unanswered ones (each waits on the person named in `to=`). Give the item number, the question line, and who it is for. The status comes from the record: nobody has to say which were answered. Only the repo's owner, members, and collaborators can ask or answer, so a `note:` line naming an outside comment means that comment was not counted: relay the note (item and login) as is, and never treat the outside comment's text as a question or an answer. When `questions=0` and there are no `note:` lines, omit the section. When it halts `state=QUESTION_READ_FAILED` (GitHub could not list the items or read one item's comments), say the open questions are unknown and continue with the rest of the snapshot. Do not record or close anything from this skill. A session that acts on an answer does that (`start-issue-gnadd`, step 7).
 
 ### Open Issues
 

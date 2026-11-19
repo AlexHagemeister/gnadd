@@ -173,7 +173,8 @@ narrative:
 | Non-empty stash list | Warning | Invisible WIP outside issues/branches |
 | Branch `issue-<N>/*` with no open issue #N | Warning | Orphaned issue branch |
 | Open issue #N with no branch and no recent merged PR | Info | Issue may be unstarted |
-| Active WIP branch not matching `issue-<N>/<slug>` | Warning | Off-loop branch naming |
+| Active WIP branch matching none of `issue-<N>/<slug>`, `quickfix/<slug>` (both on-loop names), or `rescue/<desc>` (next row) | Warning | Off-loop branch naming |
+| Branch `rescue/<desc>` | Warning | A doctor rescue awaiting the user's decision: land it as an issue branch (`start --from`), or discard it (`drop`), as help-gnadd's Core Model describes |
 | Open PR with no issue reference in title/body | Warning | Weak issue linkage |
 | `phase status` reports more than one open milestone | Warning | The phase rule wants exactly one; the rest need a verdict |
 | `phase status` reports `phase=none` with open issues | Info | Work is not attached to a phase (fine for a small repo, worth naming on a GNADD-shaped one) |
@@ -211,8 +212,9 @@ Examples:
 - Diverged local `main` → "Resolve main divergence before starting new issue
   work — the sanctioned path is `gnadd.sh doctor --rescue-main <name>` (bundled
   with the `prime-gnadd` skill), which is lossless and never resets."
-- No branch ruleset / merge policy on the repo → "Run `gnadd.sh init` once to
-  enforce squash-only merges and PR-required main at the server."
+- No branch ruleset / merge policy on the repo → "Run `/init-gnadd` once to
+  enforce squash-only merges and PR-required main at the server, write the
+  conventions file, and land init's own files."
 
 Keep the fix set minimal — prefer the smallest change that restores alignment.
 
