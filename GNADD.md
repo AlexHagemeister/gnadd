@@ -240,7 +240,9 @@ issues before you enter the loop.
 ---
 ## Part 2: The Development Loop
 
-Every piece of work moves through the same five commands.
+Every piece of work moves through the same five commands. With several issues
+in flight, each one moves through them in its own folder (see "Two issues at
+once" below).
 
 ### 1. `/prime-gnadd`: start every session here
 
@@ -389,6 +391,125 @@ counted, with the item and the login, so the person can see it and decide
 what to do. The note on an outside reply goes once the questions it would
 have answered are closed.
 
+### Two issues at once: one worktree folder each
+
+Each issue in flight lives in its own folder, a linked git worktree. Run the
+loop in each folder as usual, one session per folder. This section says what
+the script does differently there, then what is not yet proven. Why it works
+this way is in Part 5, "The loop works inside worktrees before it creates
+them".
+
+**Who makes the folder.** You or your agent harness. GNADD never creates or
+removes a folder. For example, from the main checkout with `main` checked
+out:
+
+```
+git worktree add --detach ../myproject-2
+```
+
+`--detach` leaves the new folder on no branch, at the commit `main` points
+to, which is how the test suite makes its folders. Then open a session in `../myproject-2` and start an
+issue there.
+
+**What the script does differently in a linked folder:**
+
+- `start` and `quickfix start` cut the new branch from `origin/main` when
+  another folder holds `main`, and leave local `main` alone. The
+  diverged-main halt still applies.
+- After the merge, `sync-main` runs the same divergence check, then parks
+  the folder: a detached HEAD on `origin/main`, reported as `parked=true`.
+  Local `main` only moves in the folder that holds it.
+- `cleanup` then deletes the merged branch and leaves the folder in place,
+  ready for the next `start`.
+- When a command needs a branch that another folder holds, it halts with
+  `state=BRANCH_IN_WORKTREE` and names that folder in `worktree=`. Run the
+  command from there. If that folder is gone, the halt gives the
+  `git worktree prune` recipe.
+
+**Parked and idle folders.** Both words come from `state`. Run in a folder
+that is detached with no commits beyond `origin/main` while another folder
+holds `main`, it prints `parked=true` for that folder. This is where
+`sync-main` leaves a folder, and a fresh `--detach` folder reads the same.
+For each other linked folder that is detached with no commits beyond
+`origin/main`, has a clean tree, and is not mid-rebase or mid-bisect, it
+prints `idle_folder=<path>`. It never lists the primary checkout or the
+folder it runs in. `/prime-gnadd` names each idle folder with the command
+that removes it. A folder kept on purpose for the next issue is
+listed too, because the script cannot tell a keeper from a leftover. Whenever
+linked folders exist, `state` also prints `worktrees=N` and one
+`in_flight=<branch> folder=<path>` line per issue or quickfix branch, so
+`/prime-gnadd` in any folder lists every folder's work.
+
+**The `Worktree setup:` line.** A `Worktree setup: <command>` line in
+`AGENTS.md` (`/init-gnadd` offers to write it) says how to make a fresh
+folder runnable. `start` runs it once, the first time an issue starts in a
+fresh linked folder, and prints `setup=ran`. A failure halts with
+`state=SETUP_FAILED` before any code is written, and the next `start` in
+that folder retries it. `quickfix start` does not run it. With no line,
+nothing runs.
+
+**Known limits:**
+
+- **Carrying edits.** `--carry` works only on `main` and halts with
+  `NOT_ON_MAIN` anywhere else. A folder that does not hold `main` has no
+  scripted carry, so the skill halts rather than move uncommitted edits.
+- **Ports and test data.** The script does nothing to stop two folders from
+  using the same port or the same test data. PRs #119 and #120 left this out
+  of scope.
+- **Live GitHub.** PR #119 records that the two-folder run from `start` to
+  `cleanup` ran against the test suite's `gh` stub, not real GitHub. PR #121
+  and issue #126 record the same for the question commands.
+- **Seen once** (#126): a harness's worktree folder inside the primary
+  checkout made that checkout dirty, so `sync-main` halted until the folder
+  was ignored locally.
+
+### One agent orchestrating others
+
+On #115 to #117, one session handed issues to builder agents and diffs to
+reviewer agents, then decided what merged. That was one trial. GNADD has no
+orchestrator skill. Whether it needs one is open question 5 on
+[#118](https://github.com/AlexHagemeister/gnadd/issues/118), and whether
+GNADD should make folders itself is question 4. This section does not
+settle either.
+
+**What the script provides:**
+
+- **Questions on the record** (above). `question ask` posts a question on the
+  item it is about, and `question list` reads open questions from the
+  record, answered ones first. PR #121 records that these commands ran only
+  against a stub or a fake `gh`, never live GitHub.
+- **The trace.** Every script command except `trace` and `version` appends a line (time, command, exit
+  status, branch) to `gnadd-trace.log` in that folder's own git directory,
+  outside the tree. `gnadd trace show` prints it, and `gnadd trace note
+  <text>` adds a line for a step the script did not run.
+- **`state`.** From any folder it lists every branch in flight with its
+  folder and names the idle folders. Its `parked=` line is about the folder
+  it runs in.
+
+**The sequence tried on #115 to #117 (one trial, not a rule).** The
+maintainer approved the notes in words, as the agent recorded them in the
+[orchestration comment on #118](https://github.com/AlexHagemeister/gnadd/issues/118#issuecomment-6761326963):
+"Your notes on orchestration sound quite sensible. I approve." The same
+comment calls it a first trial and records the sequence as:
+
+1. The orchestrator read each PR writeup before any review, for intent and
+   scope: did the PR build what the issue asks, stay out of neighboring
+   issues, and not contradict a decision made elsewhere.
+2. A fresh reviewer got only the issue and the diff, with none of the
+   orchestrator's impressions.
+3. The orchestrator sorted the review findings: must fix, belongs to a later
+   issue, or collides with another builder's work.
+4. After the fixes, the orchestrator checked the evidence (test output, CI
+   status, files changed) before the merge decision.
+
+Also tried once, with no recorded quote: models split by role, the reviewer
+on the stronger model and builders on the cheaper one, a builder moving up
+only after its PR failed review twice. On that one build, the review records
+on PRs #119, #120, and #121 list each review round, and record that the
+maintainer delegated each merge decision to the orchestrating agent, with no
+human reading the diff.
+Friction seen once in that build is listed on #126.
+
 ---
 
 ## Part 3: Rules of the Road
@@ -526,13 +647,19 @@ when installed with `-g`.
 /prime-gnadd            → next session: your merged PR shows as shipped, pick the next issue
 ```
 
+With several issues in flight, each runs this lifecycle in its own worktree
+folder (Part 2, "Two issues at once: one worktree folder each").
+
 ### Branching and history model
 
 - Branches are named `issue-<N>/<slug>` and are short-lived. A trivial change
   uses `quickfix/<slug>` (init's own files land on `quickfix/gnadd-init`), and
   a doctor rescue may sit on `rescue/<desc>` until it is renamed or dropped. A
   worktree folder between issues is parked on `origin/main` as a detached
-  HEAD, on no branch at all.
+  HEAD, on no branch at all. One branch per issue still holds with several
+  issues in flight: each branch sits in its own folder, and git lets only
+  one folder hold it (Part 2, "Two issues at once: one worktree folder
+  each").
 - Main moves forward by **squash-merge**: each issue becomes exactly one commit on
   main. After `gnadd.sh init`, this is repo policy, not convention: merge commits
   and rebase-merges are disabled, and the PR body becomes the squash commit's
@@ -592,6 +719,11 @@ recoverable, not catastrophic:
   committing or pushing anything; from `main` it refuses outright.
 - **A diverged `main`, however it happened.** `prime-gnadd`, `start-issue-gnadd`, and `resolve-issue-gnadd`
   all detect it and stop; every pull onto `main` is fast-forward-only.
+- **Reaching for a branch another folder holds.** With issues in parallel
+  folders, a command that needs such a branch halts with
+  `BRANCH_IN_WORKTREE` and names the folder, rather than fail silently.
+  Port and test-data collisions between folders are not caught (Part 2,
+  "Two issues at once: one worktree folder each").
 
 Not catchable by skills: these live with you (though after `gnadd.sh init`,
 the server catches the worst versions):
