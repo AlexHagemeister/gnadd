@@ -116,7 +116,7 @@ The session above is one turn of a longer cycle. Each layer lives in one place, 
 Two pieces sit alongside the cycle:
 
 - **Questions on the record.** A question the agent cannot settle itself goes on the issue or PR it is about, as a comment with the options and a recommendation, and that item is assigned to the person who owns the call (`gnadd question ask`). `/prime-gnadd` lists open questions, answered ones first, so a new session knows what was decided without being told. See the guide's Part 2, "Questions on the record".
-- **Worktrees.** Every loop command works inside a linked git worktree, so several issues can be in flight at once, one folder each, if you open your sessions that way. GNADD never creates or removes a folder. The conventions file can name a `Worktree setup:` command that `start` runs once in a fresh folder. See the guide's Part 5, "The loop works inside worktrees before it creates them".
+- **Worktrees.** Every loop command works inside a linked git worktree, so several issues can be in flight at once, one folder each, if you open your sessions that way. GNADD never creates or removes a folder. The conventions file can name a `Worktree setup:` command that `start` runs once in a fresh folder. To run two issues at once, follow the guide's Part 2, "Two issues at once: one worktree folder each". For one agent handing work to others, see "One agent orchestrating others" right after it.
 
 ## The skills
 

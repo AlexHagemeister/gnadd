@@ -74,6 +74,11 @@ change skill names, script subcommands, or workflow behavior.
 
 ### Changed
 
+- The guide explains parallel work. Part 2 gains a section to follow for
+  running two issues in two worktree folders, with its known limits, and a
+  section on one agent orchestrating others: what the script provides and
+  the sequence tried once on #115 to #117. The README, the lifecycle, the
+  branching model, and the list of caught mistakes point at them (#128).
 - The docs and skills no longer make reading the diff the required human
   step before merge. The human owns the merge call and checks that the PR
   does what was meant, by whatever review they choose: the criteria table,
