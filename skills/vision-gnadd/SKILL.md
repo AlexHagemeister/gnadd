@@ -35,8 +35,9 @@ only after confirmation.
   gets built.
 - The user's words are the words. Reflect them back for confirmation. Never
   paraphrase silently.
-- The skill writes the file. It never opens a milestone or an issue. Those go
-  through the existing skills, and only on the user's yes.
+- The skill writes the file. It opens a milestone (the first phase) only on
+  the user's yes in step 6, and it never opens an issue: that goes through
+  `new-issue-gnadd`, also only on the user's yes.
 - For the shape, the admission test, and the rationale, read `GNADD.md`
   (section "The intent document: VISION.md"). It is not bundled with this
   skill. Read it from the repo root when working inside the GNADD repo, or
@@ -204,15 +205,24 @@ the open question above). The commit is the user's act.
 
 Ask two questions, one at a time, and act on neither without a yes:
 
-1. **Open the first phase?** If yes, ask what the phase is trying to find out
-   and what ends it, in the user's words, and run:
+1. **Open the first phase?** First check whether one is open:
+
+   ```bash
+   bash "<prime-gnadd skill-dir>/gnadd.sh" phase status
+   ```
+
+   Skip the question unless it prints `phase=none`. If the user says yes, ask
+   what the phase is trying to find out and what ends it, in the user's
+   words, and run:
 
    ```bash
    bash "<prime-gnadd skill-dir>/gnadd.sh" phase open "<title>" --description "<what it is trying to find out, and what ends it>"
    ```
 
-   (`prime-gnadd` bundles the script. This skill does not.) Skip the question
-   when a phase is already open.
+   (`prime-gnadd` bundles the script. This skill does not.) `opened=true`
+   means it exists. `state=PHASE_OPEN` means a phase opened in the meantime
+   (listed): say so and leave it. `state=PHASE_CREATE_FAILED` means GitHub
+   refused the milestone: report it, and the user can retry.
 
 2. **Capture the first issue?** If yes, hand off to `/new-issue-gnadd`. Its
    interview mines this conversation, cites the invariant the issue serves,

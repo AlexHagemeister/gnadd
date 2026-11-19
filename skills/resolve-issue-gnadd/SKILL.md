@@ -38,7 +38,7 @@ bash "<skill-dir>/gnadd.sh" state --no-fetch
 ```
 
 - If `issue=<N>`, that is the issue being resolved.
-- If on `main`, `master`, or detached HEAD, **stop**. Never run this flow from main: shipping from main would push unreviewed work straight to `origin/main`, bypassing the PR gate (the script refuses this too). List local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and switch to it — applying the same working-tree protection as `start-issue-gnadd` (never switch on a dirty tree without an explicit commit/stash/abort choice).
+- If on `main`, `master`, or detached HEAD, **stop**. Never run this flow from main: shipping from main would push unreviewed work straight to `origin/main`, bypassing the PR gate (the script refuses this too). List local issue branches (`git branch --list "issue-*"`), ask which one to resolve, and resume it with `bash "<skill-dir>/gnadd.sh" start <N> <slug>` (it protects the tree and knows about other folders). Its halts: `DIRTY_TREE` (the user picks commit, stash, or abort first, as in `start-issue-gnadd`), `BRANCH_IN_WORKTREE` (another folder, named in `worktree=`, holds the branch: resolve from that folder), `CHECKOUT_REFUSED` or `BRANCH_DIVERGED_FROM_REMOTE` (stop, the user decides), `SETUP_FAILED` (this folder's `Worktree setup:` command failed: fix the cause and rerun `start`).
 - If on some other non-issue branch, ask the user to confirm this branch holds the work to resolve. Only after explicit confirmation, use `--any-branch` in step 4; everything below still applies.
 
 ## 2. Verify Completeness
@@ -63,7 +63,7 @@ Then run the project's tests:
 bash "<skill-dir>/gnadd.sh" test
 ```
 
-It auto-detects the test command (npm/make/cargo/go/pytest). Report the result alongside the criteria assessment. `state=NO_TESTS` means nothing automated verified this work. Say so: the review before merge is then the only safeguard. A failing suite is a stop-and-discuss, not something to wave past.
+It auto-detects the test command (npm/make/cargo/go/pytest, or a `test/run.sh` runner). Report the result alongside the criteria assessment. `state=NO_TESTS` means nothing automated verified this work. Say so: the review before merge is then the only safeguard. A failing suite is a stop-and-discuss, not something to wave past.
 
 ## 3. Stage And Commit
 
@@ -101,7 +101,8 @@ bash "<skill-dir>/gnadd.sh" ship push
 Outcomes:
 
 - **`pr_exists=true` with `pr_number=<PR>`:** an open PR already exists for this branch — this is a **resume** (e.g. the PR was left open in a previous session). New commits are now pushed to it. Skip step 5 and go straight to the merge gate in step 6 with `<PR>`.
-- **`pr_exists=false`:** continue to step 5 to create the PR.
+- **`pr_exists=false` with no `pr_state=` line:** continue to step 5 to create the PR.
+- **`pr_exists=false` with `pr_state=MERGED` or `CLOSED`:** this branch already had a PR that is no longer open (`pr_number=` names it). Stop and ask the user before creating a new one.
 - **`state=NOTHING_TO_SHIP`:** no commits beyond `origin/main` — nothing to resolve; stop and say so.
 - **`state=ON_MAIN` / `NOT_ISSUE_BRANCH` / `DIRTY_TREE` / `DETACHED_HEAD`:** return to the step 1/3 conversations.
 - **`state=PUSH_FAILED`:** report; retry after the user checks network/auth.
@@ -114,7 +115,7 @@ The user's word that the work is done is the last round's feedback, and no later
 bash "<skill-dir>/gnadd.sh" round feedback --feedback "<the user's words that brought you here>"
 ```
 
-`state=FEEDBACK_RECORDED` means it is already there (skip). `state=NO_ROUNDS` means the branch never posted a round comment; say so and move on, the PR body is the record then.
+`state=FEEDBACK_RECORDED` means it is already there (skip). `state=NO_ROUNDS` means the branch never posted a round comment. Say so and move on, since the PR body is the record then. On a non-issue branch (an `--any-branch` run) skip this command: round comments live only on issues, and it halts `state=NOT_ISSUE_BRANCH`, so the PR body is the record. `state=COMMENT_FAILED` means the post failed (network or auth): re-run it once the user checks.
 
 Draft the PR and show it for approval **before** creating:
 
@@ -157,12 +158,13 @@ Report the PR URL and, on its own line, the direct link to the diff: `https://gi
 
 ## 6. Merge Only If Confirmed
 
-Surface the two signals, then ask whether to merge now or leave the PR open. Do not auto-merge. First run `bash "<skill-dir>/gnadd.sh" question list` and name any open question on this issue or PR, because a question on an item drops out of the list once the item closes (a merge with `Closes #<N>` closes the issue).
+Surface the two signals, then ask whether to merge now or leave the PR open. Do not auto-merge. First run `bash "<skill-dir>/gnadd.sh" question list` and name any open question on this issue or PR, because a question on an item drops out of the list once the item closes (a merge with `Closes #<N>` closes the issue). If it halts `state=QUESTION_READ_FAILED` (GitHub could not be read), say the open questions are unknown and continue.
 
 ```bash
 bash "<skill-dir>/gnadd.sh" ship status <PR>
 ```
 
+- **`state=PR_NOT_FOUND`:** no PR has that number. Recheck the number captured in step 5 (it is not the issue number).
 - **`mergeable=MERGEABLE`** — present the merge choice.
 - **`mergeable=CONFLICTING`** — **do not offer to merge.** `main` has moved and the PR conflicts. Hand resolution to the user: GitHub's web editor, or a deliberate local resolution they drive. The agent never resolves conflicts autonomously.
 - **`mergeable=UNKNOWN`** — GitHub is still computing; wait briefly and re-run.
@@ -180,7 +182,7 @@ bash "<skill-dir>/gnadd.sh" ship merge <PR>
 bash "<skill-dir>/gnadd.sh" sync-main
 ```
 
-`ship merge` squash-merges only when the PR is OPEN, MERGEABLE, and every reported check passed. It halts with `state=CHECKS_PENDING` (wait and re-run), `state=CHECK_FAILED` (stop and discuss), or `state=NO_CHECKS` (nothing automated ran; `--no-check` is the human's explicit acceptance). Never add `--no-check` on your own. `sync-main` returns to `main` and fast-forwards it — after a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. In a linked worktree whose `main` another folder holds, it reports `parked=true` instead: the folder now sits on `origin/main` as a detached HEAD, ready for the next issue, and `main` itself syncs from the folder that holds it. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` or user-managed resolution. Never reset, never merge without `--ff-only`.
+`ship merge` squash-merges only when the PR is OPEN, MERGEABLE, and every reported check passed. It halts with `state=CHECKS_PENDING` (wait and re-run), `state=CHECK_FAILED` (stop and discuss), or `state=NO_CHECKS` (nothing automated ran, and `--no-check` is the human's explicit acceptance). Never add `--no-check` on your own. Its other halts, all with nothing merged: `PR_NOT_FOUND` (wrong number), `PR_NOT_OPEN` (already merged or closed: say which, and go to step 7 only if it merged), `PR_CONFLICTING` (handled as `mergeable=CONFLICTING` above), `MERGEABILITY_UNKNOWN` (wait, re-run `ship status`), `MERGE_FAILED` (gh refused: report and stop). `sync-main` returns to `main` and fast-forwards it. After a merge, local main is normally just *behind* by the squash commit, which is the expected, safe state. In a linked worktree whose `main` another folder holds, it reports `parked=true` instead: the folder now sits on `origin/main` as a detached HEAD, ready for the next issue, and `main` itself syncs from the folder that holds it. If it reports `state=DIVERGED_MAIN` instead, **stop**: show the listed commits, and offer `gnadd.sh doctor --rescue-main <name>` (from the folder the note names, when it names one) or user-managed resolution. Never reset, never merge without `--ff-only`. Its other halts: `DIRTY_TREE` (uncommitted changes: the user picks commit, stash, or abort), `FF_REFUSED` (stop and report), `BRANCH_IN_WORKTREE` (`main` is held by a folder that is gone: `git worktree prune`, then re-run). With no remote it prints `synced=false` and there is nothing to sync.
 
 If the user leaves the PR open: stop here. Next session, `/resolve-issue-gnadd` on this branch resumes at the merge gate automatically (step 4 detects the open PR).
 
@@ -225,6 +227,8 @@ bash "<skill-dir>/gnadd.sh" cleanup <PR> issue-<N>/<slug>
 The script confirms via GitHub that the PR actually merged (`state=MERGED` with a real `mergedAt`) **before** force-deleting the branch — that check is what makes `-D` provably non-destructive after a squash-merge (safe `-d` always refuses, because squash commits are not ancestors of the branch). It then removes the remote branch if GitHub's auto-delete hasn't already, and reports `merge_commit=<hash>`.
 
 - **`state=NOT_MERGED`:** the PR didn't merge (left open, or merge failed) — the branch is **not** deleted. Stop and report.
+- **`state=PR_NOT_FOUND`:** no PR has that number. Nothing is deleted. Recheck the PR number.
+- **`state=ON_TARGET_BRANCH`:** this folder is still on the branch. Nothing is deleted. Run `sync-main`, then rerun cleanup.
 - **`state=BRANCH_MISMATCH`:** the branch named is not the merged PR's head, so the merge proves nothing about it. Nothing is deleted. Check which PR the branch belongs to and rerun with the matching pair.
 - **`state=UNMERGED_COMMITS`:** the branch has commits after the head GitHub merged. Nothing is deleted. Those commits never shipped: push them as a new PR, or the user drops them by hand. Never delete around this.
 - **`state=BRANCH_IN_WORKTREE`:** another folder has the branch checked out, and `worktree=` names it. Nothing is deleted. Run `sync-main` in that folder, then rerun cleanup. If the message says that folder is mid-rebase or mid-bisect, stop: the user finishes or aborts it there first. The folder itself stays: whoever made it removes it.
@@ -245,7 +249,9 @@ If a phase is open and `open_issues=0`, say so: the phase has no open issues lef
 bash "<skill-dir>/gnadd.sh" phase close "<title>" --verdict "<the user's verdict, as typed>"
 ```
 
-The next phase is opened only after this one closes, and only when the user asks for it (`phase open <title> --description <what it is trying to find out, and what ends it>`). If `phase=none`, skip this step silently.
+`state=PHASE_NOT_FOUND` means no open milestone has that title: rerun `phase status` and use its `phase=` value. `state=PHASE_CLOSE_FAILED` means GitHub refused the close: report it, the phase is still open.
+
+The next phase is opened only after this one closes, and only when the user asks for it (`phase open <title> --description <what it is trying to find out, and what ends it>`). `state=PHASE_OPEN` means one is still open (close it first), and `state=PHASE_CREATE_FAILED` means GitHub refused the milestone: report it. If `phase=none`, skip this step silently.
 
 ## Closing Guidance
 

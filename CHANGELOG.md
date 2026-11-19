@@ -116,6 +116,15 @@ change skill names, script subcommands, or workflow behavior.
   question, and one shared account works as before. An outside comment stays
   on the thread untouched, and `question list` (and a refused `question
   close`) names its item and login as not counted (#131).
+- The skills name every halt their own commands can reach, with a next
+  step, and no longer contradict the script. Among the fixes: a note on an
+  issue starts with `<!-- gnadd:note -->` so it is not read as an answer,
+  resolve skips `round feedback` on a non-issue branch, a merged or closed
+  PR on the branch stops for the user before a new one is made, a quickfix
+  the guard refuses moves to an issue with `start --from`, and init says to
+  run from the folder that holds `main`. `help-gnadd` gains a table for
+  `doctor`'s output and covers worktrees, rounds, questions, and phases,
+  and `start-issue-gnadd` owns the `drop` procedure (#129).
 - `cleanup <pr> <branch>` refuses to delete a branch the merged PR did not
   land: `BRANCH_MISMATCH` when the branch is not the PR's head (or GitHub
   returns none), `UNMERGED_COMMITS` when the local tip is past the merged

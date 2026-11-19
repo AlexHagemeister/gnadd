@@ -91,8 +91,12 @@ Derive `<slug>` from the change: short kebab-case (e.g. `readme-typo`).
   commits it holds are the change; go to step 3.
 
 - **Dirty tree elsewhere, or any `state=` halt** (`DIVERGED_MAIN`,
-  `QF_BRANCH_EXISTS`, `FF_REFUSED`, `BRANCH_IN_WORKTREE`): stop and resolve with the user;
+  `QF_BRANCH_EXISTS`, `FF_REFUSED`, `BRANCH_IN_WORKTREE`, `DIRTY_TREE`,
+  `NOT_ON_MAIN` from `--carry` off `main`): stop and resolve with the user.
   `gnadd.sh doctor` is the recovery path for bad states.
+
+`result=created` with `base=origin/main` means another folder holds `main`:
+the branch was cut from `origin/main` and local `main` was left alone.
 
 ## 3. Verify, Commit, Ship
 
@@ -102,8 +106,12 @@ Make the change if it isn't already in the tree, then run the project's tests:
 bash "<skill-dir>/gnadd.sh" test
 ```
 
-A failing suite stops the flow — a quickfix must not ship on red. Commit with
-a conventional message (no issue reference; there is no issue):
+A failing suite stops the flow: a quickfix must not ship on red.
+`state=NO_TESTS` (exit 0) means the project has no test command: tell the
+user nothing ran locally, and continue, since the CI gate in step 5 still
+applies. Commit with a conventional message (no issue reference, since there is
+no issue). `guard-commit` halting `DETACHED_HEAD` or `ON_MAIN` means you are not
+on the quickfix branch: stop and report.
 
 ```bash
 bash "<skill-dir>/gnadd.sh" guard-commit
@@ -119,10 +127,22 @@ bash "<skill-dir>/gnadd.sh" quickfix ship
 
 - **`state=TOO_BIG` or `state=PROTECTED_PATH`:** the change does not qualify.
   Tell the user exactly why, and route to the full loop: `/new-issue-gnadd`,
-  then `/start-issue-gnadd` — the work is safe on the current branch and can
-  be carried into that conversation.
-- **`pr_exists=true`:** an open PR already exists for this branch — resume at
+  then `/start-issue-gnadd`. The work is safe, committed on
+  `quickfix/<slug>`. Once the issue exists, `start <N> <slug> --from
+  quickfix/<slug>` renames the branch into the issue branch with its commits
+  (`--carry` cannot: it moves only uncommitted changes on `main`).
+- **`pr_exists=true`:** an open PR already exists for this branch. Resume at
   step 5 with that PR number.
+- **`pr_exists=false` with `pr_state=` set:** a merged or closed PR already
+  exists for this branch. Stop and ask the user before creating a new one.
+- **`state=QF_NOTHING_TO_GUARD` / `state=NOTHING_TO_SHIP`:** nothing beyond
+  `origin/main` to land. Check the change was committed on this branch.
+- **`state=DIRTY_TREE`:** uncommitted changes remain. Commit or ask, then
+  re-run.
+- **`state=NOT_QUICKFIX_BRANCH` / `state=DETACHED_HEAD`:** not on a
+  `quickfix/<slug>` branch. Stop and report.
+- **`state=PUSH_FAILED`:** the commit is safe and nothing was pushed. Report
+  it and stop. Never force.
 
 ## 4. Draft And Create The PR
 
@@ -160,7 +180,8 @@ bash "<skill-dir>/gnadd.sh" quickfix merge <PR>
 The default gate is the check named `test` (override:
 `--check <name>`, or `GNADD_QF_CHECK`). The guard's budget has its own
 overrides, `GNADD_QF_MAX_FILES` (default 3) and `GNADD_QF_MAX_LINES`
-(default 30), set in the environment of the `quickfix guard` call. Use one
+(default 30), set in the environment of the `quickfix ship` call (it runs
+the guard). Use one
 only on the user's explicit say-so, and state it in the PR footer (step 4).
 A newly added `VISION.md` is exempt from the line budget without any
 override. Handle halts:
@@ -171,6 +192,11 @@ override. Handle halts:
   (or nothing recognizable) verified this PR. Surface that to the user; only
   with their explicit go-ahead re-run with `--no-check` or `--check <name>`.
 - **`state=PR_CONFLICTING`:** hand resolution to the human, as always.
+- **`state=MERGEABILITY_UNKNOWN`:** GitHub has not computed mergeability yet.
+  Wait and re-run.
+- **`state=PR_NOT_FOUND` / `state=PR_NOT_OPEN` / `state=MERGE_FAILED`:** wrong
+  number, the PR is already merged or closed, or `gh pr merge` failed. Stop
+  and report.
 
 ## 6. Sync And Clean Up
 
@@ -179,7 +205,9 @@ bash "<skill-dir>/gnadd.sh" sync-main
 bash "<skill-dir>/gnadd.sh" cleanup <PR> quickfix/<slug>
 ```
 
-The script deletes only when GitHub confirms the PR merged, the branch is that PR's head, and nothing was committed after the merged head. `state=BRANCH_MISMATCH`, `state=UNMERGED_COMMITS`, or `state=DELETE_REFUSED` means nothing was deleted: stop and report which.
+In a linked worktree whose `main` another folder holds, `sync-main` reports `parked=true`: this folder now sits on `origin/main` as a detached HEAD, and `main` syncs from the folder that holds it. `sync-main` halting `DIVERGED_MAIN` means stop: show the listed commits and offer `gnadd.sh doctor --rescue-main <name>`. `FF_REFUSED`, `DIRTY_TREE`, or `BRANCH_IN_WORKTREE` means stop and report (relay the script's recipe for the last).
+
+The script deletes only when GitHub confirms the PR merged, the branch is that PR's head, and nothing was committed after the merged head. `state=BRANCH_MISMATCH`, `state=UNMERGED_COMMITS`, `state=DELETE_REFUSED`, `state=NOT_MERGED`, or `state=PR_NOT_FOUND` means nothing was deleted: stop and report which. `state=ON_TARGET_BRANCH` means `sync-main` did not move you off the branch: run it, then re-run cleanup. `state=BRANCH_IN_WORKTREE` means another folder holds the branch: relay the script's recipe.
 
 Report the merge commit hash — the one-command undo (`git revert <hash>`).
 

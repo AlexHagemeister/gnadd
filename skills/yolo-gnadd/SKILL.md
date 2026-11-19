@@ -84,14 +84,22 @@ clean.
 **Phase 1 — Start.** Load and follow `../start-issue-gnadd/SKILL.md`.
 Auto-approved gate: plan approval (adopt the proposed plan as-is). All of its
 step-2 conversations (dirty tree, diverged main, branch switches) remain hard
-stops — those need a human.
+stops: those need a human. Two more of its gates: on a resume whose last
+round has no feedback, skip the "Did you try it?" question and record
+nothing (YOLO never runs `round feedback`, see phase 2). A plan that refines
+or contradicts a criterion (its step 4) is a hard stop: the issue body
+changes only on the user's word.
 
 **Phase 2 — Implement.** Do the work per that plan and the issue's acceptance
 criteria. If evidence emerges that the spec is wrong or the scope moved, stop
 and escalate. Do not improvise scope autonomously. YOLO runs without rounds:
 there is no one to try a preview or give feedback, so start-issue's round loop
 (step 7) collapses to one pass, its preview step (7.3) is dropped, and each
-checkpoint's round comment is posted with `--no-feedback "yolo run"`.
+checkpoint's round comment is posted with `--no-feedback "yolo run"`. YOLO
+never runs `round feedback`, here or in phase 4, so that flag is always
+right. The one exception is feedback a human session already put on the
+record: then commit-gnadd's "already recorded means omit" applies and the
+first checkpoint passes no feedback flag.
 
 **Phase 3 — Commit.** Load and follow `../commit-gnadd/SKILL.md`.
 Auto-approved gate: staging confirmation (stage what the plan produced;
@@ -99,7 +107,8 @@ flagged-file warnings — credentials, logs, scratch files — remain hard stops
 
 **Phase 4 — Ship as draft.** Load and follow `../resolve-issue-gnadd/SKILL.md`
 through its verification, test, push, and PR-creation steps, stopping before
-its merge gate. Auto-approved gate: PR-draft approval. One overlay: create
+its merge gate. Skip its `round feedback` call: no user words brought the
+run there. Auto-approved gate: PR-draft approval. One overlay: create
 the PR as a **draft** — verification is not finished yet, and draft status
 makes a premature merge impossible. The creation body is a working summary;
 the complete record lands in phase 7's single write. Draft status may also
@@ -110,12 +119,18 @@ Any `state=` halt is a hard stop, as that skill specifies.
 **Phase 5 — CI gate.** Cheap signals before expensive ones: wait for the
 draft PR's checks with `gh pr checks <PR> --watch`, then read
 `gnadd.sh ship status <PR>` from the resolve-issue skill's directory.
-`checks=pass` → phase 6. `checks=failed` → fix within the self-repair budget:
-fix, re-run the project tests, re-push with `gnadd.sh ship push` from the
-resolve-issue skill's directory (the same push its push step ran in phase 4;
-it handles an existing PR), and wait for CI again. `checks=none` is a hard
+`checks=pass` → phase 6. `checks=pending` or `checks=not_started` → CI has
+not finished (or not reported yet). Wait with `gh pr checks <PR> --watch`
+and read `ship status` again. `checks=failed` → fix within the self-repair
+budget: fix, re-run the project tests, commit through phase 3 (so an issue
+fix gets its round comment), re-push, and wait for CI again. The re-push is
+`gnadd.sh ship push` from the resolve-issue skill's directory in the issue
+loop (the same push its push step ran in phase 4, which handles an existing PR).
+In quickfix mode it is `gnadd.sh quickfix ship` from the quickfix skill's
+directory, so the guard runs again on the grown diff, and a `TOO_BIG` or
+`PROTECTED_PATH` there is a hard stop. `checks=none` is a hard
 stop in YOLO: nothing automated verified the head, and `--no-check` is never
-YOLO's to add.
+YOLO's to add. `ship status` halting `PR_NOT_FOUND` is a hard stop.
 The merge in phase 7 re-runs this gate inside the script (`ship merge`
 refuses unless every check passed), so a wait skipped here halts there.
 Never spend review effort on a head CI has not validated.
@@ -126,7 +141,7 @@ mode the stated trivial-change description) and the diff (`gh pr diff`),
 never this session's reasoning. Use a subagent where the platform supports
 one; otherwise perform a deliberate self-review pass restricted to spec +
 diff, and say which mode ran. Triage findings: worthwhile → fix, re-test,
-re-push with the same `ship push` as phase 5, and CI must return green
+commit and re-push exactly as phase 5 does (`quickfix ship` in quickfix mode), and CI must return green
 (same budget); dismissed → record why. A test-shaped finding (a new test or
 assertion) counts only after it has been shown failing on the pre-fix head.
 A test that passes before the fix proves nothing, and a false-pass test (one
@@ -183,6 +198,9 @@ bash "<skill-dir>/gnadd.sh" question ask --to <login> --on <PR or issue> --quest
 ```
 
 The answer can then arrive in the thread while no session is running, and
-the next `/prime-gnadd` lists it as answered. Never work around a `state=` halt, never resolve conflicts
+the next `/prime-gnadd` lists it as answered. If `question ask` halts
+(start-issue-gnadd step 7 names each state), put the question and the halt
+in the closing report instead. `ASSIGN_FAILED` means the question is
+already posted: do not re-ask. Never work around a `state=` halt, never resolve conflicts
 autonomously, never `--no-check`, and never relax the guard or the protected
 paths — those decisions belong to the human in every mode, YOLO included.

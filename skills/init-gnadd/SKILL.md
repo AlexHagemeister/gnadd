@@ -53,6 +53,11 @@ If this fails, the repo has no GitHub remote gh can see. Stop and say so: the
 workflow assumes GitHub exists from minute one. Point at `gh repo create` and
 `git remote add origin`, and offer to rerun once the remote exists.
 
+Run the whole flow on `main`, from the folder that holds `main`: steps 2
+and 4 write files into the current folder, and step 5 lands them only from
+`main`. In a repo with linked worktrees, a folder parked or on another
+branch is the wrong place.
+
 ## 2. Turn On The Rails
 
 ```bash
@@ -122,6 +127,8 @@ The script creates `AGENTS.md` if absent,
 appends a marked GNADD block to an existing one without touching its other
 content, and on rerun changes only a preview or setup line that differs. Report the
 result from its output: `conventions=created`, `updated`, or `unchanged`.
+`state=NO_REPO` means this folder is not inside a git repository: stop and
+say so.
 
 If the project's agent reads a differently named file (`CLAUDE.md`), tell the
 user to import `AGENTS.md` from it rather than duplicating the block.
@@ -156,6 +163,23 @@ Local `main` is never touched. Handle the outcomes:
   `--no-check`. `state=CHECKS_PENDING` means wait and re-run.
   `state=CHECK_FAILED` is a stop: the project's test command failed on a
   clean checkout, and the user decides.
+
+  The other halts on this path follow resolve-issue-gnadd steps 6 and 8.
+  `ship merge`, with nothing merged: `PR_NOT_FOUND` (wrong number),
+  `PR_NOT_OPEN` (already merged or closed: say which), `PR_CONFLICTING`
+  (the user resolves it, never the agent), `MERGEABILITY_UNKNOWN` (wait and
+  re-run), `MERGE_FAILED` (report and stop). `sync-main`: `parked=true`
+  (another folder holds `main`: this folder rests on `origin/main`, which
+  is fine), `DIVERGED_MAIN` (point at `gnadd.sh doctor`), `DIRTY_TREE` (the
+  user picks commit, stash, or abort), `FF_REFUSED` (stop and report),
+  `BRANCH_IN_WORKTREE` (`main` is held by a folder that is gone:
+  `git worktree prune`, then re-run). `cleanup`, with nothing deleted:
+  `NOT_MERGED` or `PR_NOT_FOUND` (stop and report), `ON_TARGET_BRANCH`
+  (run `sync-main` first), `BRANCH_MISMATCH` (rerun with the PR and branch
+  that match), `UNMERGED_COMMITS` (the branch has commits after the merged
+  head: the user decides), `BRANCH_IN_WORKTREE` (run `sync-main` in the
+  folder named in `worktree=`, then re-run), `DELETE_REFUSED` (report what
+  git said).
 - **`landed=none`:** init's files are already on main (a rerun). Skip on.
 - **`state=INIT_LAND_FOREIGN_FILES`:** the tree holds changes that are not
   init's (listed). They take their own route (an issue, or a quickfix); ask
@@ -165,6 +189,17 @@ Local `main` is never touched. Handle the outcomes:
   it (merge, sync, cleanup) and re-run.
 - **`state=PR_CREATE_FAILED`:** the commit and push landed but the PR did
   not. Run `gh pr create` by hand, then continue from `ship merge`.
+- **`state=NOT_ON_MAIN`:** this folder is not on `main` (another branch, or
+  a linked folder that does not hold `main`), so steps 2 and 4 wrote their
+  files here. Stop and tell the user where they sit. Rerunning steps 2, 4,
+  and 5 from the folder that holds `main` is safe, and the copies left here
+  are the user's to remove.
+- **`state=PUSH_FAILED`:** the commit is made on `quickfix/gnadd-init` (this
+  folder is now on it) but the push failed, so a rerun of `init land` would
+  halt `NOT_ON_MAIN`. Once the user has checked network and auth, push from
+  that branch with `bash "<skill-dir>/gnadd.sh" ship push`, run
+  `gh pr create` by hand (skip it when `pr_exists=true`), and continue from
+  `ship merge`. Another `PUSH_FAILED` there is the same stop.
 
 ## 6. Report
 
