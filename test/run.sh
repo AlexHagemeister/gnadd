@@ -108,7 +108,8 @@ setup_repo() {
   unset GH_STUB_PR_STATE GH_STUB_PR_NUMBER GH_STUB_PR_URL \
         GH_STUB_MERGEABLE GH_STUB_MERGED_AT GH_STUB_MERGE_COMMIT \
         GH_STUB_CHECKS GH_STUB_FAIL GH_STUB_ROUND_COUNT \
-        GH_STUB_ROUND_BODIES GH_STUB_COMMENT_FILE GH_STUB_PHASES \
+        GH_STUB_ROUND_BODIES GH_STUB_ROUND_LAST GH_STUB_ROUND_READ_FAIL \
+        GH_STUB_COMMENT_FILE GH_STUB_PHASES \
         GH_STUB_PHASE_DESC GH_STUB_API_INPUT GH_STUB_RULESETS \
         GH_STUB_PR_HEAD GH_STUB_PR_HEAD_OID GH_STUB_RULESET_FAIL 2>/dev/null || true
   unset GH_STUB_QROWS GH_STUB_QROWS_5 GH_STUB_QROWS_6 GH_STUB_QROWS_7 GH_STUB_QBODY \
@@ -1883,7 +1884,7 @@ fi
 if t round_list_in_order; then setup_repo
 run start 10 rounds
 export GH_STUB_ROUND_COUNT=2
-export GH_STUB_ROUND_BODIES='<!-- gnadd:round -->\n## Round 1\n\n**Changed:** a\n<!-- gnadd:round -->\n## Round 2\n\n**Changed:** b'
+export GH_STUB_ROUND_BODIES='## Round 1\n\n**Changed:** a\n## Round 2\n\n**Changed:** b'
 run round list
 expect_status 0 "$ST"
 expect_contains "issue=10"
@@ -1991,7 +1992,7 @@ fi
 if t round_list_includes_feedback; then setup_repo
 run start 20 rounds
 export GH_STUB_ROUND_COUNT=1
-export GH_STUB_ROUND_BODIES='<!-- gnadd:round -->\n## Round 1\n\n**Changed:** a\n<!-- gnadd:feedback -->\n## Round 1 feedback\n\n> ship it'
+export GH_STUB_ROUND_BODIES='## Round 1\n\n**Changed:** a\n## Round 1 feedback\n\n> ship it'
 run round list
 expect_status 0 "$ST"
 expect_contains "rounds=1"
@@ -2003,6 +2004,68 @@ if t round_list_none; then setup_repo
 run round list 11
 expect_status 0 "$ST"
 expect_contains "rounds=0"
+fi
+
+# A failed comment read halts with a named state and posts nothing: counting
+# it as zero rounds would number the next round 1 (#137).
+if t round_post_halts_when_read_fails; then setup_repo
+run start 21 rounds
+echo a > a.txt && git_q add a.txt && git_q commit -m "slice one"
+export GH_STUB_ROUND_READ_FAIL=1
+run round post --changed "first slice" --feedback "ok"
+expect_status 2 "$ST"
+expect_contains "state=ROUND_READ_FAILED"
+expect_not_contains "posted=true"
+expect_gh_not_called "issue comment" "round posted despite a failed read"
+git ls-remote --exit-code --heads origin issue-21/rounds >/dev/null 2>&1 && fail "round post pushed despite a failed read" || ok
+fi
+
+if t round_feedback_halts_when_read_fails; then setup_repo
+run start 22 rounds
+export GH_STUB_ROUND_READ_FAIL=1
+run round feedback --feedback "nice"
+expect_status 2 "$ST"
+expect_contains "state=ROUND_READ_FAILED"
+expect_not_contains "posted=true"
+expect_gh_not_called "issue comment" "feedback posted despite a failed read"
+fi
+
+if t round_list_halts_when_read_fails; then setup_repo
+run start 23 rounds
+export GH_STUB_ROUND_READ_FAIL=1
+run round list
+expect_status 2 "$ST"
+expect_contains "state=ROUND_READ_FAILED"
+expect_not_contains "rounds="
+fi
+
+# The stub feeds classified kinds, so gnadd's rkind jq (which gh runs) is
+# checked here against comment JSON, with system jq standing in for gh's.
+# Only the owner, members, and collaborators count, never a bot, and only
+# when the marker is the whole first line (#137). Skipped where jq is absent.
+if t round_classifier_counts_only_trusted_first_line; then
+if command -v jq >/dev/null 2>&1; then
+  eval "$(sed -n "/^ROUND_JQ_DEF=/,/end;'\$/p" "$GNADD")"
+  JSON='[{"user":{"login":"own","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:round -->\n## Round 1"},
+    {"user":{"login":"eve","type":"User"},"author_association":"NONE","body":"<!-- gnadd:round -->\n## Round 2"},
+    {"user":{"login":"mem","type":"User"},"author_association":"MEMBER","body":"<!-- gnadd:feedback -->\r\n## Round 1 feedback"},
+    {"user":{"login":"col","type":"User"},"author_association":"COLLABORATOR","body":"<!-- gnadd:round -->\n## Round 2"},
+    {"user":{"login":"own","type":"User"},"author_association":"OWNER","body":"I saw <!-- gnadd:feedback --> in the log"},
+    {"user":{"login":"own","type":"User"},"author_association":"OWNER","body":"quoting:\n<!-- gnadd:round -->"},
+    {"user":{"login":"eve","type":"User"},"author_association":"CONTRIBUTOR","body":"<!-- gnadd:feedback -->\nlooks answered"},
+    {"user":{"login":"old","type":"User"},"body":"<!-- gnadd:feedback -->\nno association field"},
+    {"user":{"login":"helper[bot]","type":"Bot"},"author_association":"MEMBER","body":"<!-- gnadd:feedback -->\nbot"},
+    {"user":{"login":"own","type":"User"},"author_association":"OWNER","body":" <!-- gnadd:feedback -->\nleading space"}]'
+  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_JQ_DEF .[] | rkind | select(length > 0)" | tr '\n' '|')"
+  # Three trusted rounds-or-feedback, and the last counted one is a round:
+  # the planted feedback does not make the round look answered.
+  [ "$OUT" = "round|feedback|round|" ] && ok || fail "rkind counted the wrong comments: $OUT"
+  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_JQ_DEF .[] | select((rkind | length) > 0) | .body | split(\"\n\") | .[1:] | join(\"\n\")")"
+  expect_not_contains "gnadd:"
+  case "$OUT" in *"## Round 1"*"## Round 1 feedback"*"## Round 2"*) ok ;; *) fail "round list bodies wrong: $OUT" ;; esac
+else
+  ok; printf 'skip %s: jq not installed\n' "$CURRENT"
+fi
 fi
 
 # ---------------------------------------------------------------- question

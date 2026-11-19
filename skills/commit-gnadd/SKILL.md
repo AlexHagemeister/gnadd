@@ -137,7 +137,10 @@ Skip this step entirely when not on an issue branch (`issue=none`). On
 `state=PUSH_FAILED` the commit is safe and nothing was posted: origin has
 commits this branch lacks, or the network or auth failed. Report it and stop;
 never force. On `state=COMMENT_FAILED` the push landed and the commit is safe;
-report it and re-run `round post` when the user says so. `pushed=false` with
+report it and re-run `round post` when the user says so. On
+`state=ROUND_READ_FAILED` the issue's comments could not be read (network,
+auth), so nothing was pushed or posted and the commit is safe. Report it and
+re-run `round post` when the user says so. `pushed=false` with
 a note means the repo has no remote; the comment still posts.
 
 ## Closing Guidance
