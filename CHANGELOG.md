@@ -27,8 +27,8 @@ change skill names, script subcommands, or workflow behavior.
   chat answer on the thread, labeled as transcribed. `close --acted` says
   the answer was acted on, closes a question issue with its last open
   question, and removes the assignment only when asking added it. `list`
-  reads markers, never authors, so it works when agent and human share one
-  account. prime lists open questions, start-issue owns the procedure, and
+  reads markers to tell the agent's comments from a person's, so it works
+  when agent and human share one account. prime lists open questions, start-issue owns the procedure, and
   yolo posts its stopping question before the run ends (#117).
 - The loop works from inside a linked git worktree, one issue per folder.
   When another folder holds `main`, `start` and `quickfix start` branch
@@ -109,6 +109,13 @@ change skill names, script subcommands, or workflow behavior.
 
 ### Fixed
 
+- `gnadd question` counts a question marker, an answer, or a closing
+  comment only from the repo's owner, members, and collaborators (GitHub's
+  `author_association`), so anyone who can comment can no longer plant an
+  open question or answer a waiting one. Any trusted author can answer any
+  question, and one shared account works as before. An outside comment stays
+  on the thread untouched, and `question list` (and a refused `question
+  close`) names its item and login as not counted (#131).
 - `cleanup <pr> <branch>` refuses to delete a branch the merged PR did not
   land: `BRANCH_MISMATCH` when the branch is not the PR's head (or GitHub
   returns none), `UNMERGED_COMMITS` when the local tip is past the merged
