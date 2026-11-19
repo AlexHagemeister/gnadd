@@ -7,6 +7,8 @@ change skill names, script subcommands, or workflow behavior.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-18
+
 ### Added
 
 - `gnadd round feedback`: records the last round's feedback on the issue the
@@ -266,7 +268,8 @@ no published tags; this entry summarizes the project as first released.
   `help-gnadd`; `gnadd-audit` became `audit-gnadd`).
 - Author-local sync installs to both Cursor and Claude Code by default.
 
-[Unreleased]: https://github.com/AlexHagemeister/gnadd/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/AlexHagemeister/gnadd/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/AlexHagemeister/gnadd/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AlexHagemeister/gnadd/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AlexHagemeister/gnadd/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AlexHagemeister/gnadd/releases/tag/v0.3.0

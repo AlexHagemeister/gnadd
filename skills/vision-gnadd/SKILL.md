@@ -44,7 +44,7 @@ only after confirmation.
   fetch it from the pinned URL (pinned to a release by `scripts/release.sh`,
   never hand-edited):
 
-  https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.5.0/GNADD.md
+  https://raw.githubusercontent.com/AlexHagemeister/gnadd/v0.6.0/GNADD.md
 
   For workflow orientation, use `help-gnadd`.
 
