@@ -1432,6 +1432,26 @@ Quickfix: no issue; this PR is the record. Landed by \`gnadd init land\`." 2>/de
 ROUND_MARKER="<!-- gnadd:round -->"
 FEEDBACK_MARKER="<!-- gnadd:feedback -->"
 
+# Rounds take the trust rule questions use (#131): a comment counts only when
+# its marker is the whole first line, where the script writes it, and its
+# author is the owner, a member, or a collaborator and not a bot (a missing
+# author_association counts as outside). Otherwise anyone who can comment
+# could plant a round, shift the numbering, or make a round look answered
+# (#137). rkind gives "round", "feedback", or "" for a comment that does not
+# count.
+ROUND_JQ_DEF='def rkind: (((.body // "") | split("\n") | .[0]) // "" | rtrimstr("\r")) as $l
+  | (.author_association // "") as $as
+  | if ((.user.type // "") == "Bot") then ""
+    elif ($as == "OWNER" or $as == "MEMBER" or $as == "COLLABORATOR") | not then ""
+    elif $l == "<!-- gnadd:round -->" then "round"
+    elif $l == "<!-- gnadd:feedback -->" then "feedback"
+    else "" end;'
+# The two reads built on rkind: the counted kinds in order (round_load), and
+# the counted bodies with the marker line dropped (round list). Named so the
+# tests check the exact filters gh runs.
+ROUND_KINDS_JQ="$ROUND_JQ_DEF"' .[] | rkind | select(length > 0)'
+ROUND_BODIES_JQ="$ROUND_JQ_DEF"' .[] | select((rkind | length) > 0) | .body | split("\n") | .[1:] | join("\n")'
+
 round_issue_or_die() { # sets ISSUE_NUM from the branch; halts elsewhere
   local br; br="$(current_branch)"
   [ -n "$br" ] || die_state DETACHED_HEAD "round comments belong to an issue branch; detached HEAD has none"
@@ -1440,18 +1460,16 @@ round_issue_or_die() { # sets ISSUE_NUM from the branch; halts elsewhere
   ROUND_BRANCH="$br"
 }
 
-round_count() { # round_count <issue>: number of existing round comments
-  "$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
-    --jq "[.[] | select(.body | contains(\"$ROUND_MARKER\"))] | length" 2>/dev/null \
-    | awk '{s+=$1} END {print s+0}'
-}
-
-round_last_kind() { # round_last_kind <issue>: "round", "feedback", or "" (no trail)
-  # The latest marked comment tells whether the last round's feedback is on
+round_load() { # round_load <issue>: sets ROUND_N (rounds on the record) and ROUND_LAST ("round", "feedback", or ""), or halts
+  # The latest counted comment tells whether the last round's feedback is on
   # the record: a feedback comment means yes, a round comment means not yet.
-  "$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
-    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\") or contains(\"$FEEDBACK_MARKER\")) | .body | (if contains(\"$FEEDBACK_MARKER\") then \"feedback\" else \"round\" end)" 2>/dev/null \
-    | tail -n 1
+  # A failed read halts: counting it as zero would number the next round 1.
+  local kinds
+  kinds="$("$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
+    --jq "$ROUND_KINDS_JQ" 2>/dev/null)" \
+    || die_state ROUND_READ_FAILED "could not read the comments on #$1 (network? auth? no such issue?); nothing was posted"
+  ROUND_N="$(printf '%s\n' "$kinds" | awk '$0=="round"{n++} END {print n+0}')"
+  ROUND_LAST="$(printf '%s\n' "$kinds" | awk 'NF{k=$0} END {print k}')"
 }
 
 read_feedback_args() { # read_feedback_args <args...>: sets feedback / feedback_file / no_feedback / have_fb / rest
@@ -1484,9 +1502,9 @@ cmd_round_post() {
   # Feedback for a round lives in exactly one comment. If the last round's
   # feedback is already on the record (round feedback), this checkpoint must
   # not carry it again; otherwise it must carry it, or say why there is none.
-  local n; n="$(round_count "$ISSUE_NUM")"
-  local recorded=0
-  [ "$n" -gt 0 ] && [ "$(round_last_kind "$ISSUE_NUM")" = "feedback" ] && recorded=1
+  round_load "$ISSUE_NUM"
+  local n="$ROUND_N" recorded=0
+  [ "$n" -gt 0 ] && [ "$ROUND_LAST" = "feedback" ] && recorded=1
   if [ "$recorded" -eq 1 ]; then
     [ "$have_fb" -eq 0 ] || usage_die "round $n's feedback is already on the record (round feedback); drop --feedback/--feedback-file/--no-feedback, it lives in one comment"
   else
@@ -1545,9 +1563,10 @@ cmd_round_feedback() {
   if [ -z "$no_feedback" ] && [ -z "$feedback" ]; then
     usage_die "feedback text is empty; pass the user's words as typed, or --no-feedback <reason> to record that there were none"
   fi
-  local n; n="$(round_count "$ISSUE_NUM")"
+  round_load "$ISSUE_NUM"
+  local n="$ROUND_N"
   [ "$n" -gt 0 ] || die_state NO_ROUNDS "issue #$ISSUE_NUM has no round comment yet; feedback answers a round, post one first (commit-gnadd)"
-  [ "$(round_last_kind "$ISSUE_NUM")" != "feedback" ] || die_state FEEDBACK_RECORDED "round $n's feedback is already on the record; a new round comes first, then its feedback"
+  [ "$ROUND_LAST" != "feedback" ] || die_state FEEDBACK_RECORDED "round $n's feedback is already on the record; a new round comes first, then its feedback"
   local body; body="$(mktemp)"
   {
     printf '%s\n' "$FEEDBACK_MARKER"
@@ -1575,13 +1594,18 @@ cmd_round_list() {
     round_issue_or_die
     issue="$ISSUE_NUM"
   fi
-  local n; n="$(round_count "$issue")"
+  round_load "$issue"
+  local n="$ROUND_N" bodies
+  # The second read can fail too, so it halts before anything is printed.
+  if [ "$n" -gt 0 ]; then
+    bodies="$("$GH" api "repos/{owner}/{repo}/issues/$issue/comments" --paginate \
+      --jq "$ROUND_BODIES_JQ" 2>/dev/null)" \
+      || die_state ROUND_READ_FAILED "could not read the comments on #$issue (network? auth? no such issue?)"
+  fi
   say "issue=$issue"
   say "rounds=$n"
   [ "$n" -gt 0 ] || return 0
-  "$GH" api "repos/{owner}/{repo}/issues/$issue/comments" --paginate \
-    --jq ".[] | select(.body | contains(\"$ROUND_MARKER\") or contains(\"$FEEDBACK_MARKER\")) | .body" \
-    | grep -v -F -e "$ROUND_MARKER" -e "$FEEDBACK_MARKER" | sed 's/^/  /'
+  printf '%s\n' "$bodies" | sed 's/^/  /'
 }
 
 # ---------------------------------------------------------------- question

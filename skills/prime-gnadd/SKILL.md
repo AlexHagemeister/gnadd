@@ -149,7 +149,7 @@ Summarize the last ~10 merged PRs. Highlight momentum, not every detail. Apply t
 
 ### Active Issue
 
-Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desired outcome, and subtasks, then the last round from `round list`: its number, what changed, and its feedback in the user's words as the comment has them. A round's feedback is its own "Round N feedback" comment or the block in round N+1. When the last round has neither, say "no feedback on the record yet", which is not "the user had no opinion"; `start-issue-gnadd` asks. When `rounds=0`, say the branch has no round trail. Do not fetch referenced issues or artifacts automatically.
+Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desired outcome, and subtasks, then the last round from `round list`: its number, what changed, and its feedback in the user's words as the comment has them. A round's feedback is its own "Round N feedback" comment or the block in round N+1. When the last round has neither, say "no feedback on the record yet", which is not "the user had no opinion"; `start-issue-gnadd` asks. When `rounds=0`, say the branch has no round trail. When it halts `state=ROUND_READ_FAILED` (GitHub could not read the issue's comments), say the round trail is unknown, never that there is none, and continue with the rest of the snapshot. Do not fetch referenced issues or artifacts automatically.
 
 ## Output Format
 

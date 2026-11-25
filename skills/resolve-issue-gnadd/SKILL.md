@@ -115,7 +115,7 @@ The user's word that the work is done is the last round's feedback, and no later
 bash "<skill-dir>/gnadd.sh" round feedback --feedback "<the user's words that brought you here>"
 ```
 
-`state=FEEDBACK_RECORDED` means it is already there (skip). `state=NO_ROUNDS` means the branch never posted a round comment. Say so and move on, since the PR body is the record then. On a non-issue branch (an `--any-branch` run) skip this command: round comments live only on issues, and it halts `state=NOT_ISSUE_BRANCH`, so the PR body is the record. `state=COMMENT_FAILED` means the post failed (network or auth): re-run it once the user checks.
+`state=FEEDBACK_RECORDED` means it is already there (skip). `state=NO_ROUNDS` means the branch never posted a round comment. Say so and move on, since the PR body is the record then. On a non-issue branch (an `--any-branch` run) skip this command: round comments live only on issues, and it halts `state=NOT_ISSUE_BRANCH`, so the PR body is the record. `state=COMMENT_FAILED` means the post failed (network or auth): re-run it once the user checks. `state=ROUND_READ_FAILED` means the issue's comments could not be read and nothing posted: re-run it once the user checks, before the PR.
 
 Draft the PR and show it for approval **before** creating:
 
