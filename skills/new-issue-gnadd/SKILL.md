@@ -209,11 +209,16 @@ After approval and creation confirmation, create the issue via `gh`.
   ```bash
    gh issue create --title "<title>" --body "<body>" --label "<label>" [--milestone "<phase title>"] [--blocked-by <N,...>] [--blocking <N,...>] [--parent <N>]
   ```
-   If gh rejects a link flag (an unknown flag means gh is too old), no issue was created. Tell the user to update gh, or offer to create it without the links and without any body text that names them.
+   If the call fails, never just run it again. gh creates the issue first and adds the links after, so a failed link (a mistyped or deleted number) can leave the issue created with some links or none, and no URL printed. Look for it first:
+  ```bash
+   gh issue list --state open --search "<title> in:title" --json number,title
+  ```
+   If it exists, add the missing links to it (`gh issue edit <N> --add-blocked-by <N,...> --add-blocking <N,...> --parent <N>`), or remove the body text that names a link that cannot be made. If it does not exist and gh rejected a link flag as unknown, gh is too old: tell the user to update gh, or offer to create it without the links and without any body text that names them.
 4. When links were confirmed, read them back and report them:
   ```bash
    gh issue view <N> --json blockedBy,blocking,parent --jq '{blocked_by: [.blockedBy.nodes[].number], blocking: [.blocking.nodes[].number], parent: .parent.number}'
   ```
+   When a confirmed link is missing from the read-back, add it with `gh issue edit` as above and read back again.
 
 Use the current repository unless the user specifies another repo.
 

@@ -127,7 +127,7 @@ Two pieces sit alongside the cycle:
 | `init-gnadd` | `/init-gnadd` | Once per repo: turns on the server-side rails and writes the conventions file with the preview launch line. Safe to rerun |
 | `vision-gnadd` | `/vision-gnadd` | Writes or revises `VISION.md` through an interview, in your words |
 | `prime-gnadd` | `/prime-gnadd` | Start of every session: fetches from GitHub and reports project shape, branch state, phase, open issues, PRs, and warnings |
-| `new-issue-gnadd` | `/new-issue-gnadd` | Interviews you into a behavioral issue with acceptance criteria, attached to the open phase and linked to the issues it depends on |
+| `new-issue-gnadd` | `/new-issue-gnadd` | Interviews you into a behavioral issue with acceptance criteria, attached to the open phase and linked to the related issues you confirm |
 | `start-issue-gnadd` | `/start-issue-gnadd <N>` | Branches off `main`, loads the spec, proposes a plan, then runs the build, try, feedback rounds |
 | `commit-gnadd` | `/commit-gnadd`, or "commit this" | Stages and commits a checkpoint, and posts the round comment on the issue |
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | Verifies the work against the criteria, runs tests, opens the PR, waits for your merge decision, cleans up |

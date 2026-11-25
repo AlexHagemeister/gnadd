@@ -74,7 +74,7 @@ then list with authors included:
 ```bash
 gh api user --jq .login
 gh issue list --state open --json number,title,author,labels,assignees,blockedBy,blocking,parent,subIssuesSummary --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))" + ([(if .assignees != [] then "assigned=\([.assignees[].login] | join(","))" else empty end), (if .blockedBy.totalCount > 0 then "blocked_by=\([.blockedBy.nodes[] | "#\(.number):\(.state | ascii_downcase)"] | join(","))" else empty end), (if .blocking.totalCount > 0 then "blocking=\([.blocking.nodes[] | "#\(.number)"] | join(","))" else empty end), (if .parent then "parent=#\(.parent.number)" else empty end), (if .subIssuesSummary.total > 0 then "sub_issues=\(.subIssuesSummary.completed)/\(.subIssuesSummary.total)" else empty end)] | if . == [] then "" else "\t" + join(" ") end)'
-gh pr list --state open --json number,title,author,isDraft,closingIssuesReferences --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)" + (if .closingIssuesReferences != [] then "\tcloses=\([.closingIssuesReferences[] | "#\(.number)"] | join(","))" else "" end)'
+gh pr list --state open --json number,title,author,isDraft,closingIssuesReferences --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)" + (if (.closingIssuesReferences // []) != [] then "\tcloses=\([.closingIssuesReferences[] | "#\(.number)"] | join(","))" else "" end)'
 gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
 bash "<skill-dir>/gnadd.sh" phase status
 bash "<skill-dir>/gnadd.sh" question list
@@ -82,7 +82,7 @@ bash "<skill-dir>/gnadd.sh" question list
 
 An issue line ends with a field only when the issue has something to show: `assigned=` (logins), `blocked_by=` (each blocker with its state, such as `#17:open`), `blocking=`, `parent=`, and `sub_issues=` (done/total). An open PR line ends with `closes=` when it will close issues. Relationships come from GitHub's links only, never from issue text.
 
-**If the issue listing fails with `Unknown JSON field`**, the installed gh is too old to read issue links. Rerun it with `--json number,title,author,labels,assignees` and the same `--jq`, so the list still shows with assignees. Say in Open Work that relationships were skipped because gh is too old (give `gh --version`) and that updating gh brings them back. Never present that list as having no relationships.
+**If either open listing fails**, gh or the server cannot read the link fields (`Unknown JSON field` means the installed gh is too old; an older GitHub Enterprise Server refuses them with its own error). Rerun the issue listing with `--json number,title,author,labels,assignees` and the open-PR listing with `--json number,title,author,isDraft`, each with the same `--jq`, so both lists still show. Say in Open Work (and In Flight, when the PR listing fell back) that relationships were skipped, give `gh --version`, and say that updating gh brings them back. Never present a fallback list as having no relationships.
 
 If `state` reported an active issue N (`issue=<N>`), also run both (the issue view prints a comment count, never the comments, so the round trail needs its own read):
 
@@ -218,7 +218,9 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 2. Open PR awaiting review → review or merge before starting new work.
 3. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
 4. On `issue-<N>/*`, clean → continue that issue's work.
-5. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue: no open blocker, unassigned or yours, and no open PR already closing it. Never suggest an issue with an open blocker without naming the blocker, or one assigned to someone else without naming who has it.
+5. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue: no open blocker, unassigned or yours, and no open PR already closing it.
 6. No open issues → `/new-issue-gnadd`.
+
+Whichever rule applies, never suggest an issue with an open blocker without naming the blocker, or one assigned to someone else without naming who has it.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.
