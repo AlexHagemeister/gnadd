@@ -2045,7 +2045,8 @@ fi
 # when the marker is the whole first line (#137). Skipped where jq is absent.
 if t round_classifier_counts_only_trusted_first_line; then
 if command -v jq >/dev/null 2>&1; then
-  eval "$(sed -n "/^ROUND_JQ_DEF=/,/end;'\$/p" "$GNADD")"
+  eval "$(sed -n -e "/^ROUND_JQ_DEF=/,/end;'\$/p" -e '/^ROUND_KINDS_JQ=/p' -e '/^ROUND_BODIES_JQ=/p' "$GNADD")"
+  [ -n "${ROUND_KINDS_JQ:-}" ] && [ -n "${ROUND_BODIES_JQ:-}" ] && ok || fail "could not read the round jq filters from gnadd"
   JSON='[{"user":{"login":"own","type":"User"},"author_association":"OWNER","body":"<!-- gnadd:round -->\n## Round 1"},
     {"user":{"login":"eve","type":"User"},"author_association":"NONE","body":"<!-- gnadd:round -->\n## Round 2"},
     {"user":{"login":"mem","type":"User"},"author_association":"MEMBER","body":"<!-- gnadd:feedback -->\r\n## Round 1 feedback"},
@@ -2056,12 +2057,16 @@ if command -v jq >/dev/null 2>&1; then
     {"user":{"login":"old","type":"User"},"body":"<!-- gnadd:feedback -->\nno association field"},
     {"user":{"login":"helper[bot]","type":"Bot"},"author_association":"MEMBER","body":"<!-- gnadd:feedback -->\nbot"},
     {"user":{"login":"own","type":"User"},"author_association":"OWNER","body":" <!-- gnadd:feedback -->\nleading space"}]'
-  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_JQ_DEF .[] | rkind | select(length > 0)" | tr '\n' '|')"
+  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_KINDS_JQ" | tr '\n' '|')"
   # Three trusted rounds-or-feedback, and the last counted one is a round:
   # the planted feedback does not make the round look answered.
   [ "$OUT" = "round|feedback|round|" ] && ok || fail "rkind counted the wrong comments: $OUT"
-  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_JQ_DEF .[] | select((rkind | length) > 0) | .body | split(\"\n\") | .[1:] | join(\"\n\")")"
+  OUT="$(printf '%s' "$JSON" | jq -r "$ROUND_BODIES_JQ")"
   expect_not_contains "gnadd:"
+  expect_not_contains "looks answered"
+  expect_not_contains "no association field"
+  expect_not_contains "bot"
+  expect_not_contains "leading space"
   case "$OUT" in *"## Round 1"*"## Round 1 feedback"*"## Round 2"*) ok ;; *) fail "round list bodies wrong: $OUT" ;; esac
 else
   ok; printf 'skip %s: jq not installed\n' "$CURRENT"

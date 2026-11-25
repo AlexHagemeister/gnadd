@@ -1446,6 +1446,11 @@ ROUND_JQ_DEF='def rkind: (((.body // "") | split("\n") | .[0]) // "" | rtrimstr(
     elif $l == "<!-- gnadd:round -->" then "round"
     elif $l == "<!-- gnadd:feedback -->" then "feedback"
     else "" end;'
+# The two reads built on rkind: the counted kinds in order (round_load), and
+# the counted bodies with the marker line dropped (round list). Named so the
+# tests check the exact filters gh runs.
+ROUND_KINDS_JQ="$ROUND_JQ_DEF"' .[] | rkind | select(length > 0)'
+ROUND_BODIES_JQ="$ROUND_JQ_DEF"' .[] | select((rkind | length) > 0) | .body | split("\n") | .[1:] | join("\n")'
 
 round_issue_or_die() { # sets ISSUE_NUM from the branch; halts elsewhere
   local br; br="$(current_branch)"
@@ -1461,7 +1466,7 @@ round_load() { # round_load <issue>: sets ROUND_N (rounds on the record) and ROU
   # A failed read halts: counting it as zero would number the next round 1.
   local kinds
   kinds="$("$GH" api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
-    --jq "$ROUND_JQ_DEF .[] | rkind | select(length > 0)" 2>/dev/null)" \
+    --jq "$ROUND_KINDS_JQ" 2>/dev/null)" \
     || die_state ROUND_READ_FAILED "could not read the comments on #$1 (network? auth? no such issue?); nothing was posted"
   ROUND_N="$(printf '%s\n' "$kinds" | awk '$0=="round"{n++} END {print n+0}')"
   ROUND_LAST="$(printf '%s\n' "$kinds" | awk 'NF{k=$0} END {print k}')"
@@ -1594,7 +1599,7 @@ cmd_round_list() {
   # The second read can fail too, so it halts before anything is printed.
   if [ "$n" -gt 0 ]; then
     bodies="$("$GH" api "repos/{owner}/{repo}/issues/$issue/comments" --paginate \
-      --jq "$ROUND_JQ_DEF .[] | select((rkind | length) > 0) | .body | split(\"\n\") | .[1:] | join(\"\n\")" 2>/dev/null)" \
+      --jq "$ROUND_BODIES_JQ" 2>/dev/null)" \
       || die_state ROUND_READ_FAILED "could not read the comments on #$issue (network? auth? no such issue?)"
   fi
   say "issue=$issue"
