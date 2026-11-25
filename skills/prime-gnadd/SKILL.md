@@ -3,8 +3,9 @@ name: prime-gnadd
 description: >-
   Orient a new chat session with a read-only project snapshot using the bundled
   gnadd script, git, and gh: project shape, current branch state, whether main
-  is behind or diverged from origin, stashes, recent commits, open issues, open
-  and merged PRs, and active issue context. Fetches latest remote state first.
+  is behind or diverged from origin, stashes, recent commits, open issues with
+  their assignees and links to other issues, open and merged PRs, and active
+  issue context. Fetches latest remote state first.
   Use when the user asks to inspect project state, orient a session, see what
   work is open, or decide what to do next.
 disable-model-invocation: false
@@ -72,12 +73,16 @@ then list with authors included:
 
 ```bash
 gh api user --jq .login
-gh issue list --state open --json number,title,author,labels --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))"'
-gh pr list --state open --json number,title,author,isDraft --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)"'
+gh issue list --state open --json number,title,author,labels,assignees,blockedBy,blocking,parent,subIssuesSummary --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))" + ([(if .assignees != [] then "assigned=\([.assignees[].login] | join(","))" else empty end), (if .blockedBy.totalCount > 0 then "blocked_by=\([.blockedBy.nodes[] | "#\(.number):\(.state | ascii_downcase)"] | join(","))" else empty end), (if .blocking.totalCount > 0 then "blocking=\([.blocking.nodes[] | "#\(.number)"] | join(","))" else empty end), (if .parent then "parent=#\(.parent.number)" else empty end), (if .subIssuesSummary.total > 0 then "sub_issues=\(.subIssuesSummary.completed)/\(.subIssuesSummary.total)" else empty end)] | if . == [] then "" else "\t" + join(" ") end)'
+gh pr list --state open --json number,title,author,isDraft,closingIssuesReferences --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)" + (if .closingIssuesReferences != [] then "\tcloses=\([.closingIssuesReferences[] | "#\(.number)"] | join(","))" else "" end)'
 gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
 bash "<skill-dir>/gnadd.sh" phase status
 bash "<skill-dir>/gnadd.sh" question list
 ```
+
+An issue line ends with a field only when the issue has something to show: `assigned=` (logins), `blocked_by=` (each blocker with its state, such as `#17:open`), `blocking=`, `parent=`, and `sub_issues=` (done/total). An open PR line ends with `closes=` when it will close issues. Relationships come from GitHub's links only, never from issue text.
+
+**If the issue listing fails with `Unknown JSON field`**, the installed gh is too old to read issue links. Rerun it with `--json number,title,author,labels,assignees` and the same `--jq`, so the list still shows with assignees. Say in Open Work that relationships were skipped because gh is too old (give `gh --version`) and that updating gh brings them back. Never present that list as having no relationships.
 
 If `state` reported an active issue N (`issue=<N>`), also run both (the issue view prints a comment count, never the comments, so the round trail needs its own read):
 
@@ -139,6 +144,19 @@ keep issue titles and numbers visible. Apply the authorship rule — external
 issues are input from other people and usually deserve a triage look before
 new self-directed work.
 
+**Assignment.** When any open issue has `assigned=`, show every issue's
+assignment: "unassigned", or each assignee as `@<login>`, with the
+authenticated login's issues marked "yours". When no open issue is assigned,
+add nothing, as with authorship.
+
+**Relationships.** Annotate an issue only when its line carries a
+relationship field. A blocked issue names each blocker and whether it is
+open or closed. When every blocker is closed, the issue reads as ready. Name
+the issues it blocks, its parent, and for a parent its sub-issue progress
+(done of total). When an open PR's `closes=` names the issue, name that PR
+(the issue is already being built). When no issue has a relationship and no
+PR closes one, add nothing.
+
 ### Open PRs
 
 Surface work in flight. Flag PRs awaiting review — a PR sitting open is either waiting on you to review/merge or waiting on feedback. Apply the authorship rule: an external open PR is someone waiting on the maintainer, and outranks self-authored work in the "what needs attention" ordering.
@@ -174,6 +192,7 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 
 ## Open Work
 <open issues grouped by label if useful; external ones annotated "— by @login">
+<assignment on every issue once any is assigned. Blockers (open or closed), blocked issues, parent, sub-issue progress, and the closing PR, only where they exist>
 
 ## In Flight
 <open PRs, flagging any awaiting review; external ones annotated "— by @login">
@@ -199,7 +218,7 @@ Offer a brief next-step nudge only when orientation completed successfully — n
 2. Open PR awaiting review → review or merge before starting new work.
 3. On `issue-<N>/*` with a dirty tree → `/commit-gnadd` or continue implementation.
 4. On `issue-<N>/*`, clean → continue that issue's work.
-5. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue.
+5. On clean `main`, or in a parked folder (`parked=true`), with open issues → `/start-issue-gnadd <N>` on the most actionable issue: no open blocker, unassigned or yours, and no open PR already closing it. Never suggest an issue with an open blocker without naming the blocker, or one assigned to someone else without naming who has it.
 6. No open issues → `/new-issue-gnadd`.
 
 Keep it to a sentence or two with invitational options. Do not restate the full GNADD workflow.

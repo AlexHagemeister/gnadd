@@ -255,6 +255,12 @@ attention:
 - A **stash warning**: you have invisible saved work; deal with it or it will be
   forgotten.
 - **PRs awaiting review**: someone's waiting on you.
+- **Who has each issue and how issues relate**: once any issue is assigned,
+  each one shows its assignee or "unassigned", and yours are marked. An issue
+  shows its blockers (open or closed), what it blocks, its parent or sub-issue
+  progress, and the open PR that will close it. These come from GitHub's own
+  links, never from issue text, and show only where they exist. gh too old to
+  read the links gets a note saying to update it.
 - **Open questions**: answered ones are ready to act on. Unanswered ones wait on
   the person named.
 - **Folders**, if you use linked worktrees: each issue in flight and the folder
@@ -270,7 +276,9 @@ Your only job: describe **what** should happen and **why**: observable behavior,
 not implementation. "Users can search and see results," not "build the search data
 layer." If you catch yourself dictating *how*, the skill will redirect you; let
 it. It will also flag when you're bundling several issues into one. Take the
-split. You approve the draft before anything is created.
+split. It suggests the few open issues most likely to block the new one, be
+blocked by it, or be its parent, and asks about each. The ones you confirm
+become GitHub links on the issue. You approve the draft before anything is created.
 
 ### 3. `/start-issue-gnadd <N>`: when you're ready to work
 
@@ -1120,6 +1128,29 @@ issue starts in a fresh linked worktree. A failure halts with
 folder retries it. `state` also prints `idle_folder=` for each other linked
 folder that is detached with no commits beyond `origin/main` and a clean tree,
 so a folder left behind by finished work does not sit unnoticed.
+
+### Issue relationships are GitHub links, never prose (2026-11, #138, #139)
+
+**Decision:** a dependency, a parent, or a sub-issue between issues is
+recorded only as GitHub's native link. `/new-issue-gnadd` suggests likely
+links from the open issues and records the ones the user confirms. Body text
+may explain a dependency, only on the waiting issue, and never stands in for
+the link. `/prime-gnadd` reads assignees and links from the issue list
+(`blockedBy`, `blocking`, `parent`, `subIssuesSummary`) and open PRs'
+closing references, and never parses prose. An issue with nothing to show
+prints exactly as before, so a solo repo's snapshot does not change. The
+listing stays in prime's skill text next to the other `gh` reads, not in
+`bin/gnadd`.
+
+**Why:** prose dependencies drift and no tool can see them (FixFinder #23
+had only the prose). The links are what GitHub shows on the issue page, and
+gh can read and write them. Requiring a newer gh is accepted: prime says so
+when gh is too old instead of showing a list that looks link-free.
+
+**Hypothesis, and what would revise it:** move the listing into `bin/gnadd`
+if its format needs fixing more than once or another skill needs the same
+read. Revisit the suggestion step in new-issue if users decline most of its
+suggestions.
 
 ### Skills deferred (not built speculatively)
 - **`update-issue`**: superseded (2026-09) by the round comment above. The
