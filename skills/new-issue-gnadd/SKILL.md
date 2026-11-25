@@ -62,6 +62,18 @@ Optional **Context** can be inferred from the repo or conversation; do not inter
 
 If `VISION.md` exists at the repo root, read its Core section and offer to cite the numbered invariant the issue serves ("Serves invariant 3: ...") in the Context section. One question, the user's call, never required. If the issue would fight an invariant, say so before drafting rather than after.
 
+### Relationships
+
+Once scope is settled, read the open issues and look for links the new issue should carry:
+
+```bash
+gh issue list --state open --json number,title,body
+```
+
+Suggest only the few strongest candidates, from three kinds: an open issue that blocks the new one, an open issue the new one would block, and a likely parent. Give each a one-line reason. Ask about each as its own interview question ("Link #12 as blocking this one? It builds the export this issue reads."), with a recommendation. Record only the ones the user confirms. When nothing fits, say so in one line and move on.
+
+A relationship lives only as a native GitHub link. Body text may explain a dependency (which part of the other issue matters, or what to use meanwhile), and only in the waiting issue's Context. Never write "depends on" or "blocked by" in the body without the matching link, and drop any such sentence when the user declines the link.
+
 ### Interview rules
 
 - **One question at a time.** Do not batch questions.
@@ -154,6 +166,7 @@ Before finalizing, show the user:
 ```markdown
 Title: <title>
 Label: <bug|enhancement|documentation|chore>
+Links: <only if confirmed: blocked by #N, blocking #N, parent #N>
 
 ## Problem / Motivation
 <observable problem or missing behavior>
@@ -192,16 +205,26 @@ After approval and creation confirmation, create the issue via `gh`.
   ```bash
    bash "<prime-gnadd skill-dir>/gnadd.sh" phase status
   ```
-3. Create the issue, with `--milestone "<phase title>"` when the user accepted the attach:
+3. Create the issue, with `--milestone "<phase title>"` when the user accepted the attach, and the confirmed links in the same call (comma-separated numbers):
   ```bash
-   gh issue create --title "<title>" --body "<body>" --label "<label>" [--milestone "<phase title>"]
+   gh issue create --title "<title>" --body "<body>" --label "<label>" [--milestone "<phase title>"] [--blocked-by <N,...>] [--blocking <N,...>] [--parent <N>]
   ```
+   If the call fails, never just run it again. gh creates the issue first and adds the links after, so a failed link (a mistyped or deleted number) can leave the issue created with some links or none, and no URL printed. Look for it first:
+  ```bash
+   gh issue list --state open --search "<title> in:title" --json number,title
+  ```
+   If it exists, add the missing links to it (`gh issue edit <N> --add-blocked-by <N,...> --add-blocking <N,...> --parent <N>`), or remove the body text that names a link that cannot be made. If it does not exist and gh rejected a link flag as unknown, gh is too old: tell the user to update gh, or offer to create it without the links and without any body text that names them.
+4. When links were confirmed, read them back and report them:
+  ```bash
+   gh issue view <N> --json blockedBy,blocking,parent --jq '{blocked_by: [.blockedBy.nodes[].number], blocking: [.blocking.nodes[].number], parent: .parent.number}'
+  ```
+   When a confirmed link is missing from the read-back, add it with `gh issue edit` as above and read back again.
 
 Use the current repository unless the user specifies another repo.
 
 ## Report Back
 
-Confirm with the issue number and URL.
+Confirm with the issue number and URL, and any links as read back.
 
 ## Closing Guidance
 

@@ -7,6 +7,18 @@ change skill names, script subcommands, or workflow behavior.
 
 ## [Unreleased]
 
+### Added
+
+- prime shows who each open issue is assigned to once any issue is
+  assigned, and marks the user's own (#138). It shows each issue's links:
+  its open blockers (a closed blocker drops off, as GitHub stops counting
+  it), the issues it blocks, its parent, sub-issue progress, and the open PR
+  that will close it. It reads only GitHub's links, never issue text, and
+  says so when gh is too old to read them. Its next-step suggestion steers to
+  issues that are unblocked and free, or names the blocker or assignee.
+  new-issue suggests likely blockers, blocked issues, and a parent from the
+  open issues, and records the confirmed ones as native links (#139).
+
 ### Fixed
 
 - `gnadd round` counts a round or feedback comment only from the repo's

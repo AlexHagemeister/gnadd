@@ -77,7 +77,7 @@ Two other common models, for contrast:
 
 **Starting a project.** Create the repo on GitHub, then run `/init-gnadd`. It turns on the server-side rules and writes a small conventions file (`AGENTS.md`) that tells any agent the repo runs GNADD and how to launch a preview of the app. Then run `/vision-gnadd`: talk through the idea and the agent writes `VISION.md` in your words, confirmed by you. It then offers to open the first phase, a GitHub milestone whose description says what this stretch of work is trying to find out and what ends it. Capture the first three or four issues with `/new-issue-gnadd`, and stop there. Issues are cheap to add later.
 
-**Every session after that.** Start with `/prime-gnadd`. It fetches from GitHub and reports where things stand: the branch you are on, the open phase, open issues, PRs in flight, what shipped recently, and any warning that needs sorting before new work. Then:
+**Every session after that.** Start with `/prime-gnadd`. It fetches from GitHub and reports where things stand: the branch you are on, the open phase, open issues (with who has each and what blocks it), PRs in flight, what shipped recently, and any warning that needs sorting before new work. Then:
 
 1. `/start-issue-gnadd <N>` branches off `main`, loads the issue as the working spec, and proposes a plan. You say go.
 2. The work runs in rounds. The agent builds a slice, checkpoints it with `/commit-gnadd`, and hands you a running preview to try. You try it and say what you think. That drives the next slice. Each checkpoint posts a comment on the issue with what changed and your feedback, so a branch that spans sessions picks up where it left off.
@@ -127,7 +127,7 @@ Two pieces sit alongside the cycle:
 | `init-gnadd` | `/init-gnadd` | Once per repo: turns on the server-side rails and writes the conventions file with the preview launch line. Safe to rerun |
 | `vision-gnadd` | `/vision-gnadd` | Writes or revises `VISION.md` through an interview, in your words |
 | `prime-gnadd` | `/prime-gnadd` | Start of every session: fetches from GitHub and reports project shape, branch state, phase, open issues, PRs, and warnings |
-| `new-issue-gnadd` | `/new-issue-gnadd` | Interviews you into a behavioral issue with acceptance criteria, attached to the open phase |
+| `new-issue-gnadd` | `/new-issue-gnadd` | Interviews you into a behavioral issue with acceptance criteria, attached to the open phase and linked to the related issues you confirm |
 | `start-issue-gnadd` | `/start-issue-gnadd <N>` | Branches off `main`, loads the spec, proposes a plan, then runs the build, try, feedback rounds |
 | `commit-gnadd` | `/commit-gnadd`, or "commit this" | Stages and commits a checkpoint, and posts the round comment on the issue |
 | `resolve-issue-gnadd` | `/resolve-issue-gnadd` | Verifies the work against the criteria, runs tests, opens the PR, waits for your merge decision, cleans up |
