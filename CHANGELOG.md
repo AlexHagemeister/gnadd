@@ -19,6 +19,18 @@ change skill names, script subcommands, or workflow behavior.
   new-issue suggests likely blockers, blocked issues, and a parent from the
   open issues, and records the confirmed ones as native links (#139).
 
+### Fixed
+
+- `gnadd round` counts a round or feedback comment only from the repo's
+  owner, members, and collaborators, never a bot, and only when its marker is
+  the comment's whole first line. Anyone who can comment can no longer plant
+  a round, shift the next round's number, or make a round look answered, and
+  a trusted comment that quotes a marker mid-body no longer counts. A failed
+  read of the issue's comments halts `round post`, `round feedback`, and
+  `round list` with `state=ROUND_READ_FAILED` and posts nothing, where it
+  used to count as zero rounds. Round comments already on issues keep
+  counting (#137).
+
 ## [0.6.0] - 2026-11-18
 
 ### Added

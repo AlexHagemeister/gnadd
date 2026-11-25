@@ -350,7 +350,9 @@ Every checkpoint commit on an issue branch leaves one comment on the issue:
 which round it closes, what changed, and the feedback from you that drove it,
 in your words as typed. `/commit-gnadd` posts it through the script, which
 pushes the branch first (so every checkpoint reaches GitHub) and numbers the
-round from the comments already on the issue, never from memory.
+round from the comments already on the issue, never from memory. Only round
+and feedback comments from the repo's owner, members, and collaborators
+count, the same rule questions use.
 Four things follow:
 
 - **The trail survives the squash.** Main keeps only the PR body, so the
@@ -1085,6 +1087,14 @@ real data.
 owning organization, which is not always write access. If an organization
 member without write access misuses the record, narrow the trusted set or
 check permissions directly.
+
+**Rounds take the same rule (2026-11, #137).** A round or feedback comment
+counts only from a trusted author who is not a bot, and only when its marker
+is the comment's whole first line, where the script writes it. Before this,
+anyone who could comment could plant a round, shift the numbering, or make a
+round look answered. A failed read of the comments now halts
+`ROUND_READ_FAILED` and posts nothing, where it used to count as zero rounds
+and number the next round 1. Comments the script already wrote keep counting.
 
 ### The loop works inside worktrees before it creates them (2026-11, #115)
 

@@ -14,9 +14,11 @@
 #   GH_STUB_CHECKS        tab-separated check rows, e.g. 'test\tpass\t1s\turl'
 #                         (\n for multiple rows; unset = "no checks reported")
 #   GH_STUB_FAIL          set = every command fails
-#   GH_STUB_ROUND_COUNT   existing round comments on an issue (unset = 0)
-#   GH_STUB_ROUND_BODIES  bodies for `round list` (\n-separated, printf %b)
-#   GH_STUB_ROUND_LAST    kind of the latest marked comment: round / feedback (unset = round)
+#   GH_STUB_ROUND_COUNT   counted round comments on an issue (unset = 0)
+#   GH_STUB_ROUND_BODIES  bodies for `round list`, marker line already dropped
+#                         as gnadd's jq does (\n-separated, printf %b)
+#   GH_STUB_ROUND_LAST    kind of the latest counted comment: round / feedback (unset = round)
+#   GH_STUB_ROUND_READ_FAIL set = reading an issue's comments fails (404)
 #   GH_STUB_COMMENT_FILE  where `issue comment --body-file` copies its body
 #   GH_STUB_PHASES        open milestones as tab rows 'num\ttitle\topen\tclosed\tdesc'
 #                         (\n for multiple rows; unset = none open)
@@ -168,13 +170,17 @@ case "$1" in
         [ "$method" = GET ] && printf '%b\n' "${GH_STUB_PHASE_DESC:-}"
         exit 0 ;;
     esac
-    # Issue comments: a count when the jq asks for length, bodies otherwise.
+    # Issue comments, as gnadd's rkind jq emits them: one kind per counted
+    # comment (GH_STUB_ROUND_COUNT rounds, then a feedback when
+    # GH_STUB_ROUND_LAST=feedback), or the counted bodies for `round list`.
     case "$2" in
       */issues/*/comments)
+        [ -n "${GH_STUB_ROUND_READ_FAIL:-}" ] && not_found
         case "$jq_expr" in
-          *length*)     printf '%s\n' "${GH_STUB_ROUND_COUNT:-0}" ;;
-          *if\ contains*) [ "${GH_STUB_ROUND_COUNT:-0}" -gt 0 ] && printf '%s\n' "${GH_STUB_ROUND_LAST:-round}" ;;
-          *)            [ -n "${GH_STUB_ROUND_BODIES:-}" ] && printf '%b\n' "$GH_STUB_ROUND_BODIES" ;;
+          *"| rkind | select"*)
+            i=0; while [ "$i" -lt "${GH_STUB_ROUND_COUNT:-0}" ]; do printf 'round\n'; i=$((i+1)); done
+            [ "${GH_STUB_ROUND_COUNT:-0}" -gt 0 ] && [ "${GH_STUB_ROUND_LAST:-round}" = feedback ] && printf 'feedback\n' ;;
+          *) [ -n "${GH_STUB_ROUND_BODIES:-}" ] && printf '%b\n' "$GH_STUB_ROUND_BODIES" ;;
         esac
         exit 0 ;;
     esac
