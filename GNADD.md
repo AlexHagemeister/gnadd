@@ -257,7 +257,7 @@ attention:
 - **PRs awaiting review**: someone's waiting on you.
 - **Who has each issue and how issues relate**: once any issue is assigned,
   each one shows its assignee or "unassigned", and yours are marked. An issue
-  shows its blockers (open or closed), what it blocks, its parent or sub-issue
+  shows its open blockers, what it blocks, its parent or sub-issue
   progress, and the open PR that will close it. These come from GitHub's own
   links, never from issue text, and show only where they exist. gh too old to
   read the links gets a note saying to update it.

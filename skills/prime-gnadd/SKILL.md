@@ -73,14 +73,14 @@ then list with authors included:
 
 ```bash
 gh api user --jq .login
-gh issue list --state open --json number,title,author,labels,assignees,blockedBy,blocking,parent,subIssuesSummary --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))" + ([(if .assignees != [] then "assigned=\([.assignees[].login] | join(","))" else empty end), (if .blockedBy.totalCount > 0 then "blocked_by=\([.blockedBy.nodes[] | "#\(.number):\(.state | ascii_downcase)"] | join(","))" else empty end), (if .blocking.totalCount > 0 then "blocking=\([.blocking.nodes[] | "#\(.number)"] | join(","))" else empty end), (if .parent then "parent=#\(.parent.number)" else empty end), (if .subIssuesSummary.total > 0 then "sub_issues=\(.subIssuesSummary.completed)/\(.subIssuesSummary.total)" else empty end)] | if . == [] then "" else "\t" + join(" ") end)'
+gh issue list --state open --json number,title,author,labels,assignees,blockedBy,blocking,parent,subIssuesSummary --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)\t\([.labels[].name] | join(","))" + ([(if .assignees != [] then "assigned=\([.assignees[].login] | join(","))" else empty end), ([.blockedBy.nodes[]? | select(.state == "OPEN") | "#\(.number)"] | if . != [] then "blocked_by=\(join(","))" else empty end), (if .blocking.totalCount > 0 then "blocking=\([.blocking.nodes[] | "#\(.number)"] | join(","))" else empty end), (if .parent then "parent=#\(.parent.number)" else empty end), (if .subIssuesSummary.total > 0 then "sub_issues=\(.subIssuesSummary.completed)/\(.subIssuesSummary.total)" else empty end)] | if . == [] then "" else "\t" + join(" ") end)'
 gh pr list --state open --json number,title,author,isDraft,closingIssuesReferences --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(if .isDraft then "draft" else "open" end)\t\(.title)" + (if (.closingIssuesReferences // []) != [] then "\tcloses=\([.closingIssuesReferences[] | "#\(.number)"] | join(","))" else "" end)'
 gh pr list --state merged --limit 10 --json number,title,author --jq '.[] | "#\(.number)\t\(.author.login // "ghost")\t\(.title)"'
 bash "<skill-dir>/gnadd.sh" phase status
 bash "<skill-dir>/gnadd.sh" question list
 ```
 
-An issue line ends with a field only when the issue has something to show: `assigned=` (logins), `blocked_by=` (each blocker with its state, such as `#17:open`), `blocking=`, `parent=`, and `sub_issues=` (done/total). An open PR line ends with `closes=` when it will close issues. Relationships come from GitHub's links only, never from issue text.
+An issue line ends with a field only when the issue has something to show: `assigned=` (logins), `blocked_by=` (open blockers only, such as `#17`: a closed blocker no longer blocks, so it is left out), `blocking=`, `parent=`, and `sub_issues=` (done/total). An open PR line ends with `closes=` when it will close issues. Relationships come from GitHub's links only, never from issue text.
 
 **If either open listing fails**, gh or the server cannot read the link fields (`Unknown JSON field` means the installed gh is too old; an older GitHub Enterprise Server refuses them with its own error). Rerun the issue listing with `--json number,title,author,labels,assignees` and the open-PR listing with `--json number,title,author,isDraft`, each with the same `--jq`, so both lists still show. Say in Open Work (and In Flight, when the PR listing fell back) that relationships were skipped, give `gh --version`, and say that updating gh brings them back. Never present a fallback list as having no relationships.
 
@@ -150,8 +150,9 @@ authenticated login's issues marked "yours". When no open issue is assigned,
 add nothing, as with authorship.
 
 **Relationships.** Annotate an issue only when its line carries a
-relationship field. A blocked issue names each blocker and whether it is
-open or closed. When every blocker is closed, the issue reads as ready. Name
+relationship field. A blocked issue names each open blocker. Closed blockers
+are left out, so an issue whose blockers have all closed shows none and reads
+as ready. Name
 the issues it blocks, its parent, and for a parent its sub-issue progress
 (done of total). When an open PR's `closes=` names the issue, name that PR
 (the issue is already being built). When no issue has a relationship and no
@@ -192,7 +193,7 @@ Only when on an `issue-<N>/<slug>` branch: summarize the issue's problem, desire
 
 ## Open Work
 <open issues grouped by label if useful; external ones annotated "— by @login">
-<assignment on every issue once any is assigned. Blockers (open or closed), blocked issues, parent, sub-issue progress, and the closing PR, only where they exist>
+<assignment on every issue once any is assigned. Open blockers, blocked issues, parent, sub-issue progress, and the closing PR, only where they exist>
 
 ## In Flight
 <open PRs, flagging any awaiting review; external ones annotated "— by @login">
